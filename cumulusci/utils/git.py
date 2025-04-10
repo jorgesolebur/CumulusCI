@@ -79,12 +79,12 @@ def parse_repo_url(url: str) -> Tuple[str, str, str]:
         raise ValueError(EMPTY_URL_MESSAGE)
 
     from urllib.parse import urlparse
-    
+
     formatted_url = f"ssh://{url}" if url.startswith("git") else url
     parse_result = urlparse(formatted_url)
-    
+
     host = parse_result.hostname
-    
+
     url_parts = re.split("/|@|:", parse_result.path.rstrip("/").lstrip("/"))
     url_parts = list(filter(None, url_parts))
 
@@ -94,8 +94,9 @@ def parse_repo_url(url: str) -> Tuple[str, str, str]:
 
     owner = parse_result._hostinfo[-1] if url.startswith("git") else url_parts[-2]
 
-    if 'azure' in host and owner == 'v3':
-        owner = url_parts[0] # Set organization as the owner.
+    if "azure" in host:
+        if owner == "v3" or parse_result.scheme == "https":
+            owner = url_parts[0]  # Set organization as the owner.
     # TODO: With azure url we have project value in url, need to include that in return.
-        
+
     return (owner, name, host)
