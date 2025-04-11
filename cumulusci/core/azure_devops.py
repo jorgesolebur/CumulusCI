@@ -1,6 +1,7 @@
 from azure.devops.connection import Connection
 from msrest.authentication import BasicAuthentication
 from azure.devops.exceptions import AzureDevOpsAuthenticationError
+from cumulusci.core.exceptions import ADOException
 
 import logging
 logger = logging.getLogger(__name__)
@@ -13,7 +14,7 @@ def validate_service(options: dict, keychain) -> dict:
     if services:
         hosts = [service.organization_url for service in services]
         if hosts.count(organization_url) > 1:
-            raise AzureDevOpsAuthenticationError(
+            raise ADOException(
                 f"More than one Azure Devops service configured for domain {organization_url}."
             )
     
@@ -24,7 +25,7 @@ def validate_service(options: dict, keychain) -> dict:
         base_url = core_client.config.base_url
         assert organization_url in base_url, f"https://{organization_url}"
     except AttributeError as e:
-        raise AzureDevOpsAuthenticationError(
+        raise ADOException(
             f"Authentication Error. ({str(e)})"
         )
     except Exception as e:

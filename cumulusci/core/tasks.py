@@ -402,3 +402,8 @@ class BaseSalesforceTask(BaseTask):
             return injected
         else:
             return sobject
+class BaseScmTask(BaseTask):
+    
+    def get_repo(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+    

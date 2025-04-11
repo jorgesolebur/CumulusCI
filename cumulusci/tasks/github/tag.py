@@ -1,6 +1,6 @@
-from cumulusci.tasks.base_scm_task import BaseScmTask
+from cumulusci.tasks.scm_task import ScmTask
 
-class CloneTag(BaseScmTask):
+class CloneTag(ScmTask):
     task_options = {  # TODO: should use `class Options instead`
         "src_tag": {
             "description": "The source tag to clone.  Ex: beta/1.0-Beta_2",

@@ -54,11 +54,16 @@ class ScmClass:
 runtime = CliRuntime(load_keychain=True)
 entry_class = ScmClass(runtime=runtime)
 
-BaseScmTask = type("BaseScmTask", (entry_class.scmKlass,), {})
+ScmTask = type("ScmTask", (entry_class.scmKlass,), {})
 
 
 def __init__(self, *args, **kwds):
-    super(BaseScmTask, self).__init__(*args, **kwds)
+    super(ScmTask, self).__init__(*args, **kwds)
 
 
-BaseScmTask.__init__ = __init__
+ScmTask.__init__ = __init__
+
+def get_base_scm(project_config, task_config):
+    base_task = ScmTask(project_config, task_config)
+    base_task._init_task()
+    return base_task

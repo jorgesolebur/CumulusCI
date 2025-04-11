@@ -1,9 +1,9 @@
 from datetime import datetime
 
 import cumulusci.core.github as scm
-from cumulusci.core.tasks import BaseTask
+from cumulusci.core.tasks import BaseScmTask
 
-class BaseGithubTask(BaseTask):
+class BaseGithubTask(BaseScmTask):
     def _init_task(self):
         super()._init_task()
         self.github_config = self.project_config.keychain.get_service("github")

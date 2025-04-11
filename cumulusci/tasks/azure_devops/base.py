@@ -1,9 +1,7 @@
-from datetime import datetime
+from cumulusci.core.tasks import BaseScmTask
+import cumulusci.core.azure_devops as scm
 
-from cumulusci.core.tasks import BaseTask
-import cumulusci.core.azure_devops as scm #import get_azure_api_for_repo
-
-class BaseAzureTask(BaseTask):
+class BaseAzureTask(BaseScmTask):
     def _init_task(self):
         super()._init_task()
 
