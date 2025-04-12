@@ -402,8 +402,23 @@ class BaseSalesforceTask(BaseTask):
             return injected
         else:
             return sobject
+
+
 class BaseScmTask(BaseTask):
-    
     def get_repo(self):
         raise NotImplementedError("Subclasses should provide their own implementation")
-    
+
+    def gather_release_notes(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def release_notes(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def parent_pr_notes(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def get_tag_by_name(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def create_tag(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")

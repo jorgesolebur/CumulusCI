@@ -25,7 +25,6 @@ from cumulusci.core.exceptions import (
     PackageUploadFailure,
     TaskOptionsError,
 )
-from cumulusci.core.github import get_version_id_from_tag
 from cumulusci.core.sfdx import convert_sfdx_source
 from cumulusci.core.utils import process_bool_arg
 from cumulusci.core.versions import PackageType, PackageVersionNumber, VersionTypeEnum
@@ -34,6 +33,7 @@ from cumulusci.salesforce_api.package_zip import (
     MetadataPackageZipBuilder,
 )
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
+from cumulusci.tasks.base_scm_task import get_base_scm
 from cumulusci.tasks.salesforce.BaseSalesforceApiTask import BaseSalesforceApiTask
 from cumulusci.tasks.salesforce.org_settings import build_settings_package
 from cumulusci.utils.git import split_repo_url
@@ -323,7 +323,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             if existing_package["ContainerOptions"] != package_config.package_type:
                 raise PackageUploadFailure(
                     f"Duplicate Package: {existing_package['ContainerOptions']} package with id "
-                    f"{ existing_package['Id']} has the same name ({package_config.package_name}) "
+                    f"{existing_package['Id']} has the same name ({package_config.package_name}) "
                     "for this namespace but has a different package type"
                 )
             package_id = existing_package["Id"]
@@ -495,8 +495,10 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             except GithubException:
                 # No release found
                 return ""
-            repo = self.project_config.get_repo()
-            spv_id = get_version_id_from_tag(repo, tag_name)
+
+            base_scm = get_base_scm(self.project_config, self.task_config)
+            # repo = self.project_config.get_repo()
+            spv_id = base_scm.get_version_id_from_tag(tag_name)
             self.logger.info(f"Resolved ancestor to version: {spv_id}")
             self.logger.info("")
 
