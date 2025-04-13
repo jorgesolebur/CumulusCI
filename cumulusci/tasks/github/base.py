@@ -30,7 +30,7 @@ class BaseGithubTask(BaseScmTask):
     def create_tag(self):
         src_tag_name = self.options["src_tag"]
         repo = self.get_repo()
-        src_tag = self.get_tag_by_name(repo, src_tag_name)
+        src_tag = scm.get_tag_by_name(repo, src_tag_name)
         tag = repo.create_tag(
             tag=self.options["tag"],
             message=f"Cloned from {src_tag_name}",
