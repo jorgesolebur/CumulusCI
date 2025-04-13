@@ -14,7 +14,7 @@ class BaseAzureTask(BaseScmTask):
 
     def create_tag(self):
         self.repo = self.azure_git_client.get_repository(
-            self.project_config.repo_name, self.project_config.repo_name
+            self.project_config.repo_name, self.project_config.repo_project_name
         )
 
         src_tag = scm.get_tag_by_name(

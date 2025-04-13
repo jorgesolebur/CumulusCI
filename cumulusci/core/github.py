@@ -109,7 +109,7 @@ def _determine_github_client(host: str, client_params: dict) -> GitHub:
 
 
 def get_github_api_for_repo(keychain, repo_url, session=None) -> GitHub:
-    owner, repo_name, host = parse_repo_url(repo_url)
+    owner, repo_name, host, _ = parse_repo_url(repo_url)
     gh: GitHub = _determine_github_client(
         host,
         {
@@ -189,7 +189,7 @@ def validate_service(options: dict, keychain) -> dict:
     server_domain = options.get("server_domain", None)
 
     gh = _determine_github_client(server_domain, {"token": token})
-    if type(gh) == GitHubEnterprise:
+    if isinstance(gh, GitHubEnterprise):  # flake8 error type(gh) == GitHubEnterprise:
         validate_gh_enterprise(server_domain, keychain)
     try:
         authed_user = gh.me()

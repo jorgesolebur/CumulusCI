@@ -58,22 +58,22 @@ def construct_release_branch_name(prefix: str, release_identifier: str) -> str:
 
 
 def split_repo_url(url: str) -> Tuple[str, str]:
-    owner, name, _ = parse_repo_url(url)
+    owner, name, _, _ = parse_repo_url(url)
     return (owner, name)
 
 
-def parse_repo_url(url: str) -> Tuple[str, str, str]:
-    """Parses a given Github URI into Owner, Repo Name, and Host
+def parse_repo_url(url: str) -> Tuple[str, str, str, str]:
+    """Parses a given Github URI into Owner, Repo Name, Host and Project (for Azure urls)
 
     Parameters
     ----------
     url: str
         A github URI. Examples: ["https://github.com/owner/repo/","https://github.com/owner/repo.git","git@github.com:owner/repo.git", "https://api.github.com/repos/owner/repo_name/"]
-
+        A Azure URI. Examples: ["https://user@dev.azure.com/[org|user]/project/_git/repo", "git@ssh.dev.azure.com:v3/[user|org]/project/repo"]
     Returns
     -------
-    Tuple: (str, str, str)
-        Returns (owner, name, host)
+    Tuple: (str, str, str, str)
+        Returns (owner, name, host, project)
     """
     if not url:
         raise ValueError(EMPTY_URL_MESSAGE)
@@ -92,11 +92,16 @@ def parse_repo_url(url: str) -> Tuple[str, str, str]:
     if name.endswith(".git"):
         name = name[:-4]
 
-    owner = parse_result._hostinfo[-1] if url.startswith("git") else url_parts[-2]
+    owner = (
+        parse_result._hostinfo[-1]
+        if url.startswith("git") and parse_result._hostinfo[-1] is not None
+        else url_parts[-2]
+    )
+    project = None
 
     if "azure" in host:
         if owner == "v3" or parse_result.scheme == "https":
             owner = url_parts[0]  # Set organization as the owner.
-    # TODO: With azure url we have project value in url, need to include that in return.
+        project = url_parts[1]
 
-    return (owner, name, host)
+    return (owner, name, host, project)
