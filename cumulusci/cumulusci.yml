@@ -367,6 +367,16 @@ tasks:
         options:
             source_branch: $project_config.repo_branch
         group: GitHub
+    scm_automerge_main:
+        description: Merges the latest commit on the main branch into all open feature branches
+        class_path: cumulusci.tasks.github.MergeBranch
+        group: SCM
+    scm_automerge_feature:
+        description: Merges the latest commit on a source branch to all child branches.
+        class_path: cumulusci.tasks.github.MergeBranch
+        options:
+            source_branch: $project_config.repo_branch
+        group: SCM
     github_copy_subtree:
         description: Copies one or more subtrees from the project repository for a given release to a target repository, with the option to include release notes.
         class_path: cumulusci.tasks.github.publish.PublishSubtree

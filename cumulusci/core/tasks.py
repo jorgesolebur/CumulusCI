@@ -422,3 +422,27 @@ class BaseScmTask(BaseTask):
 
     def create_tag(self):
         raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def get_branches(self):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def compare_commit_count(self, branch_name, commit):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def merge_commit_to_branch(self, branch_name, source, commit):
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def validate_branch(self, source_branch):
+        """Validates that the source branch exists in the repository"""
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def get_existing_prs(self, source_branch, branch_prefix):
+        """Returns the existing pull requests from the source branch
+        to other branches that are candidates for merging."""
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def create_pull_request():
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    def init_merge_repo_options():
+        raise NotImplementedError("Subclasses should provide their own implementation")

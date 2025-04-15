@@ -1,6 +1,11 @@
+import http.client
 from datetime import datetime
 
+import github3.exceptions
+from github3 import GitHubError
+
 import cumulusci.core.github as scm
+from cumulusci.core.exceptions import GithubApiNotFoundError
 from cumulusci.core.tasks import BaseScmTask
 from cumulusci.core.utils import process_bool_arg
 from cumulusci.tasks.release_notes.generator import (
@@ -18,6 +23,9 @@ class BaseGithubTask(BaseScmTask):
         self.github = scm.get_github_api_for_repo(
             self.project_config.keychain, self.project_config.repo_url
         )
+
+    def init_merge_repo_options():
+        pass
 
     def get_repo(self):
         return self.github.repository(
@@ -212,6 +220,68 @@ class BaseGithubTask(BaseScmTask):
         if pull_request_link not in body:
             body += "\r\n* " + pull_request_link
             to_update.update(body=body)
+
+    def get_branches(self):
+        return self.repo.branches()
+
+    def compare_commits(self, branch_name, commit):
+        return self.repo.compare_commits(branch_name, commit)
+
+    def compare_commit_count(self, branch_name, commit):
+        compare = self.compare_commits(branch_name, commit)
+        if not compare or not compare.files:
+            return None
+        return compare.behind_by
+
+    def merge_commit_to_branch(self, branch_name, source, commit, behind_by: None):
+        try:
+            self.repo.merge(branch_name, commit)
+            self.logger.info(f"Merged {behind_by} commits into branch: {branch_name}")
+        except GitHubError as e:
+            if e.code != http.client.CONFLICT:
+                raise
+
+            if self.options["create_pull_request_on_conflict"]:
+                self._create_conflict_pull_request(branch_name, source)
+            else:
+                self.logger.info(
+                    f"Merge conflict on branch {branch_name}: skipping pull request creation"
+                )
+
+    def validate_branch(self, branch):
+        """Validates that the source branch exists in the repository"""
+        try:
+            self.repo.branch(branch)
+        except github3.exceptions.NotFoundError:
+            message = f"Branch {branch} not found"
+            raise GithubApiNotFoundError(message)
+
+    def get_existing_prs(self, branch, branch_prefix):
+        """Returns the existing pull requests from the source branch
+        to other branches that are candidates for merging."""
+        existing_prs = []
+        for pr in self.repo.pull_requests(state="open"):
+            if pr.base.ref.startswith(branch_prefix) and pr.head.ref == branch:
+                existing_prs.append(pr.base.ref)
+        return existing_prs
+
+    def create_pull_request(self, branch_name, source):
+        """Attempt to create a pull request from source into branch_name if merge operation encounters a conflict"""
+        try:
+            pull = self.repo.create_pull(
+                title=f"Merge {source} into {branch_name}",
+                base=branch_name,
+                head=source,
+                body="This pull request was automatically generated because "
+                "an automated merge hit a merge conflict",
+            )
+            self.logger.info(
+                f"Merge conflict on branch {branch_name}: created pull request #{pull.number}"
+            )
+        except github3.exceptions.UnprocessableEntity as e:
+            self.logger.error(
+                f"Error creating merge conflict pull request to merge {source} into {branch_name}:\n{e.response.text}"
+            )
 
     # def get_version_id_from_tag(self, tag_name):
     #     self.logger.info(f"get_version_id_from_tag from Github module called for tag {tag_name}")

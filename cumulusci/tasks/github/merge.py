@@ -1,15 +1,9 @@
-import http.client
-
-import github3.exceptions
-from github3 import GitHubError
-
-from cumulusci.core.exceptions import GithubApiNotFoundError
 from cumulusci.core.utils import process_bool_arg
-from cumulusci.tasks.github.base import BaseGithubTask
+from cumulusci.tasks.scm_task import ScmTask
 from cumulusci.utils.git import is_release_branch
 
 
-class MergeBranch(BaseGithubTask):
+class MergeBranch(ScmTask):
     task_docs = """
     Merges the most recent commit on the current branch into other branches depending on the value of source_branch.
 
@@ -36,6 +30,12 @@ class MergeBranch(BaseGithubTask):
         },
         "create_pull_request_on_conflict": {
             "description": "If true, then create a pull request when a merge conflict arises. Defaults to True."
+        },
+        "retry_timeout": {
+            "description": "ADO Timeout to check PR merge status (default=100)"
+        },
+        "retry_interval": {
+            "description": "Number of seconds to wait before the next retry (default=10),"
         },
     }
 
@@ -68,12 +68,14 @@ class MergeBranch(BaseGithubTask):
                 self.options.get("create_pull_request_on_conflict")
             )
 
+        self.init_merge_repo_options()
+
     def _init_task(self):
         super()._init_task()
         self.repo = self.get_repo()
 
     def _run_task(self):
-        self._validate_source_branch(self.options["source_branch"])
+        self.validate_branch(self.options["source_branch"])
         branches_to_merge = self._get_branches_to_merge()
 
         for branch in branches_to_merge:
@@ -82,23 +84,6 @@ class MergeBranch(BaseGithubTask):
                 self.options["source_branch"],
                 self.options["commit"],
             )
-
-    def _validate_source_branch(self, source_branch):
-        """Validates that the source branch exists in the repository"""
-        try:
-            self.repo.branch(source_branch)
-        except github3.exceptions.NotFoundError:
-            message = f"Branch {source_branch} not found"
-            raise GithubApiNotFoundError(message)
-
-    def _get_existing_prs(self, source_branch, branch_prefix):
-        """Returns the existing pull requests from the source branch
-        to other branches that are candidates for merging."""
-        existing_prs = []
-        for pr in self.repo.pull_requests(state="open"):
-            if pr.base.ref.startswith(branch_prefix) and pr.head.ref == source_branch:
-                existing_prs.append(pr.base.ref)
-        return existing_prs
 
     def _get_branches_to_merge(self):
         """
@@ -115,7 +100,7 @@ class MergeBranch(BaseGithubTask):
         If update_future_releases is True, and source_branch is a release branch
         then we also collect all future release branches.
         """
-        repo_branches = list(self.repo.branches())
+        repo_branches = list(self.get_branches())
         next_release = self._get_next_release(repo_branches)
         skip_future_releases = self.options["skip_future_releases"]
         update_future_releases = self._update_future_releases(next_release)
@@ -240,30 +225,16 @@ class MergeBranch(BaseGithubTask):
 
     def _merge(self, branch_name, source, commit):
         """Attempt to merge a commit from source to branch with branch_name"""
-        compare = self.repo.compare_commits(branch_name, commit)
-        if not compare or not compare.files:
+        compare_commit_count = self.compare_commit_count(branch_name, commit)
+        if compare_commit_count is None or compare_commit_count < 1:
             self.logger.info(f"Skipping branch {branch_name}: no file diffs found")
             return
 
-        try:
-            self.repo.merge(branch_name, commit)
-            self.logger.info(
-                f"Merged {compare.behind_by} commits into branch: {branch_name}"
-            )
-        except GitHubError as e:
-            if e.code != http.client.CONFLICT:
-                raise
-
-            if self.options["create_pull_request_on_conflict"]:
-                self._create_conflict_pull_request(branch_name, source)
-            else:
-                self.logger.info(
-                    f"Merge conflict on branch {branch_name}: skipping pull request creation"
-                )
+        self.merge_commit_to_branch(branch_name, source, commit, compare_commit_count)
 
     def _create_conflict_pull_request(self, branch_name, source):
         """Attempt to create a pull request from source into branch_name if merge operation encounters a conflict"""
-        if branch_name in self._get_existing_prs(
+        if branch_name in self.get_existing_prs(
             self.options["source_branch"], self.options["branch_prefix"]
         ):
             self.logger.info(
@@ -271,21 +242,7 @@ class MergeBranch(BaseGithubTask):
             )
             return
 
-        try:
-            pull = self.repo.create_pull(
-                title=f"Merge {source} into {branch_name}",
-                base=branch_name,
-                head=source,
-                body="This pull request was automatically generated because "
-                "an automated merge hit a merge conflict",
-            )
-            self.logger.info(
-                f"Merge conflict on branch {branch_name}: created pull request #{pull.number}"
-            )
-        except github3.exceptions.UnprocessableEntity as e:
-            self.logger.error(
-                f"Error creating merge conflict pull request to merge {source} into {branch_name}:\n{e.response.text}"
-            )
+        self.create_pull_request(branch_name, source)
 
     def _is_source_branch_direct_descendent(self, branch_name):
         """Returns True if branch is a direct descendent of the source branch"""
