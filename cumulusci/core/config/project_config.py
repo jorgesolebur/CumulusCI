@@ -391,6 +391,20 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
             return split_repo_url(url_line)[0]
 
     @property
+    def repo_project_name(self) -> Optional[str]:
+        project = self.repo_info.get("project")
+        if project:
+            return project
+
+        if not self.repo_root:
+            return
+
+        url_line = self.git_config_remote_origin_url()
+
+        if url_line:
+            return parse_repo_url(url_line)[-1]
+
+    @property
     def repo_branch(self) -> Optional[str]:
         branch = self.repo_info.get("branch")
         if branch:

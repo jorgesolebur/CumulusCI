@@ -295,3 +295,14 @@ class PackageInstallError(Exception):
 
 class YAMLParseException(CumulusCIException):
     """Error parsing a YAML File"""
+
+
+class ADOException(CumulusCIException):
+    """ADO Exception"""
+
+
+class ADOApiError(CumulusCIException):
+    pass
+
+class ADOApiNotFoundError(CumulusCIException):
+    pass

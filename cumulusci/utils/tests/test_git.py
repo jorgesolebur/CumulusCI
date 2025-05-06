@@ -75,7 +75,31 @@ def test_construct_release_branch_name():
     ],
 )
 def test_parse_repo_url(repo_uri, owner, repo_name, host):
-    assert parse_repo_url(repo_uri) == (owner, repo_name, host)
+    assert parse_repo_url(repo_uri) == (owner, repo_name, host, None)
+    assert split_repo_url(repo_uri) == (owner, repo_name)
+
+
+@pytest.mark.parametrize(
+    "repo_uri,owner,repo_name,host,project",
+    [
+        (
+            "https://user@dev.azure.com/org/project/_git/repo/",
+            "org",
+            "repo",
+            "dev.azure.com",
+            "project",
+        ),
+        (
+            "git@ssh.dev.azure.com:v3/org/project/repo",
+            "org",
+            "repo",
+            "ssh.dev.azure.com",
+            "project",
+        ),
+    ],
+)
+def test_azure_parse_repo_url(repo_uri, owner, repo_name, host, project):
+    assert parse_repo_url(repo_uri) == (owner, repo_name, host, project)
     assert split_repo_url(repo_uri) == (owner, repo_name)
 
 
