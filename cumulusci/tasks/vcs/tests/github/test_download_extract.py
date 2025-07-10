@@ -373,20 +373,24 @@ class TestDownloadExtract:
 
     def test_set_target_directory__absolute_path(self):
         """Test _set_target_directory with absolute path"""
-        absolute_path = "/tmp/test_dir"
-        task_config = TaskConfig(
-            {
-                "options": {
-                    "repo_url": self.repo_url,
-                    "target_directory": absolute_path,
+        absolute_path = tempfile.mkdtemp(prefix="test_")
+        try:
+            task_config = TaskConfig(
+                {
+                    "options": {
+                        "repo_url": self.repo_url,
+                        "target_directory": absolute_path,
+                    }
                 }
-            }
-        )
-        task = DownloadExtract(self.project_config, task_config)
+            )
+            task = DownloadExtract(self.project_config, task_config)
 
-        task._set_target_directory()
+            task._set_target_directory()
 
-        assert task.options["target_directory"] == absolute_path
+            assert task.options["target_directory"] == absolute_path
+        finally:
+            # Clean up the temporary directory
+            os.rmdir(absolute_path)
 
     def test_rename_files(self):
         """Test _rename_files method"""
