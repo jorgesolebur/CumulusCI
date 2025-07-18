@@ -1,6 +1,7 @@
 name: Publish and release CumulusCI
 
 on:
+    workflow_dispatch:
     push:
         branches:
             - main
@@ -12,6 +13,8 @@ concurrency: publishing
 jobs:
     publish-to-pypi:
         name: Publish new release to PyPI
+        permissions:
+            contents: write
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@main
@@ -22,6 +25,18 @@ jobs:
                   cache: pip
             - name: Install build tools
               run: python -m pip install hatch tomli tomli-w
+            - name: Check version type
+              id: version_check
+              run: |
+                  VERSION=$(hatch version)
+                  echo "Current version: $VERSION"
+                  IS_PUBLISHABLE="false"
+                  # Stable versions (major, minor, patch) don't have letters like a, b, rc
+                  # and beta versions have 'b'.
+                  if ! [[ "$VERSION" =~ [a-df-z] ]] && ! [[ "$VERSION" =~ "rc" ]]; then
+                      IS_PUBLISHABLE="true"
+                  fi
+                  echo "publishable=${IS_PUBLISHABLE}" >> $GITHUB_OUTPUT
             - name: Build source tarball and binary wheel
               run: hatch build -c
             - name: Upload to PyPI
@@ -30,6 +45,7 @@ jobs:
                   HATCH_INDEX_USER: "__token__"
                   HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
             - name: Create release
+              if: steps.version_check.outputs.publishable == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
