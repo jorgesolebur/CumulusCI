@@ -1,0 +1,26 @@
+name: Add Default PR Label
+
+on:
+    pull_request:
+        types: [opened]
+
+jobs:
+    add-label:
+        name: Add default semver label
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@v4
+            - name: Add semver:dev label if no other semver label exists
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: |
+                  LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels.[].name' 2>/dev/null || echo "")
+                  if ! echo "$LABELS" | grep -q "semver:"; then
+                    echo "No semver label found. Adding semver:dev."
+                    gh pr edit "$PR_NUMBER" --add-label "semver:dev"
+                  else
+                    echo "A semver label is already present. Skipping."
+                  fi

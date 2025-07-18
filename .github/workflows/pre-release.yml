@@ -1,0 +1,97 @@
+name: Draft release pull request
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+
+concurrency:
+    group: ${{ github.workflow }}
+    cancel-in-progress: true
+
+jobs:
+    generate-changelog:
+        name: Create a PR to update version and release notes
+        if: github.event.pull_request.merged == true
+        permissions:
+            contents: write
+            actions: write
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Needed to get all tags for changelog generation
+            - name: Set up Python 3.12
+              uses: actions/setup-python@v4
+              with:
+                  python-version: 3.12
+                  cache: pip
+            - name: Install build tool
+              run: python -m pip install hatch
+            - name: Determine Version Bump from PR Labels
+              id: version
+              run: |
+                  BUMP="patch"
+                  LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+                  echo "Checking labels: $LABELS"
+                  if echo "$LABELS" | grep -q "semver:major"; then
+                    BUMP="major"
+                  elif echo "$LABELS" | grep -q "semver:minor"; then
+                    BUMP="minor"
+                  elif echo "$LABELS" | grep -q "semver:alpha"; then
+                    BUMP="alpha"
+                  elif echo "$LABELS" | grep -q "semver:beta"; then
+                    BUMP="beta"
+                  elif echo "$LABELS" | grep -q "semver:preview"; then
+                    BUMP="preview"
+                  elif echo "$LABELS" | grep -q "semver:dev"; then
+                    BUMP="dev"
+                  fi
+                  echo "Version bump determined: $BUMP"
+                  echo "level=${BUMP}" >> $GITHUB_OUTPUT
+            - name: Bump version
+              run: hatch version ${{ steps.version.outputs.level }}
+            - name: Generate release notes
+              if: steps.version.outputs.level == 'major' || steps.version.outputs.level == 'minor' || steps.version.outputs.level == 'patch' || steps.version.outputs.level == 'beta'
+              id: changelog
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  # This will be empty if there are no releases yet
+                  PREVIOUS_VERSION=$(gh release view --json tagName --jq .tagName 2>/dev/null || echo "")
+                  NEXT_VERSION="v$(hatch version)"
+                  echo "## $NEXT_VERSION ($(date -I))" > changelog.md
+
+                  # Build arguments for the API call
+                  ARGS=("--method" "POST" "-H" "Accept: application/vnd.github.v3+json" "/repos/SFDO-Tooling/CumulusCI/releases/generate-notes" "-f" "target_commitish=main" "-f" "tag_name=$NEXT_VERSION")
+                  if [ -n "$PREVIOUS_VERSION" ]; then
+                    echo "Generating notes between $PREVIOUS_VERSION and $NEXT_VERSION"
+                    ARGS+=("-f" "previous_tag_name=$PREVIOUS_VERSION")
+                  else
+                    echo "No previous release found. Generating notes for the first release."
+                  fi
+
+                  gh api "${ARGS[@]}" --jq '.body' |
+                    sed -e 's_\(https.*\/\)\([0-9]*\)$_[#\2](\1\2)_' \
+                        -e 's_by @\(.*\) in_by [@\1](https://github.com/\1) in_' >> changelog.md
+                  python utility/update-history.py
+            - name: Lint history
+              if: steps.version.outputs.level == 'major' || steps.version.outputs.level == 'minor' || steps.version.outputs.level == 'patch' || steps.version.outputs.level == 'beta'
+              run: |
+                  npm install prettier
+                  npx prettier --write docs/history.md
+            - name: Commit version and changelog
+              if: steps.version.outputs.level == 'major' || steps.version.outputs.level == 'minor' || steps.version.outputs.level == 'patch' || steps.version.outputs.level == 'beta'
+              run: |
+                  git config user.name github-actions[bot]
+                  git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+                  git add docs/history.md cumulusci/__about__.py
+                  git commit -m "Update changelog for v$(hatch version)"
+                  git push
+            - name: Call Release Workflow
+              if: steps.version.outputs.level == 'major' || steps.version.outputs.level == 'minor' || steps.version.outputs.level == 'patch' || steps.version.outputs.level == 'beta'
+              uses: benc-uk/workflow-dispatch@v1
+              with:
+                  workflow: "Publish and release CumulusCI"
+                  token: ${{ secrets.GITHUB_TOKEN }}
