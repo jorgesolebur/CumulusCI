@@ -38,10 +38,8 @@ jobs:
                   fi
                   echo "publishable=${IS_PUBLISHABLE}" >> $GITHUB_OUTPUT
             - name: Build source tarball and binary wheel
-              if: steps.version_check.outputs.publishable == 'true'
               run: hatch build -c
             - name: Upload to PyPI
-              if: steps.version_check.outputs.publishable == 'true'
               run: hatch publish
               env:
                   HATCH_INDEX_USER: "__token__"
