@@ -31,15 +31,16 @@ jobs:
                   VERSION=$(hatch version)
                   echo "Current version: $VERSION"
                   IS_PUBLISHABLE="false"
-                  # Stable versions (major, minor, patch) don't have letters like a, b, rc
-                  # and beta versions have 'b'.
-                  if ! [[ "$VERSION" =~ [a-df-z] ]] && ! [[ "$VERSION" =~ "rc" ]]; then
+                  # Publish only stable and preview releases, which do not contain letters like a,b,d or "rc".
+                  if ! [[ "$VERSION" =~ [abd] ]] && ! [[ "$VERSION" =~ "rc" ]]; then
                       IS_PUBLISHABLE="true"
                   fi
                   echo "publishable=${IS_PUBLISHABLE}" >> $GITHUB_OUTPUT
             - name: Build source tarball and binary wheel
+              if: steps.version_check.outputs.publishable == 'true'
               run: hatch build -c
             - name: Upload to PyPI
+              if: steps.version_check.outputs.publishable == 'true'
               run: hatch publish
               env:
                   HATCH_INDEX_USER: "__token__"
