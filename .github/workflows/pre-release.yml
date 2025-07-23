@@ -65,7 +65,7 @@ jobs:
                   echo "## $NEXT_VERSION ($(date -I))" > changelog.md
 
                   # Build arguments for the API call
-                  ARGS=("--method" "POST" "-H" "Accept: application/vnd.github.v3+json" "/repos/SFDO-Tooling/CumulusCI/releases/generate-notes" "-f" "target_commitish=main" "-f" "tag_name=$NEXT_VERSION")
+                  ARGS=("--method" "POST" "-H" "Accept: application/vnd.github.v3+json" "/repos/jorgesolebur/CumulusCI/releases/generate-notes" "-f" "target_commitish=main" "-f" "tag_name=$NEXT_VERSION")
                   if [ -n "$PREVIOUS_VERSION" ]; then
                     echo "Generating notes between $PREVIOUS_VERSION and $NEXT_VERSION"
                     ARGS+=("-f" "previous_tag_name=$PREVIOUS_VERSION")
