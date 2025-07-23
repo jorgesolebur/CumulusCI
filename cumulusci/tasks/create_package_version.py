@@ -9,7 +9,11 @@ from pydantic import BaseModel, validator
 from simple_salesforce.exceptions import SalesforceMalformedRequest
 
 from cumulusci.core.config.util import get_devhub_config
-from cumulusci.core.dependencies.base import UnmanagedDependency, UnmanagedVcsDependency
+from cumulusci.core.dependencies.base import (
+    UnmanagedDependency,
+    UnmanagedVcsDependency,
+    UnmanagedVcsDependencyFlow,
+)
 from cumulusci.core.dependencies.dependencies import (
     PackageNamespaceVersionDependency,
     PackageVersionIdDependency,
@@ -628,6 +632,11 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                         f"Skipping dependency {dependency} because create_unlocked_dependency_packages is False."
                     )
                     continue
+            elif isinstance(dependency, UnmanagedVcsDependencyFlow):
+                self.logger.info(
+                    f"Skipping Pre/Post flow static dependency {dependency}."
+                )
+                continue
             else:
                 raise DependencyLookupError(
                     f"Unable to convert dependency: {dependency}"
