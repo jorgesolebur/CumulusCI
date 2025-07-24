@@ -1,6 +1,6 @@
 from cumulusci.core.exceptions import TaskOptionsError
-from cumulusci.core.options import CCIOptions, Field
 from cumulusci.tasks.base_source_control_task import BaseSourceControlTask
+from cumulusci.utils.options import CCIOptions, Field
 
 
 class CreatePackageDataFromCommitStatus(BaseSourceControlTask):
