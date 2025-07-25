@@ -50,13 +50,8 @@ _exit_stack = None
 _signal_handler_active = False  # Flag to prevent recursive signal handler calls
 
 
-def _signal_handler(signum, frame):
-    """Handle termination signals.
-
-    This handler ensures the CLI exits gracefully with a failure code when
-    receiving SIGTERM or SIGINT signals, such as when an Azure DevOps pipeline
-    is cancelled. It also terminates all child processes in the process group.
-    """
+def _cleanup_on_signal(signum):
+    """Cleanup action for termination signals."""
     global _signal_handler_active
 
     # Prevent recursive signal handler calls
@@ -116,6 +111,11 @@ def _signal_handler(signum, frame):
     # Exit with appropriate failure code
     exit_code = 143 if signum == signal.SIGTERM else 130  # Standard exit codes
     sys.exit(exit_code)
+
+
+def _signal_handler(signum, frame):
+    """Handle termination signals by deferring to the cleanup function."""
+    _cleanup_on_signal(signum)
 
 
 #
@@ -185,9 +185,7 @@ def main(args=None):
             try:
                 cli(args[1:], standalone_mode=False, obj=runtime)
             except click.Abort:  # Keyboard interrupt
-                console = Console()
-                show_debug_info() if debug else console.print("\n[red bold]Aborted!")
-                sys.exit(1)
+                _cleanup_on_signal(signal.SIGINT)
             except Exception as e:
                 if debug:
                     console = Console()
