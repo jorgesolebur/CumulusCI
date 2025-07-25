@@ -4,7 +4,7 @@ from cumulusci.utils.options import CCIOptions, Field
 
 
 class CreatePackageDataFromCommitStatus(BaseSourceControlTask):
-    class CreatePackageDataFromCommitStatusOptions(CCIOptions):
+    class Options(CCIOptions):
         state: str = Field(description="sha of the commit")
         context: str = Field(description="Name of the commit status context")
         commit_id: str = Field(description="sha of the commit", default=None)
@@ -15,7 +15,7 @@ class CreatePackageDataFromCommitStatus(BaseSourceControlTask):
             description="URL to associate with the commit status", default=None
         )
 
-    parsed_options: CreatePackageDataFromCommitStatusOptions
+    parsed_options: Options
 
     def _run_task(self):
         repo = self.get_repo()
@@ -37,3 +37,7 @@ class CreatePackageDataFromCommitStatus(BaseSourceControlTask):
         )
 
         self.return_values = {"commit_id": commit.sha}
+
+        self.logger.info(
+            f"Commit status created for commit {commit_sha} with state {self.parsed_options.state}"
+        )

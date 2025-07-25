@@ -662,14 +662,20 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
         flow_config = project_config.get_flow(self.flow_name)
         flow_config.name = self.flow_name
 
+        pre_post_options = {
+            "unmanaged": self._get_unmanaged(org),
+            "namespace_inject": self.namespace_inject,
+            "namespace_strip": self.namespace_strip,
+        }
+
         coordinator = FlowCoordinator(
             project_config,
             flow_config,
             name=flow_config.name,
             options={
-                "unmanaged": self._get_unmanaged(org),
-                "namespace_inject": self.namespace_inject,
-                "namespace_strip": self.namespace_strip,
+                "flow": pre_post_options,
+                "deploy_pre": pre_post_options,
+                "deploy_post": pre_post_options,
             },
             skip=None,
             callbacks=self.callback_class(),
