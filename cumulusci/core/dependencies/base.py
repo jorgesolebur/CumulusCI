@@ -488,7 +488,7 @@ class VcsDynamicDependency(BaseVcsDynamicDependency, ABC):
             self._flatten_dependency_flow(
                 package_config,
                 "dependency_flow_pre",
-                managed=managed,
+                managed=False,
                 namespace=namespace,
             )
         )
