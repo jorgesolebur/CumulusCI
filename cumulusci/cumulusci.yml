@@ -404,6 +404,8 @@ tasks:
     vcs_create_package_data:
         description: Create a 2gp package version id reference in a commit status.
         class_path: cumulusci.tasks.vcs.create_commit_status.CreatePackageDataFromCommitStatus
+        options:
+            context: $project_config.project__git__2gp_context
         group: VCS
     github_pull_requests:
         description: Lists open pull requests in project Github repository
