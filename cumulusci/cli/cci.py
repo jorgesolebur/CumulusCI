@@ -1,6 +1,5 @@
 import code
 import contextlib
-import os
 import pdb
 import runpy
 import signal
@@ -80,33 +79,8 @@ def _cleanup_on_signal(signum):
         except Exception as e:
             console.print(f"[red]Error during cleanup: {e}[/red]")
 
-    # Terminate child processes in the process group
-    try:
-        console.print("[yellow]Terminating child processes...[/yellow]")
-
-        # Temporarily ignore the signal to prevent recursion
-        old_handler = signal.signal(signum, signal.SIG_IGN)
-
-        try:
-            # Only use process group termination on Unix systems
-            if hasattr(os, "getpgrp") and hasattr(os, "killpg"):
-                pgrp = os.getpgrp()
-                # Send signal to all processes in the group except ourselves
-                os.killpg(pgrp, signum)
-            else:
-                # On Windows, we can't use process groups, so just log the attempt
-                console.print(
-                    "[yellow]Process group termination not supported on this platform[/yellow]"
-                )
-        finally:
-            # Restore the original signal handler
-            signal.signal(signum, old_handler)
-
-    except ProcessLookupError:
-        # Process group may not exist or may already be terminated
-        pass
-    except Exception as e:
-        console.print(f"[red]Warning: Error terminating child processes: {e}[/red]")
+    # The parent process's trap is now responsible for killing the process group.
+    # This process will exit gracefully after receiving the signal from the parent.
 
     # Exit with appropriate failure code
     exit_code = 143 if signum == signal.SIGTERM else 130  # Standard exit codes
@@ -130,15 +104,8 @@ def main(args=None):
     """
     global _exit_stack
 
-    # Create a new process group so we can terminate all child processes
-    # when we receive a termination signal
-    try:
-        if hasattr(os, "setpgrp"):
-            # On Unix systems, create a new process group
-            os.setpgrp()
-    except Exception:
-        # On Windows or if setpgrp fails, continue without process group
-        pass
+    # By not creating a new process group, cci remains in the parent's group.
+    # This allows the parent's trap command to correctly terminate cci and its children.
 
     # Set up signal handlers for graceful termination
     signal.signal(signal.SIGTERM, _signal_handler)
