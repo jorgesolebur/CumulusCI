@@ -10,7 +10,12 @@ from cumulusci.core.config import OrgConfig
 from cumulusci.core.config.project_config import BaseProjectConfig
 from cumulusci.core.dependencies.utils import TaskContext
 from cumulusci.core.exceptions import DependencyResolutionError, VcsNotFoundError
-from cumulusci.core.flowrunner import FlowCallback, FlowCoordinator
+from cumulusci.core.flowrunner import (
+    FlowCallback,
+    FlowCoordinator,
+    StepResult,
+    StepVersion,
+)
 from cumulusci.core.sfdx import (
     SourceFormat,
     convert_sfdx_source,
@@ -673,12 +678,22 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
             flow_config,
             name=flow_config.name,
             options={
-                "flow": pre_post_options,
                 "deploy_pre": pre_post_options,
                 "deploy_post": pre_post_options,
             },
             skip=None,
             callbacks=self.callback_class(),
+        )
+
+        coordinator.results.append(
+            StepResult(
+                step_num=StepVersion("0.0.0"),
+                task_name="flow",
+                path=f"{self.flow_name}.flow",
+                result=None,
+                return_values=pre_post_options,
+                exception=None,
+            )
         )
 
         start_time = datetime.now()
