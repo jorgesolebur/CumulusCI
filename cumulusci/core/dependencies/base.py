@@ -667,8 +667,11 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
         flow_config = project_config.get_flow(self.flow_name)
         flow_config.name = self.flow_name
 
+        managed = not self._get_unmanaged(org)
+
         pre_post_options = {
-            "unmanaged": self._get_unmanaged(org),
+            "unmanaged": not managed,
+            "managed": managed,
             "namespace_inject": self.namespace_inject,
             "namespace_strip": self.namespace_strip,
         }
@@ -680,6 +683,7 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
             options={
                 "deploy_pre": pre_post_options,
                 "deploy_post": pre_post_options,
+                "update_admin_profile": pre_post_options,
             },
             skip=None,
             callbacks=self.callback_class(),
