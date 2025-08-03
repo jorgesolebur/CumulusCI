@@ -9,6 +9,7 @@ import sys
 import tempfile
 import textwrap
 import zipfile
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Union, Optional
@@ -729,3 +730,18 @@ def filter_namelist(includes, namelist):
             if name.startswith(tuple(included_dirs)) or name in includes
         }
     )
+
+
+@functools.lru_cache(50)
+def get_tasks_with_options(project_config, frozen_options: frozenset):
+    coordinator_opts = {}
+    options = dict(frozen_options)
+    for task_config in project_config.list_tasks():
+        if any(
+            key in options.keys()
+            for key in project_config.get_task(task_config["name"])
+            .get_class()
+            .task_options.keys()
+        ):
+            coordinator_opts[task_config["name"]] = options
+    return coordinator_opts

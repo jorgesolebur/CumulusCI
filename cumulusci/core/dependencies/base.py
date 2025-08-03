@@ -24,7 +24,11 @@ from cumulusci.core.sfdx import (
 from cumulusci.core.utils import format_duration
 from cumulusci.salesforce_api.metadata import ApiDeploy
 from cumulusci.salesforce_api.package_zip import MetadataPackageZipBuilder
-from cumulusci.utils import download_extract_vcs_from_repo, temporary_dir
+from cumulusci.utils import (
+    download_extract_vcs_from_repo,
+    get_tasks_with_options,
+    temporary_dir,
+)
 from cumulusci.utils.yaml.model_parser import HashableBaseModel
 from cumulusci.utils.ziputils import zip_subfolder
 from cumulusci.vcs.models import AbstractRepo
@@ -676,15 +680,15 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
             "namespace_strip": self.namespace_strip,
         }
 
+        coordinator_opts = get_tasks_with_options(
+            project_config, frozenset(pre_post_options.items())
+        )
+
         coordinator = FlowCoordinator(
             project_config,
             flow_config,
             name=flow_config.name,
-            options={
-                "deploy_pre": pre_post_options,
-                "deploy_post": pre_post_options,
-                "update_admin_profile": pre_post_options,
-            },
+            options=coordinator_opts,
             skip=None,
             callbacks=self.callback_class(),
         )
