@@ -1018,6 +1018,7 @@ class TestUnmanagedVcsDependencyFlow:
         # Setup flow config mock
         mock_flow_config = mock.Mock()
         mock_project_config.get_flow.return_value = mock_flow_config
+        mock_project_config.list_tasks.return_value = []
 
         # Setup coordinator mock
         mock_coordinator_instance = mock.Mock()
@@ -1076,11 +1077,7 @@ class TestUnmanagedVcsDependencyFlow:
         assert args[0] == mock_project_config
         assert args[1] == mock_flow_config
         assert kwargs["name"] == "install_deps"
-        assert kwargs["options"] == {
-            "unmanaged": True,  # _get_unmanaged should return True for empty installed_packages
-            "namespace_inject": "test_ns",
-            "namespace_strip": "old_ns",
-        }
+        assert kwargs["options"] == {}
         assert kwargs["skip"] is None
         assert isinstance(kwargs["callbacks"], type(flow_dep.callback_class()))
 
