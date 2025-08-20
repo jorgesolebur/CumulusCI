@@ -749,6 +749,10 @@ tasks:
         options:
             level: info
         group: Utilities
+    configure_env:
+        description: Get or set environment variables.
+        class_path: cumulusci.tasks.utility.env_management.EnvManagement
+        group: Utilities
     download_extract:
         description: Downloads files and folders from a VCS repository.
         class_path: cumulusci.tasks.vcs.download_extract.DownloadExtract
