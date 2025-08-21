@@ -18,7 +18,12 @@ class TestVcsRemoteBranch(unittest.TestCase):
         project_config = create_project_config()
         project_config.repo_info["branch"] = "feature/branch-1"
         task_config = TaskConfig(
-            {"options": {"url": "https://github.com/TestOwner/TestRepo"}}
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
         )
 
         with patch(
@@ -32,14 +37,22 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
             task = VcsRemoteBranch(project_config, task_config)
             task()
-            self.assertEqual(task.return_values["remote_branch"], "feature/branch-1")
+            self.assertEqual(
+                task.return_values["url"], "https://github.com/TestOwner/TestRepo"
+            )
+            self.assertEqual(task.return_values["branch"], "feature/branch-1")
             repo_mock.branch.assert_called_once_with("feature/branch-1")
 
     def test_run_task_branch_not_exist(self):
         project_config = create_project_config()
         project_config.repo_info["branch"] = "feature/branch-1"
         task_config = TaskConfig(
-            {"options": {"url": "https://github.com/TestOwner/TestRepo"}}
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
         )
 
         with patch(
@@ -52,7 +65,10 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
             task = VcsRemoteBranch(project_config, task_config)
             task()
-            self.assertEqual(task.return_values["remote_branch"], "main")
+            self.assertEqual(
+                task.return_values["url"], "https://github.com/TestOwner/TestRepo"
+            )
+            self.assertEqual(task.return_values["branch"], "main")
             repo_mock.branch.assert_called_once_with("feature/branch-1")
 
 
@@ -177,20 +193,21 @@ class TestEnvManagement(unittest.TestCase):
             task()
 
     @patch("cumulusci.tasks.utility.env_management.VcsRemoteBranch")
-    def test_vcs_branch_datatype(self, vcs_mock):
-        os.environ["TEST_VAR"] = ""  # vcs_branch doesn't use env var
-
+    def test_vcs_repo_datatype(self, vcs_mock):
         vcs_instance_mock = vcs_mock.return_value
-        vcs_instance_mock.return_value = {"remote_branch": "my-feature-branch"}
+        vcs_instance_mock.return_value = {
+            "url": "https://github.com/TestOwner/TestRepo",
+            "branch": "my-feature-branch",
+        }
 
         task_config = TaskConfig(
             {
                 "options": {
                     "envs": [
                         {
-                            "name": "VCS_BRANCH",
-                            "datatype": "vcs_branch",
-                            "url": "https://github.com/TestOwner/TestRepo",
+                            "name": "VCS_URL",
+                            "datatype": "vcs_repo",
+                            "default": "https://github.com/TestOwner/TestRepo",
                         }
                     ]
                 }
@@ -199,7 +216,8 @@ class TestEnvManagement(unittest.TestCase):
         task = EnvManagement(self.project_config, task_config, self.org_config)
         result = task()
 
-        self.assertEqual(result["VCS_BRANCH"], "my-feature-branch")
+        self.assertEqual(result["VCS_URL"], "https://github.com/TestOwner/TestRepo")
+        self.assertEqual(result["VCS_URL_BRANCH"], "my-feature-branch")
         vcs_mock.assert_called_once()
 
     @patch.dict(os.environ, {}, clear=True)
