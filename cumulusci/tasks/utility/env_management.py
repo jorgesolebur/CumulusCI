@@ -109,14 +109,10 @@ class EnvManagementOption(CCIOptions):
                 f"Formatting Error: {value} for datatype: {datatype} - {e}"
             )
 
-        if self.set and self.name not in os.environ:
+        if self.set:
             os.environ[self.name] = str(task_values[self.name])
 
-        if (
-            self.set
-            and self.datatype == "vcs_repo"
-            and f"{self.name}_BRANCH" not in os.environ
-        ):
+        if self.set and self.datatype == "vcs_repo":
             os.environ[f"{self.name}_BRANCH"] = str(task_values[f"{self.name}_BRANCH"])
 
 
