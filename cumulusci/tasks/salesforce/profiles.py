@@ -23,6 +23,9 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
             "description": "The description of the the new profile",
             "required": False,
         },
+        "collision_check": {
+            "description": "Performs a collision check with metadata already present in the target org. Defaults to True"
+        },
     }
 
     def _init_options(self, kwargs):
@@ -32,12 +35,22 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
                 "Either the name or the ID of the user license must be set."
             )
         self.license = self.options.get("license", "Salesforce")
+        self.sf = None
 
     def _run_task(self):
 
         self.name = self.options["name"]
         self.description = self.options.get("description") or ""
         self.license_id = self.options.get("license_id")
+
+        if self.options.get("collision_check", True):
+            profile_id = self._get_profile_id(self.name)
+            if profile_id:
+                self.logger.info(
+                    f"Profile '{self.name}' already exists with id: {profile_id}"
+                )
+                self.return_values = {"profile_id": profile_id}
+                return profile_id
 
         if not self.license_id:
             self.license_id = self._get_user_license_id(self.license)
@@ -48,21 +61,37 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
         self.logger.info(f"Profile '{self.name}' created with id: {result}")
         return result
 
+    def _get_profile_id(self, profile_name):
+        """Returns the Id of a Profile from a given Name"""
+        res = self._query_sf(
+            f"SELECT Id, Name FROM Profile WHERE FullName = '{profile_name}' LIMIT 1"
+        )
+        if res["records"]:
+            return res["records"][0]["Id"]
+
+        self.logger.info(f"Profile name '{profile_name}' was not found.")
+        return None
+
     def _get_user_license_id(self, license_name):
         """Returns the Id of a UserLicense from a given Name"""
-        self.sf = get_simple_salesforce_connection(
+        res = self._query_sf(
+            f"SELECT Id, Name FROM UserLicense WHERE Name = '{license_name}' LIMIT 1"
+        )
+
+        if res["records"]:
+            return res["records"][0]["Id"]
+        else:
+            raise TaskOptionsError(f"License name '{license_name}' was not found.")
+
+    def _query_sf(self, query):
+        self.sf = self.sf or get_simple_salesforce_connection(
             self.project_config,
             self.org_config,
             api_version=self.org_config.latest_api_version,
             base_url=None,
         )
-        res = self.sf.query(
-            f"SELECT Id, Name FROM UserLicense WHERE Name = '{license_name}' LIMIT 1"
-        )
-        if res["records"]:
-            return res["records"][0]["Id"]
-        else:
-            raise TaskOptionsError(f"License name '{license_name}' was not found.")
+        res = self.sf.query(query)
+        return res
 
     def _get_api(self):
         return self.api_class(

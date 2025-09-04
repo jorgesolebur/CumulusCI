@@ -95,6 +95,15 @@ def test_run_task_success():
         json={
             "done": True,
             "totalSize": 1,
+            "records": [],
+        },
+    )
+    responses.add(
+        responses.GET,
+        query_url,
+        json={
+            "done": True,
+            "totalSize": 0,
             "records": [
                 {
                     "attributes": {
@@ -115,9 +124,12 @@ def test_run_task_success():
     result = task._run_task()
     assert result == "001R0000029IyDPIA0"
     assert responses.calls[0].request.params == {
+        "q": "SELECT Id, Name FROM Profile WHERE FullName = 'Test Profile Name' LIMIT 1"
+    }
+    assert responses.calls[1].request.params == {
         "q": "SELECT Id, Name FROM UserLicense WHERE Name = 'Foo' LIMIT 1"
     }
-    soap_body = responses.calls[1].request.body
+    soap_body = responses.calls[2].request.body
     assert "<Name>Test Profile Name</Name>" in str(soap_body)
     assert "<UserLicenseId>10056000000VGjUAAW</UserLicenseId>" in str(soap_body)
     assert "<Description>Have fun stormin da castle</Description>" in str(soap_body)
@@ -135,6 +147,15 @@ def test_run_task_fault():
     )
     task.org_config._latest_api_version = "53.0"
 
+    responses.add(
+        responses.GET,
+        "https://test.salesforce.com/services/data/v53.0/query/",
+        json={
+            "done": True,
+            "totalSize": 0,
+            "records": [],
+        },
+    )
     responses.add(
         responses.POST,
         "https://test.salesforce.com/services/Soap/u/53.0/ORG_ID",
@@ -157,6 +178,17 @@ def test_run_task_field_error():
         },
     )
     task.org_config._latest_api_version = "53.0"
+
+    responses.add(
+        responses.GET,
+        "https://test.salesforce.com/services/data/v53.0/query/",
+        json={
+            "done": True,
+            "totalSize": 0,
+            "records": [],
+        },
+    )
+
     responses.add(
         responses.POST,
         "https://test.salesforce.com/services/Soap/u/53.0/ORG_ID",
@@ -181,6 +213,16 @@ def test_run_task_error():
     task.org_config._latest_api_version = "53.0"
 
     responses.add(
+        responses.GET,
+        "https://test.salesforce.com/services/data/v53.0/query/",
+        json={
+            "done": True,
+            "totalSize": 0,
+            "records": [],
+        },
+    )
+
+    responses.add(
         responses.POST,
         "https://test.salesforce.com/services/Soap/u/53.0/ORG_ID",
         RESPONSE_ERROR,
@@ -200,3 +242,85 @@ def test_task_options_error():
                 "description": "Foo",
             },
         )
+
+
+@responses.activate
+def test_run_task_success_with_collision_check():
+    query_url = "https://test.salesforce.com/services/data/v53.0/query/"
+
+    task = create_task(
+        CreateBlankProfile,
+        {
+            "license": "Foo",
+            "name": "Test Profile Name",
+            "description": "Have fun stormin da castle",
+        },
+    )
+    task.org_config._latest_api_version = "53.0"
+
+    responses.add(
+        responses.GET,
+        query_url,
+        json={
+            "done": True,
+            "totalSize": 1,
+            "records": [
+                {
+                    "attributes": {
+                        "type": "Profile",
+                        "url": "/services/data/v53.0/sobjects/Profile/10056000000VGjUAAW",
+                    },
+                    "Id": "10056000000VGjUAAW",
+                    "Name": "Test Profile Name",
+                }
+            ],
+        },
+    )
+
+    result = task._run_task()
+    assert result == "10056000000VGjUAAW"
+    assert responses.calls[0].request.params == {
+        "q": "SELECT Id, Name FROM Profile WHERE FullName = 'Test Profile Name' LIMIT 1"
+    }
+
+
+@responses.activate
+def test_run_task_with_invalid_license():
+    query_url = "https://test.salesforce.com/services/data/v53.0/query/"
+
+    task = create_task(
+        CreateBlankProfile,
+        {
+            "license": "Foo",
+            "name": "Test Profile Name",
+            "description": "Have fun stormin da castle",
+        },
+    )
+    task.org_config._latest_api_version = "53.0"
+
+    responses.add(
+        responses.GET,
+        query_url,
+        json={
+            "done": True,
+            "totalSize": 1,
+            "records": [],
+        },
+    )
+    responses.add(
+        responses.GET,
+        query_url,
+        json={
+            "done": True,
+            "totalSize": 0,
+            "records": [],
+        },
+    )
+    responses.add(
+        responses.POST,
+        "https://test.salesforce.com/services/Soap/u/53.0/ORG_ID",
+        RESPONSE_SUCCESS,
+    )
+    with pytest.raises(TaskOptionsError) as e:
+        task._run_task()
+    assert "License name 'Foo' was not found." in str(e)
