@@ -823,10 +823,6 @@ tasks:
         class_path: cumulusci.tasks.salesforce.SfDataCommands.DataCreateRecordTask
         description: "Executes the `sf data create` command against an org"
         group: SalesforceDX Data Commands
-    get_first_item_from_record_list:
-        class_path: cumulusci.tasks.utility.data_management.GetFirstItemFromRecordListTask
-        description: "Get the first item from a record list"
-        group: Utilities
 flows:
     ci_beta:
         group: Continuous Integration

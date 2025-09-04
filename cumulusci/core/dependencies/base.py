@@ -255,7 +255,9 @@ class UnmanagedDependency(UnmanagedStaticDependency, ABC):
 
         return package_zip
 
-    def install(self, context: BaseProjectConfig, org: OrgConfig):
+    def install(
+        self, context: BaseProjectConfig, org: OrgConfig, options: Optional[dict] = {}
+    ):
 
         context.logger.info(f"Deploying unmanaged metadata from {self.description}")
 
@@ -411,6 +413,7 @@ class VcsDynamicDependency(BaseVcsDynamicDependency, ABC):
                     unmanaged=not managed,
                     namespace_inject=namespace if namespace and managed else None,
                     namespace_strip=namespace if namespace and not managed else None,
+                    package_dependency=self.package_dependency,
                 )
             ]
         return []
@@ -446,6 +449,7 @@ class VcsDynamicDependency(BaseVcsDynamicDependency, ABC):
                         namespace_strip=namespace
                         if namespace and not managed
                         else None,
+                        package_dependency=self.package_dependency,
                     )
                 )
 
@@ -493,22 +497,22 @@ class VcsDynamicDependency(BaseVcsDynamicDependency, ABC):
 
         # Look for any flow to executed in project config
         # Pre flows will run to dynamically generate metadata and deploy.
-        deps.extend(
-            self._flatten_dependency_flow(
-                package_config,
-                "dependency_flow_pre",
-                managed=False,
-                namespace=namespace,
-            )
+        flow = self._flatten_dependency_flow(
+            package_config,
+            "dependency_flow_pre",
+            managed=False,
+            namespace=namespace,
         )
-
-        # Look for subfolders under unpackaged/pre
-        # unpackaged/pre is always deployed unmanaged, no namespace manipulation.
-        deps.extend(
-            self._flatten_unpackaged(
-                repo, "unpackaged/pre", self.skip, managed=False, namespace=None
+        if flow:
+            deps.extend(flow)
+        else:
+            # Look for subfolders under unpackaged/pre
+            # unpackaged/pre is always deployed unmanaged, no namespace manipulation.
+            deps.extend(
+                self._flatten_unpackaged(
+                    repo, "unpackaged/pre", self.skip, managed=False, namespace=None
+                )
             )
-        )
 
         if not self.package_dependency:
             if managed:
@@ -532,25 +536,26 @@ class VcsDynamicDependency(BaseVcsDynamicDependency, ABC):
 
         # Look for any flow to executed in project config
         # Pre flows will run to dynamically generate metadata and deploy.
-        deps.extend(
-            self._flatten_dependency_flow(
-                package_config,
-                "dependency_flow_post",
-                managed=managed,
-                namespace=namespace,
-            )
+        flow = self._flatten_dependency_flow(
+            package_config,
+            "dependency_flow_post",
+            managed=managed,
+            namespace=namespace,
         )
 
-        # We always inject the project's namespace into unpackaged/post metadata if managed
-        deps.extend(
-            self._flatten_unpackaged(
-                repo,
-                "unpackaged/post",
-                self.skip,
-                managed=managed,
-                namespace=namespace,
+        if flow:
+            deps.extend(flow)
+        else:
+            # We always inject the project's namespace into unpackaged/post metadata if managed
+            deps.extend(
+                self._flatten_unpackaged(
+                    repo,
+                    "unpackaged/post",
+                    self.skip,
+                    managed=managed,
+                    namespace=namespace,
+                )
             )
-        )
 
         return deps
 
@@ -573,6 +578,9 @@ class UnmanagedVcsDependency(UnmanagedDependency, ABC):
     subfolder: Optional[str] = None
     namespace_inject: Optional[str] = None
     namespace_strip: Optional[str] = None
+
+    # Field to reference corresponding package dependency
+    package_dependency: Optional["BasePackageVersionDependency"] = None
 
     @root_validator(pre=True)
     @abstractmethod
@@ -619,6 +627,19 @@ class UnmanagedVcsDependency(UnmanagedDependency, ABC):
 
         return f"{self.url}{subfolder} @{self.ref}"
 
+    def install(
+        self, context: BaseProjectConfig, org: OrgConfig, options: Optional[dict] = {}
+    ):
+        if (
+            self.package_dependency is not None
+            and not self.package_dependency.is_installable(org, options)
+        ):
+            context.logger.info(
+                f"{self.description} or a newer version is already deployed; skipping."
+            )
+            return
+        super().install(context, org)
+
 
 class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
     vcs: str
@@ -632,6 +653,9 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
     namespace_strip: Optional[str] = None
     password_env_name: Optional[str] = None
 
+    # Field to reference corresponding package dependency
+    package_dependency: Optional["BasePackageVersionDependency"] = None
+
     @property
     def name(self):
         return f"Deploy {self.url} Flow: {self.flow_name}"
@@ -640,7 +664,18 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
     def description(self):
         return f"{self.url} Flow: {self.flow_name} @{self.commit}"
 
-    def install(self, context: BaseProjectConfig, org: OrgConfig):
+    def install(
+        self, context: BaseProjectConfig, org: OrgConfig, options: Optional[dict] = {}
+    ):
+        if (
+            self.package_dependency is not None
+            and not self.package_dependency.is_installable(org, options)
+        ):
+            context.logger.info(
+                f"{self.description} or a newer version is already deployed; skipping."
+            )
+            return
+
         context.logger.info(f"Deploying dependency Flow from {self.description}")
 
         from cumulusci.utils.yaml.cumulusci_yml import VCSSourceModel
@@ -656,7 +691,6 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
         vcs_source = VCSSource.create(context, source_model)
 
         # Fetch the data and get remote project config.
-        context.logger.info(f"Fetching from {vcs_source}")
         project_config = vcs_source.fetch()
 
         project_config.set_keychain(context.keychain)
@@ -708,3 +742,13 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
         coordinator.run(org)
         duration = datetime.now() - start_time
         context.logger.info(f"Ran {self.flow_name} in {format_duration(duration)}")
+
+
+class BasePackageVersionDependency(StaticDependency, ABC):
+    @abstractmethod
+    def is_installable(self, org: OrgConfig, options: Optional[dict] = {}) -> bool:
+        pass
+
+
+UnmanagedVcsDependency.update_forward_refs()
+UnmanagedVcsDependencyFlow.update_forward_refs()

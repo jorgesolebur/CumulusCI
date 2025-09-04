@@ -362,7 +362,7 @@ def test_install_dependency_installs_unmanaged():
 
     task._install_dependency(task.dependencies[0])
     task.dependencies[0].install.assert_called_once_with(
-        task.project_config, task.org_config
+        task.project_config, task.org_config, task.options
     )
 
 

@@ -164,3 +164,237 @@ class DataDeleteRecordTask(SfDataToolingAPISupportedCommands):
 
     def _run_task(self):
         return super()._run_task()
+
+
+class DataUpdateRecordTask(SfDataToolingAPISupportedCommands):
+    class Options(SfDataToolingAPISupportedCommands.Options):
+        sobject: str = Field(
+            ...,
+            description="API name of the Salesforce or Tooling API object that you're updating a record from.",
+        )
+        record_id: str = Field(None, description="ID of the record you’re updating.")
+        where: str = Field(
+            None,
+            description="List of <fieldName>=<value> pairs that identify the record you want to update.",
+        )
+        values: str = Field(
+            ...,
+            description="Values for the flags in the form <fieldName>=<value>, separate multiple pairs with spaces.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "update record"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.sobject:
+            self.args.extend(["--sobject", self.parsed_options.sobject])
+        if self.parsed_options.record_id:
+            self.args.extend(["--record-id", self.parsed_options.record_id])
+        if self.parsed_options.where:
+            self.args.extend(["--where", self.parsed_options.where])
+        if self.parsed_options.values:
+            self.args.extend(["--values", self.parsed_options.values])
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataGetRecordTask(SfDataToolingAPISupportedCommands):
+    class Options(SfDataToolingAPISupportedCommands.Options):
+        sobject: str = Field(
+            ...,
+            description="API name of the Salesforce or Tooling API object that you're fetching a record from.",
+        )
+        record_id: str = Field(None, description="ID of the record you’re fetching.")
+        where: str = Field(
+            None,
+            description="List of <fieldName>=<value> pairs that identify the record you want to fetch.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "get record"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.sobject:
+            self.args.extend(["--sobject", self.parsed_options.sobject])
+        if self.parsed_options.record_id:
+            self.args.extend(["--record-id", self.parsed_options.record_id])
+        if self.parsed_options.where:
+            self.args.extend(["--where", self.parsed_options.where])
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataQueryResumeTask(SfDataToolingAPISupportedCommands):
+    class Options(SfDataToolingAPISupportedCommands.Options):
+        bulk_query_id: str = Field(
+            ...,
+            description="The 18-character ID of the bulk query to resume.",
+        )
+        result_format: str = Field(
+            None,
+            description="Format to display the results; the --json_output flag overrides this flag. Permissible values are: human, csv, json.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "query resume"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.bulk_query_id:
+            self.args.extend(["--bulk-query-id", self.parsed_options.bulk_query_id])
+        if self.parsed_options.result_format:
+            self.args.extend(["--result-format", self.parsed_options.result_format])
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataDeleteBulkTask(SfDataCommands):
+    class Options(SfDataCommands.Options):
+        sobject: str = Field(
+            ...,
+            description="The API name of the object for the bulk job.",
+        )
+        file: str = Field(
+            ...,
+            description="The path to the CSV file that contains the IDs of the records to delete.",
+        )
+        wait: int = Field(
+            None,
+            description="The number of minutes to wait for the command to complete.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "delete bulk"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.sobject:
+            self.args.extend(["--sobject", self.parsed_options.sobject])
+        if self.parsed_options.file:
+            self.args.extend(["--file", self.parsed_options.file])
+        if self.parsed_options.wait:
+            self.args.extend(["--wait", str(self.parsed_options.wait)])
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataUpsertBulkTask(SfDataCommands):
+    class Options(SfDataCommands.Options):
+        sobject: str = Field(
+            ...,
+            description="The API name of the object for the bulk job.",
+        )
+        file: str = Field(
+            ...,
+            description="The path to the CSV file that contains the records to upsert.",
+        )
+        external_id_field: str = Field(
+            ...,
+            description="The API name of the external ID field for the upsert.",
+        )
+        wait: int = Field(
+            None,
+            description="The number of minutes to wait for the command to complete.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "upsert bulk"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.sobject:
+            self.args.extend(["--sobject", self.parsed_options.sobject])
+        if self.parsed_options.file:
+            self.args.extend(["--file", self.parsed_options.file])
+        if self.parsed_options.external_id_field:
+            self.args.extend(
+                ["--external-id-field", self.parsed_options.external_id_field]
+            )
+        if self.parsed_options.wait:
+            self.args.extend(["--wait", str(self.parsed_options.wait)])
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataImportTreeTask(SfDataCommands):
+    class Options(SfDataCommands.Options):
+        files: list = Field(
+            None,
+            description="A list of paths to sObject Tree API plan definition files.",
+        )
+        plan: str = Field(
+            None,
+            description="The path to a plan definition file.",
+        )
+        content_type_map: str = Field(
+            None,
+            description="A mapping of file extensions to content types.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "import tree"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.files:
+            self.args.extend(["--files", ",".join(self.parsed_options.files)])
+        if self.parsed_options.plan:
+            self.args.extend(["--plan", self.parsed_options.plan])
+        if self.parsed_options.content_type_map:
+            self.args.extend(
+                ["--content-type-map", self.parsed_options.content_type_map]
+            )
+
+    def _run_task(self):
+        return super()._run_task()
+
+
+class DataExportTreeTask(SfDataCommands):
+    class Options(SfDataCommands.Options):
+        query: str = Field(
+            ...,
+            description="A SOQL query that retrieves the records you want to export.",
+        )
+        plan: bool = Field(
+            False,
+            description="Generate a plan definition file.",
+        )
+        prefix: str = Field(
+            None,
+            description="The prefix for the exported data files.",
+        )
+        output_dir: str = Field(
+            None,
+            description="The directory to store the exported files.",
+        )
+
+    def _init_task(self):
+        super()._init_task()
+        self.data_command += "export tree"
+
+    def _init_options(self, kwargs):
+        super()._init_options(kwargs)
+        if self.parsed_options.query:
+            self.args.extend(["--query", self.parsed_options.query])
+        if self.parsed_options.plan:
+            self.args.extend(["--plan"])
+        if self.parsed_options.prefix:
+            self.args.extend(["--prefix", self.parsed_options.prefix])
+        if self.parsed_options.output_dir:
+            self.args.extend(["--output-dir", self.parsed_options.output_dir])
+
+    def _run_task(self):
+        return super()._run_task()
