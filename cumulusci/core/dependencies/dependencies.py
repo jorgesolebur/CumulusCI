@@ -20,7 +20,7 @@ from cumulusci.utils import download_extract_zip
 logger = logging.getLogger(__name__)
 
 
-class PackageNamespaceVersionDependency(base_dependency.StaticDependency):
+class PackageNamespaceVersionDependency(base_dependency.BasePackageVersionDependency):
     """Static dependency on a package identified by namespace and version number."""
 
     namespace: str
@@ -33,6 +33,21 @@ class PackageNamespaceVersionDependency(base_dependency.StaticDependency):
     @property
     def package(self):
         return self.package_name or self.namespace or "Unknown Package"
+
+    def is_installable(self, org: OrgConfig, options: Optional[dict] = {}) -> bool:
+        if "Beta" in self.version:
+            version_string = self.version.split(" ")[0]
+            beta = self.version.split(" ")[-1].strip(")")
+            version = f"{version_string}b{beta}"
+        else:
+            version = self.version
+
+        if org.has_minimum_package_version(
+            self.namespace,
+            version,
+        ):
+            return False
+        return True
 
     def install(
         self,
@@ -48,17 +63,7 @@ class PackageNamespaceVersionDependency(base_dependency.StaticDependency):
         if not retry_options:
             retry_options = DEFAULT_PACKAGE_RETRY_OPTIONS
 
-        if "Beta" in self.version:
-            version_string = self.version.split(" ")[0]
-            beta = self.version.split(" ")[-1].strip(")")
-            version = f"{version_string}b{beta}"
-        else:
-            version = self.version
-
-        if org.has_minimum_package_version(
-            self.namespace,
-            version,
-        ):
+        if not self.is_installable(org):
             context.logger.info(
                 f"{self} or a newer version is already installed; skipping."
             )
@@ -83,7 +88,7 @@ class PackageNamespaceVersionDependency(base_dependency.StaticDependency):
         return f"{self.package} {self.version}"
 
 
-class PackageVersionIdDependency(base_dependency.StaticDependency):
+class PackageVersionIdDependency(base_dependency.BasePackageVersionDependency):
     """Static dependency on a package identified by 04t version id."""
 
     version_id: str
@@ -95,6 +100,14 @@ class PackageVersionIdDependency(base_dependency.StaticDependency):
     @property
     def package(self):
         return self.package_name or "Unknown Package"
+
+    def is_installable(self, org: OrgConfig, options: Optional[dict] = {}) -> bool:
+        if any(
+            self.version_id == v.id
+            for v in itertools.chain(*org.installed_packages.values())
+        ) and not options.get("force_pre_post_install"):
+            return False
+        return True
 
     def install(
         self,
@@ -110,10 +123,7 @@ class PackageVersionIdDependency(base_dependency.StaticDependency):
         if not retry_options:
             retry_options = DEFAULT_PACKAGE_RETRY_OPTIONS
 
-        if any(
-            self.version_id == v.id
-            for v in itertools.chain(*org.installed_packages.values())
-        ):
+        if not self.is_installable(org):
             context.logger.info(
                 f"{self} or a newer version is already installed; skipping."
             )

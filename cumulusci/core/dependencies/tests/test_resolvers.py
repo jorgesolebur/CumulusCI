@@ -767,6 +767,16 @@ class TestStaticDependencyResolution:
 
         gh = GitHubDynamicDependency(github="https://github.com/SFDO-Tooling/RootRepo")
 
+        dep_repo = PackageNamespaceVersionDependency(
+            namespace="foo",
+            version="1.1",
+            package_name="DependencyRepo",
+            password_env_name="DEP_PW",
+        )
+        root_repo = PackageNamespaceVersionDependency(
+            namespace="bar", version="2.0", package_name="RootRepo"
+        )
+
         assert get_static_dependencies(
             project_config,
             dependencies=[gh],
@@ -777,41 +787,39 @@ class TestStaticDependencyResolution:
                 subfolder="unpackaged/pre/top",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=dep_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="foo",
-                version="1.1",
-                package_name="DependencyRepo",
-                password_env_name="DEP_PW",
-            ),
+            dep_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
                 subfolder="unpackaged/post/top",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="foo",
+                package_dependency=dep_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/first",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="bar", version="2.0", package_name="RootRepo"
-            ),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]
 
@@ -855,50 +863,58 @@ version_id: 04t000000000000""",
             pins=pins,
         )
 
+        dep_repo = PackageNamespaceVersionDependency(
+            namespace="foo",
+            version="1.0",  # from the pinned tag
+            package_name="DependencyRepo",
+            version_id="04t000000000000",
+        )
+        root_repo = PackageNamespaceVersionDependency(
+            namespace="bar",
+            version="1.5",  # From pinned tag
+            package_name="RootRepo",
+            version_id="04t000000000000",
+        )
+
         assert deps == [
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
                 subfolder="unpackaged/pre/top",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=dep_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="foo",
-                version="1.0",  # from the pinned tag
-                package_name="DependencyRepo",
-                version_id="04t000000000000",
-            ),
+            dep_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
                 subfolder="unpackaged/post/top",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="foo",
+                package_dependency=dep_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/first",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="bar",
-                version="1.5",  # From pinned tag
-                package_name="RootRepo",
-                version_id="04t000000000000",
-            ),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]
 
@@ -938,6 +954,16 @@ version_id: 04t000000000000""",
 
         gh = GitHubDynamicDependency(github="https://github.com/SFDO-Tooling/RootRepo")
 
+        root_repo = PackageNamespaceVersionDependency(
+            namespace="bar", version="2.0", package_name="RootRepo"
+        )
+        dep_repo = PackageNamespaceVersionDependency(
+            namespace="foo",
+            version="1.1",  # from the pinned tag
+            package_name="DependencyRepo",
+            password_env_name="DEP_PW",
+        )
+
         assert get_static_dependencies(
             project_config,
             dependencies=[gh],
@@ -949,6 +975,7 @@ version_id: 04t000000000000""",
                 subfolder="unpackaged/pre/top",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=dep_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
@@ -956,28 +983,30 @@ version_id: 04t000000000000""",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="foo",
+                package_dependency=dep_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/first",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="bar", version="2.0", package_name="RootRepo"
-            ),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]
 
@@ -994,6 +1023,10 @@ version_id: 04t000000000000""",
 
         gh = GitHubDynamicDependency(github="https://github.com/SFDO-Tooling/RootRepo")
 
+        root_repo = PackageNamespaceVersionDependency(
+            namespace="bar", version="2.0", package_name="RootRepo"
+        )
+
         assert get_static_dependencies(
             project_config,
             dependencies=[gh],
@@ -1007,21 +1040,22 @@ version_id: 04t000000000000""",
                 subfolder="unpackaged/pre/first",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="tag_sha",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(
-                namespace="bar", version="2.0", package_name="RootRepo"
-            ),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="tag_sha",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]

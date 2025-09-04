@@ -64,6 +64,9 @@ class UpdateDependencies(BaseSalesforceTask):
         "base_package_url_format": {
             "description": "If `interactive` is set to True, display package Ids using a format string ({} will be replaced with the package Id)."
         },
+        "force_pre_post_install": {
+            "description": "Forces the pre-install and post-install steps to be run. Defaults to False."
+        },
         **{k: v for k, v in PACKAGE_INSTALL_TASK_OPTIONS.items() if k != "password"},
     }
 
@@ -220,8 +223,11 @@ class UpdateDependencies(BaseSalesforceTask):
             if not click.confirm("Continue to install dependencies?", default=True):
                 raise CumulusCIException("Dependency installation was canceled.")
 
-        for d in dependencies:
-            self._install_dependency(d)
+        if dependencies:
+            self.logger.info("Installing dependencies:")
+
+            for d in dependencies:
+                self._install_dependency(d)
 
         self.org_config.reset_installed_packages()
 
@@ -233,7 +239,7 @@ class UpdateDependencies(BaseSalesforceTask):
                 self.project_config, self.org_config, self.install_options
             )
         else:
-            dependency.install(self.project_config, self.org_config)
+            dependency.install(self.project_config, self.org_config, self.options)
 
     def freeze(self, step):
         if self.options["interactive"]:

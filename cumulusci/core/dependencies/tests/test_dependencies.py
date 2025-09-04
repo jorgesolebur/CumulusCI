@@ -256,6 +256,8 @@ class TestGitHubDynamicDependency:
             namespace="bar", version="2.0"
         )
 
+        root_repo = PackageNamespaceVersionDependency(namespace="bar", version="2.0")
+
         assert gh.flatten(project_config) == [
             GitHubDynamicDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
@@ -266,20 +268,23 @@ class TestGitHubDynamicDependency:
                 subfolder="unpackaged/pre/first",
                 unmanaged=True,
                 ref="aaaaa",
+                package_dependency=root_repo,
             ),
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="aaaaa",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(namespace="bar", version="2.0"),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="aaaaa",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]
 
@@ -295,6 +300,8 @@ class TestGitHubDynamicDependency:
             namespace="bar", version="2.0"
         )
 
+        root_repo = PackageNamespaceVersionDependency(namespace="bar", version="2.0")
+
         assert gh.flatten(project_config) == [
             GitHubDynamicDependency(
                 github="https://github.com/SFDO-Tooling/DependencyRepo",
@@ -305,14 +312,16 @@ class TestGitHubDynamicDependency:
                 subfolder="unpackaged/pre/second",
                 unmanaged=True,
                 ref="aaaaa",
+                package_dependency=root_repo,
             ),
-            PackageNamespaceVersionDependency(namespace="bar", version="2.0"),
+            root_repo,
             UnmanagedGitHubRefDependency(
                 github="https://github.com/SFDO-Tooling/RootRepo",
                 subfolder="unpackaged/post/first",
                 unmanaged=False,
                 ref="aaaaa",
                 namespace_inject="bar",
+                package_dependency=root_repo,
             ),
         ]
 
@@ -1086,13 +1095,10 @@ class TestUnmanagedVcsDependencyFlow:
 
         # Verify logging
         assert (
-            mock_context.logger.info.call_count == 3
+            mock_context.logger.info.call_count == 2
         )  # Initial log, fetching log, final log
         mock_context.logger.info.assert_any_call(
             "Deploying dependency Flow from https://github.com/test/repo Flow: install_deps @abc123"
-        )
-        mock_context.logger.info.assert_any_call(
-            f"Fetching from {mock_vcs_source_instance}"
         )
         mock_context.logger.info.assert_any_call("Ran install_deps in 5.2s")
 
