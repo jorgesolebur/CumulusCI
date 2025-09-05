@@ -23,8 +23,9 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
             "description": "The description of the the new profile",
             "required": False,
         },
-        "collision_check": {
-            "description": "Performs a collision check with metadata already present in the target org. Defaults to True"
+        "skip_if_exists": {
+            "description": "Skip if the profile already exists in the target org. Defaults to True",
+            "required": False,
         },
     }
 
@@ -43,14 +44,17 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
         self.description = self.options.get("description") or ""
         self.license_id = self.options.get("license_id")
 
-        if self.options.get("collision_check", True):
-            profile_id = self._get_profile_id(self.name)
-            if profile_id:
-                self.logger.info(
+        profile_id = self._get_profile_id(self.name)
+        if profile_id:
+            if not self.options.get("skip_if_exists", True):
+                raise TaskOptionsError(
                     f"Profile '{self.name}' already exists with id: {profile_id}"
                 )
-                self.return_values = {"profile_id": profile_id}
-                return profile_id
+            self.logger.info(
+                f"Profile '{self.name}' already exists with id: {profile_id}"
+            )
+            self.return_values = {"profile_id": profile_id}
+            return profile_id
 
         if not self.license_id:
             self.license_id = self._get_user_license_id(self.license)

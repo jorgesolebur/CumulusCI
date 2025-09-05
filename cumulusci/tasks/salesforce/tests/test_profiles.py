@@ -245,7 +245,7 @@ def test_task_options_error():
 
 
 @responses.activate
-def test_run_task_success_with_collision_check():
+def test_run_task_success_with_skip_if_exists_false():
     query_url = "https://test.salesforce.com/services/data/v53.0/query/"
 
     task = create_task(
@@ -278,10 +278,50 @@ def test_run_task_success_with_collision_check():
     )
 
     result = task._run_task()
+
     assert result == "10056000000VGjUAAW"
     assert responses.calls[0].request.params == {
         "q": "SELECT Id, Name FROM Profile WHERE FullName = 'Test Profile Name' LIMIT 1"
     }
+
+
+@responses.activate
+def test_run_task_success_with_skip_if_exists_true():
+    query_url = "https://test.salesforce.com/services/data/v53.0/query/"
+
+    task = create_task(
+        CreateBlankProfile,
+        {
+            "license": "Foo",
+            "name": "Test Profile Name",
+            "description": "Have fun stormin da castle",
+            "skip_if_exists": False,
+        },
+    )
+    task.org_config._latest_api_version = "53.0"
+
+    responses.add(
+        responses.GET,
+        query_url,
+        json={
+            "done": True,
+            "totalSize": 1,
+            "records": [
+                {
+                    "attributes": {
+                        "type": "Profile",
+                        "url": "/services/data/v53.0/sobjects/Profile/10056000000VGjUAAW",
+                    },
+                    "Id": "10056000000VGjUAAW",
+                    "Name": "Test Profile Name",
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(TaskOptionsError) as e:
+        task._run_task()
+    assert "10056000000VGjUAAW" in str(e)
 
 
 @responses.activate
