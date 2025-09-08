@@ -124,7 +124,7 @@ def test_run_task_success():
     result = task._run_task()
     assert result == "001R0000029IyDPIA0"
     assert responses.calls[0].request.params == {
-        "q": "SELECT Id, Name FROM Profile WHERE FullName = 'Test Profile Name' LIMIT 1"
+        "q": "SELECT Id, Name FROM Profile WHERE Name = 'Test Profile Name' LIMIT 1"
     }
     assert responses.calls[1].request.params == {
         "q": "SELECT Id, Name FROM UserLicense WHERE Name = 'Foo' LIMIT 1"
@@ -281,7 +281,7 @@ def test_run_task_success_with_skip_if_exists_false():
 
     assert result == "10056000000VGjUAAW"
     assert responses.calls[0].request.params == {
-        "q": "SELECT Id, Name FROM Profile WHERE FullName = 'Test Profile Name' LIMIT 1"
+        "q": "SELECT Id, Name FROM Profile WHERE Name = 'Test Profile Name' LIMIT 1"
     }
 
 

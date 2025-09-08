@@ -68,7 +68,7 @@ class CreateBlankProfile(BaseSalesforceMetadataApiTask):
     def _get_profile_id(self, profile_name):
         """Returns the Id of a Profile from a given Name"""
         res = self._query_sf(
-            f"SELECT Id, Name FROM Profile WHERE FullName = '{profile_name}' LIMIT 1"
+            f"SELECT Id, Name FROM Profile WHERE Name = '{profile_name}' LIMIT 1"
         )
         if res["records"]:
             return res["records"][0]["Id"]
