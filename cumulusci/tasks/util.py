@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 import shutil
 import time
 
@@ -220,9 +221,35 @@ class CopyFile(BaseTask):
         },
     }
 
+    def _init_options(self, kwargs):
+        super(CopyFile, self)._init_options(kwargs)
+        self.options["src"] = self.replace_env_vars(self.options["src"])
+        self.options["dest"] = self.replace_env_vars(self.options["dest"])
+
     def _run_task(self):
         self.logger.info("Copying file {src} to {dest}".format(**self.options))
-        shutil.copyfile(src=self.options["src"], dst=self.options["dest"])
+        shutil.copyfile(
+            src=os.path.expandvars(self.options["src"]),
+            dst=os.path.expandvars(self.options["dest"]),
+        )
+
+    def replace_env_vars(self, text):
+        """
+        Environment variable replacement that handles:
+        - &VAR& -> $VAR (POSIX) or %VAR% (Windows)
+        """
+        if not text:
+            return text
+
+        pattern = r"\&([A-Za-z_][A-Za-z0-9_]*)\&"
+        if os.name == "posix":
+            # POSIX: Convert &VAR& to $VAR
+            replacement = r"$\1"
+        else:
+            # Windows: Convert &VAR$ to %VAR%
+            replacement = r"%\1%"
+
+        return re.sub(pattern, replacement, text)
 
 
 class LogLine(BaseTask):
