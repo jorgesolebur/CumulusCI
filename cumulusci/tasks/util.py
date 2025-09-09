@@ -252,6 +252,15 @@ class CopyFile(BaseTask):
         return re.sub(pattern, replacement, text)
 
 
+class LoadDotEnv(BaseTask):
+    def _run_task(self):
+        from dotenv import load_dotenv
+
+        load_dotenv()
+
+        self.logger.info("Loaded .env file")
+
+
 class LogLine(BaseTask):
     task_options = {
         "level": {"description": "The logger level to use", "required": True},

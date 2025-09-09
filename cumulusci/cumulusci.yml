@@ -753,6 +753,10 @@ tasks:
         description: "Copy a file for src to dest with environment variable support, Ex: &TMPDIR&/src resolves to /tmp/src on linux or %TMPDIR%/src on windows."
         class_path: cumulusci.tasks.util.CopyFile
         group: Utilities
+    load_dot_env:
+        description: "Log the contents of the .env file"
+        class_path: cumulusci.tasks.util.LoadDotEnv
+        group: Utilities
     configure_env:
         description: Get or set environment variables.
         class_path: cumulusci.tasks.utility.env_management.EnvManagement
