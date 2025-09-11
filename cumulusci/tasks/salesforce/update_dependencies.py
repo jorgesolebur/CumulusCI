@@ -56,7 +56,7 @@ class UpdateDependencies(BaseSalesforceTask):
             "description": "The name of a sequence of resolution_strategy (from project__dependency_resolutions) to apply to dynamic dependencies."
         },
         "packages_only": {
-            "description": "Install only packaged dependencies. Ignore all unmanaged metadata. Defaults to False."
+            "description": "Install only packaged dependencies. Ignore all unpackaged metadata. Defaults to False."
         },
         "interactive": {
             "description": "If True, stop after identifying all dependencies and output the package Ids that will be installed. Defaults to False."
@@ -65,7 +65,7 @@ class UpdateDependencies(BaseSalesforceTask):
             "description": "If `interactive` is set to True, display package Ids using a format string ({} will be replaced with the package Id)."
         },
         "force_pre_post_install": {
-            "description": "Forces the pre-install and post-install steps to be run. Defaults to False."
+            "description": "Forces the dependency_flow_pre flows and dependency_flow_post flows to run even if the dependency version is already installed. Defaults to False."
         },
         **{k: v for k, v in PACKAGE_INSTALL_TASK_OPTIONS.items() if k != "password"},
     }
