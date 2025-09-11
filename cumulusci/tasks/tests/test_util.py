@@ -182,6 +182,47 @@ class TestUtilTasks:
 
         assert os.path.exists(dest)
 
+    @pytest.mark.skipif(os.name == "posix", reason="Only run on POSIX systems")
+    def test_CopyFileVars(self):
+        src_expanded = os.path.expandvars(os.path.join("$TMPDIR", "src"))
+        with open(src_expanded, "w"):
+            pass
+
+        src = os.path.join("&TMPDIR&", "src")
+        dest = os.path.join("&TMPDIR&", "dest")
+
+        task_config = TaskConfig({"options": {"src": src, "dest": dest}})
+        task = util.CopyFile(self.project_config, task_config, self.org_config)
+        task()
+
+        assert os.path.exists(os.path.expandvars(os.path.join("$TMPDIR", "dest")))
+
+    def test_CopyFileVars_Windows(self):
+        """Test CopyFile environment variable replacement on Windows."""
+        with mock.patch("os.name", "nt"):  # Mock Windows
+            src = os.path.join("&TMPDIR&", "src")
+            dest = os.path.join("&TMPDIR&", "dest")
+
+            task_config = TaskConfig({"options": {"src": src, "dest": dest}})
+            task = util.CopyFile(self.project_config, task_config, self.org_config)
+
+            # On Windows, &TMPDIR& should become %TMPDIR%
+            assert task.options["src"] == os.path.join("%TMPDIR%", "src")
+            assert task.options["dest"] == os.path.join("%TMPDIR%", "dest")
+
+    def test_CopyFileVars_POSIX(self):
+        """Test CopyFile environment variable replacement on POSIX."""
+        with mock.patch("os.name", "posix"):  # Mock POSIX
+            src = os.path.join("&TMPDIR&", "src")
+            dest = os.path.join("&TMPDIR&", "dest")
+
+            task_config = TaskConfig({"options": {"src": src, "dest": dest}})
+            task = util.CopyFile(self.project_config, task_config, self.org_config)
+
+            # On POSIX, &TMPDIR& should become $TMPDIR
+            assert task.options["src"] == os.path.join("$TMPDIR", "src")
+            assert task.options["dest"] == os.path.join("$TMPDIR", "dest")
+
     def test_LogLine(self):
         task_config = TaskConfig({"options": {"level": "debug", "line": "test"}})
         task = util.LogLine(self.project_config, task_config, self.org_config)
