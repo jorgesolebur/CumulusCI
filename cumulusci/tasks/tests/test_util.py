@@ -182,8 +182,9 @@ class TestUtilTasks:
 
         assert os.path.exists(dest)
 
-    @pytest.mark.skipif(os.name == "posix", reason="Only run on POSIX systems")
+    @pytest.mark.skipif(os.name != "posix", reason="Only run on POSIX systems")
     def test_CopyFileVars(self):
+        os.environ["TMPDIR"] = "/tmp"
         src_expanded = os.path.expandvars(os.path.join("$TMPDIR", "src"))
         with open(src_expanded, "w"):
             pass
