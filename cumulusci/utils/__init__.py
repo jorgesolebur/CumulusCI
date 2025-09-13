@@ -42,7 +42,7 @@ BREW_DEPRECATION_MSG = (
     "brew uninstall cumulusci-plus\nbrew install pipx\npipx ensurepath\npipx install cumulusci-plus"
 )
 PIP_UPDATE_CMD = "pip install --upgrade cumulusci-plus"
-PIPX_UPDATE_CMD = "pipx upgrade cumulusci-plus"
+PIPX_UPDATE_CMD = "pipx install cumulusci-plus-azure-devops --include-deps --force"
 
 
 def parse_api_datetime(value):
