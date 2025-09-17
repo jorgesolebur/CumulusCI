@@ -114,11 +114,16 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         "version_base": {
             "description": "The version number to use as a base before incrementing. "
             "Optional; defaults to the highest existing version number of this package. "
-            "Can be set to ``latest_vcs_release`` to use the version of the most recent release published to GitHub."
+            "Can be set to ``latest_vcs_release`` to use the version of the most recent release published to VCS."
+            "If version_number is set, version_base and version_type will be ignored"
         },
         "version_type": {
             "description": "The part of the version number to increment. "
             "Options are major, minor, patch, build.  Defaults to build"
+            "If version_number is set, version_base and version_type will be ignored"
+        },
+        "version_number": {
+            "description": "Set a fixed version number, if not using version_base and version_type"
         },
         "skip_validation": {
             "description": "If true, skip validation of the package version. Default: false. "
@@ -384,9 +389,13 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                     return res["records"][0]["Id"]
 
             # Create the package descriptor
-            version_number = self._get_base_version_number(
+            version_number = self.options.get(
+                "version_number"
+            ) or self._get_base_version_number(
                 package_config.version_base, package_id
-            ).increment(package_config.version_type)
+            ).increment(
+                package_config.version_type
+            )
 
             package_descriptor = {
                 "id": package_id,
