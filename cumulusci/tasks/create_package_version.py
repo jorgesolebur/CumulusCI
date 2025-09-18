@@ -128,6 +128,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         "skip_validation": {
             "description": "If true, skip validation of the package version. Default: false. "
             "Skipping validation creates packages more quickly, but they cannot be promoted for release."
+            "And package version is created without reference to dependencies."
         },
         "org_dependent": {
             "description": "If true, create an org-dependent unlocked package. Default: false."
@@ -160,6 +161,12 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         "create_unlocked_dependency_packages": {
             "description": "If True, create unlocked packages for unpackaged metadata in this project and dependencies. "
             "Defaults to False."
+        },
+        "dependencies": {
+            "description": "The dependencies to use when creating the package version. Defaults to None."
+            "Ensure that the dependencies are in the correct format for Package2VersionCreateRequest."
+            "If not provided, the dependencies will be resolved using the resolution_strategy."
+            "The format should be a list of dictionaries with the key: 'subscriberPackageVersionId' and the value: '04t...'"
         },
     }
 
@@ -204,6 +211,13 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         )
         self.options["create_unlocked_dependency_packages"] = process_bool_arg(
             self.options.get("create_unlocked_dependency_packages") or False
+        )
+        self.options["version_number"] = (
+            PackageVersionNumber.parse(
+                self.options.get("version_number"), package_type=PackageType.SECOND_GEN
+            )
+            if self.options.get("version_number")
+            else None
         )
 
     def _init_task(self):
@@ -452,6 +466,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             ):
                 self.logger.info("Determining dependencies for package")
                 dependencies = self._get_dependencies()
+                dependencies = self.options.get("dependencies")
             if dependencies:
                 package_descriptor["dependencies"] = dependencies
 
