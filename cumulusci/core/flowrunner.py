@@ -164,6 +164,11 @@ class StepSpec:
         )
 
 
+class FlowStepSpec(StepSpec):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class StepResult(NamedTuple):
     step_num: StepVersion
     task_name: str
@@ -356,6 +361,10 @@ class FlowCoordinator:
 
         self.logger = self._init_logger()
         self.steps = self._init_steps()
+        self._expression_cache = {}
+        self._jinja2_context = None
+        self._context_project_config = None
+        self._context_org_config = None
 
     @classmethod
     def from_steps(
@@ -403,6 +412,9 @@ class FlowCoordinator:
         previous_parts = []
         previous_source = None
         for step in self.steps:
+            if isinstance(step, FlowStepSpec):
+                continue
+
             parts = step.path.split(".")
             steps = str(step.step_num).split("/")
             if len(parts) > len(steps):
@@ -491,7 +503,27 @@ class FlowCoordinator:
         self._rule(new_line=True)
 
         try:
+            # Pre-evaluate all flow conditions
+            skipped_flows_set = set()
             for step in self.steps:
+                if isinstance(step, FlowStepSpec):
+                    if not self._evaluate_flow_step(step):
+                        skipped_flows_set.add(step.path)
+
+            # Main execution loop with optimized path checking
+            for step in self.steps:
+                if isinstance(step, FlowStepSpec):
+                    self.logger.info(
+                        f"Skipping Flow {step.task_name} (skipped unless {step.when})"
+                    )
+                    continue
+
+                if self._is_task_in_skipped_flow(step.path, skipped_flows_set):
+                    self.logger.info(
+                        f"Skipping Task {step.task_name} in flow {step.path} (parent flow is skipped)"
+                    )
+                    continue
+
                 self._run_step(step)
             flow_name = f"'{self.name}' " if self.name else ""
             self.logger.info(
@@ -499,6 +531,45 @@ class FlowCoordinator:
             )
         finally:
             self.callbacks.post_flow(self)
+
+    def _get_jinja2_context(self, project_config, org_config):
+        """Get or create jinja2 context, reusing when possible."""
+        if (
+            self._jinja2_context is None
+            or self._context_project_config != project_config
+            or self._context_org_config != org_config
+        ):
+
+            self._jinja2_context = {
+                "project_config": project_config,
+                "org_config": org_config,
+            }
+            self._context_project_config = project_config
+            self._context_org_config = org_config
+
+        return self._jinja2_context
+
+    def _evaluate_flow_step(self, step: StepSpec) -> bool:
+        if not step.when:
+            return True
+
+        # Check cache first
+        if step.when in self._expression_cache:
+            expr = self._expression_cache[step.when]
+        else:
+            expr = jinja2_env.compile_expression(step.when)
+            self._expression_cache[step.when] = expr
+
+        jinja2_context = self._get_jinja2_context(step.project_config, self.org_config)
+
+        return expr(**jinja2_context)
+
+    def _is_task_in_skipped_flow(self, task_path: str, skipped_flows_set: set) -> bool:
+        """Check if task belongs to any skipped flow using O(1) set lookup."""
+        for skipped_path in skipped_flows_set:
+            if task_path.startswith(skipped_path + "."):
+                return True
+        return False
 
     def _run_step(self, step: StepSpec):
         if step.skip:
@@ -508,12 +579,7 @@ class FlowCoordinator:
             return
 
         if step.when:
-            jinja2_context = {
-                "project_config": step.project_config,
-                "org_config": self.org_config,
-            }
-            expr = jinja2_env.compile_expression(step.when)
-            value = expr(**jinja2_context)
+            value = self._evaluate_flow_step(step)
             if not value:
                 self.logger.info(
                     f"Skipping task {step.task_name} (skipped unless {step.when})"
@@ -685,6 +751,20 @@ class FlowCoordinator:
             step_options.update(parent_task_options)
             step_ui_options = step_config.get("ui_options", {})
             flow_config = project_config.get_flow(name)
+
+            if step_config.get("when"):
+                visited_steps.append(
+                    FlowStepSpec(
+                        task_config={},
+                        step_num=step_number,
+                        task_name=path,
+                        task_class=None,
+                        project_config=flow_config.project_config,
+                        allow_failure=step_config.get("ignore_failure", False),
+                        when=step_config.get("when"),
+                    )
+                )
+
             for sub_number, sub_stepconf in flow_config.steps.items():
                 # append the flow number to the child number, since its a LooseVersion.
                 # e.g. if we're in step 2.3 which references a flow with steps 1-5, it
