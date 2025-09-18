@@ -681,6 +681,8 @@ class FlowCoordinator:
             else:
                 path = name
             step_options = step_config.get("options", {})
+            parent_task_options = parent_options.get(name, {})
+            step_options.update(parent_task_options)
             step_ui_options = step_config.get("ui_options", {})
             flow_config = project_config.get_flow(name)
             for sub_number, sub_stepconf in flow_config.steps.items():
