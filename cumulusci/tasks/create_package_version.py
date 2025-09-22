@@ -465,8 +465,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 and not is_dependency
             ):
                 self.logger.info("Determining dependencies for package")
-                dependencies = self._get_dependencies()
-                dependencies = self.options.get("dependencies")
+                dependencies = (
+                    self.options.get("dependencies") or self._get_dependencies()
+                )
             if dependencies:
                 package_descriptor["dependencies"] = dependencies
 
