@@ -43,20 +43,30 @@ def create_mock_sarge_command(stdout="", stderr="", returncode=0):
     return mock_command
 
 
+def setup_devhub_mock(mock_devhub):
+    """Helper function to set up devhub mock"""
+    mock_devhub.return_value.username = "test-devhub@example.com"
+
+
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestSfPackageCommands:
-    def test_init_options_basic(self, mock_sfdx):
+    def test_init_options_basic(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
+        setup_devhub_mock(mock_devhub)
         task = create_task(SfPackageCommands, {})
         task()
         assert task.package_command == "package "
         assert len(task.args) == 2
+        assert "--target-dev-hub" in task.args
+        assert "test-devhub@example.com" in task.args
 
-    def test_init_options_all_flags(self, mock_sfdx):
+    def test_init_options_all_flags(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
         )
+        setup_devhub_mock(mock_devhub)
         task = create_task(
             SfPackageCommands,
             {
@@ -72,35 +82,40 @@ class TestSfPackageCommands:
             "--json",
             "--api-version",
             "50.0",
+            "--target-dev-hub",
+            "test-devhub@example.com",
         ]
         assert all(arg in task.args for arg in expected_args)
 
-    def test_load_json_output_success(self, mock_sfdx):
+    def test_load_json_output_success(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersionId": "04t000000000001"}}
         stdout = json.dumps(json_response)
         mock_command = create_mock_sarge_command(stdout=stdout)
         mock_sfdx.return_value = mock_command
+        setup_devhub_mock(mock_devhub)
 
         task = create_task(SfPackageCommands, {"json_output": True})
         task()
 
         assert task.return_values == json_response
 
-    def test_load_json_output_decode_error(self, mock_sfdx):
+    def test_load_json_output_decode_error(self, mock_sfdx, mock_devhub):
         mock_command = create_mock_sarge_command(stdout="invalid json")
         mock_sfdx.return_value = mock_command
+        setup_devhub_mock(mock_devhub)
 
         task = create_task(SfPackageCommands, {"json_output": True})
 
         with pytest.raises(SalesforceDXException, match="Failed to parse the output"):
             task()
 
-    def test_logging_stdout_and_stderr(self, mock_sfdx):
+    def test_logging_stdout_and_stderr(self, mock_sfdx, mock_devhub):
         mock_command = create_mock_sarge_command(
             stdout="Success: Package version updated\nVersion ID: 04t000000000001",
             stderr="Warning: Some non-critical issue",
         )
         mock_sfdx.return_value = mock_command
+        setup_devhub_mock(mock_devhub)
 
         task = create_task(SfPackageCommands, {})
         with mock.patch.object(task, "logger") as mock_logger:
@@ -114,15 +129,17 @@ class TestSfPackageCommands:
             mock_logger.error.assert_called_with("Warning: Some non-critical issue")
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionUpdateTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
+        setup_devhub_mock(mock_devhub)
         task = create_task(PackageVersionUpdateTask, {"package_id": "0Ho000000000001"})
         task()
         assert task.package_command == "package version update"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersionId": "04t000000000001"}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -163,7 +180,7 @@ class TestPackageVersionUpdateTask:
         assert "/tmp/flags" in call_args
         assert "--json" in call_args
 
-    def test_minimal_options(self, mock_sfdx):
+    def test_minimal_options(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageVersionUpdateTask, {"package_id": "0Ho000000000001"})
         task()
@@ -172,7 +189,7 @@ class TestPackageVersionUpdateTask:
         assert "--package" in call_args
         assert "0Ho000000000001" in call_args
 
-    def test_json_output_logging(self, mock_sfdx):
+    def test_json_output_logging(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersionId": "04t000000000001"}}
         stdout = json.dumps(json_response)
         mock_sfdx.return_value = create_mock_sarge_command(stdout=stdout)
@@ -186,22 +203,23 @@ class TestPackageVersionUpdateTask:
             task()
             mock_logger.info.assert_called_with(json_response)
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):
             create_task(PackageVersionUpdateTask, {})
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionCreateTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageVersionCreateTask, {"package_id": "0Ho000000000001"})
         task()
         assert task.package_command == "package version create"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersionId": "04t000000000001"}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -243,7 +261,7 @@ class TestPackageVersionCreateTask:
         assert "--skip-validation" in call_args
         assert "--json" in call_args
 
-    def test_minimal_options(self, mock_sfdx):
+    def test_minimal_options(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageVersionCreateTask, {"package_id": "0Ho000000000001"})
         task()
@@ -253,15 +271,16 @@ class TestPackageVersionCreateTask:
         assert "0Ho000000000001" in call_args
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionListTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageVersionListTask, {})
         task()
         assert task.package_command == "package version list"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersions": []}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -288,7 +307,7 @@ class TestPackageVersionListTask:
         assert "--concise" in call_args
         assert "--json" in call_args
 
-    def test_minimal_options(self, mock_sfdx):
+    def test_minimal_options(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageVersionListTask, {})
         task()
@@ -298,9 +317,10 @@ class TestPackageVersionListTask:
         assert "--package" not in call_args
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionDisplayTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(
             PackageVersionDisplayTask, {"package_version_id": "04t000000000001"}
@@ -308,7 +328,7 @@ class TestPackageVersionDisplayTask:
         task()
         assert task.package_command == "package version display"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageVersion": {}}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -330,16 +350,17 @@ class TestPackageVersionDisplayTask:
         assert True in call_args  # Boolean flags include the value
         assert "--json" in call_args
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):
             create_task(PackageVersionDisplayTask, {})
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionDeleteTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(
             PackageVersionDeleteTask, {"package_version_id": "04t000000000001"}
@@ -347,7 +368,7 @@ class TestPackageVersionDeleteTask:
         task()
         assert task.package_command == "package version delete"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -369,16 +390,17 @@ class TestPackageVersionDeleteTask:
         assert True in call_args  # Boolean flags include the value
         assert "--json" in call_args
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):
             create_task(PackageVersionDeleteTask, {})
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageVersionReportTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(
             PackageVersionReportTask, {"package_version_id": "04t000000000001"}
@@ -386,7 +408,7 @@ class TestPackageVersionReportTask:
         task()
         assert task.package_command == "package version report"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {
             "status": 0,
             "result": {"reportUrl": "https://example.com/report"},
@@ -414,22 +436,23 @@ class TestPackageVersionReportTask:
         assert "/tmp/reports" in call_args
         assert "--json" in call_args
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):
             create_task(PackageVersionReportTask, {})
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageCreateTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageCreateTask, {"name": "Test Package"})
         task()
         assert task.package_command == "package create"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packageId": "0Ho000000000001"}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -457,22 +480,23 @@ class TestPackageCreateTask:
         assert "/tmp/package" in call_args
         assert "--json" in call_args
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):
             create_task(PackageCreateTask, {})
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageListTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageListTask, {})
         task()
         assert task.package_command == "package list"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"packages": []}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -492,15 +516,16 @@ class TestPackageListTask:
         assert "--json" in call_args
 
 
+@mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.get_devhub_config")
 @mock.patch("cumulusci.tasks.salesforce.SfPackageCommands.sfdx")
 class TestPackageDisplayTask:
-    def test_init_task_sets_command(self, mock_sfdx):
+    def test_init_task_sets_command(self, mock_sfdx, mock_devhub):
         mock_sfdx.return_value = create_mock_sarge_command()
         task = create_task(PackageDisplayTask, {"package_id": "0Ho000000000001"})
         task()
         assert task.package_command == "package display"
 
-    def test_init_options_all_parameters(self, mock_sfdx):
+    def test_init_options_all_parameters(self, mock_sfdx, mock_devhub):
         json_response = {"status": 0, "result": {"package": {}}}
         mock_sfdx.return_value = create_mock_sarge_command(
             stdout=json.dumps(json_response)
@@ -522,7 +547,7 @@ class TestPackageDisplayTask:
         assert True in call_args  # Boolean flags include the value
         assert "--json" in call_args
 
-    def test_missing_required_options(self, mock_sfdx):
+    def test_missing_required_options(self, mock_sfdx, mock_devhub):
         from cumulusci.core.exceptions import TaskOptionsError
 
         with pytest.raises(TaskOptionsError, match="field required"):

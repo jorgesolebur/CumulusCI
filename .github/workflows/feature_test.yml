@@ -70,6 +70,10 @@ jobs:
                   enable-cache: true
             - name: Install dependencies
               run: uv sync -p ${{ matrix.python-version }}
+            - name: Install Salesforce CLI
+              run: npm install @salesforce/cli --global
+            - name: Verify Salesforce CLI
+              run: sf --version
             - name: Run Pytest
               run: uv run pytest --cov-report= --cov=cumulusci
 
@@ -94,6 +98,10 @@ jobs:
                   enable-cache: true
             - name: Install dependencies
               run: uv sync --all-extras -p ${{ matrix.python-version }}
+            - name: Install Salesforce CLI
+              run: npm install @salesforce/cli --global
+            - name: Verify Salesforce CLI
+              run: sf --version
             - name: Run Pytest
               run: uv run pytest --cov-report= --cov=cumulusci
 
