@@ -29,7 +29,7 @@ from cumulusci.core.exceptions import (
     VcsException,
 )
 from cumulusci.core.sfdx import convert_sfdx_source
-from cumulusci.core.utils import process_bool_arg
+from cumulusci.core.utils import process_bool_arg, process_list_arg
 from cumulusci.core.versions import PackageType, PackageVersionNumber, VersionTypeEnum
 from cumulusci.salesforce_api.package_zip import (
     BasePackageZipBuilder,
@@ -163,10 +163,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             "Defaults to False."
         },
         "dependencies": {
-            "description": "The dependencies to use when creating the package version. Defaults to None."
-            "Ensure that the dependencies are in the correct format for Package2VersionCreateRequest."
+            "description": "The list of dependencies to use when creating the package version. Defaults to None."
             "If not provided, the dependencies will be resolved using the resolution_strategy."
-            "The format should be a list of dictionaries with the key: 'subscriberPackageVersionId' and the value: '04t...'"
+            "The format should be a pcakge version Ids i.e '04t...,04t...'"
         },
     }
 
@@ -217,6 +216,14 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 self.options.get("version_number"), package_type=PackageType.SECOND_GEN
             )
             if self.options.get("version_number")
+            else None
+        )
+        self.options["dependencies"] = (
+            [
+                {"subscriberPackageVersionId": x}
+                for x in process_list_arg(self.options.get("dependencies"))
+            ]
+            if self.options.get("dependencies")
             else None
         )
 
