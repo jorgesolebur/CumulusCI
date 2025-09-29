@@ -831,10 +831,10 @@ tasks:
         class_path: cumulusci.tasks.salesforce.SfDataCommands.DataCreateRecordTask
         description: "Executes the `sf data create` command against an org"
         group: SalesforceDX Data Commands
-    pkg_version_update:
+    update_package_version:
         class_path: cumulusci.tasks.salesforce.SfPackageCommands.PackageVersionUpdateTask
         description: "Executes the `sf package version update` command against an org"
-        group: SalesforceDX Package Commands
+        group: Salesforce Packages
 flows:
     ci_beta:
         group: Continuous Integration
