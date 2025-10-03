@@ -842,6 +842,10 @@ tasks:
         options:
             package_name: $project_config.project__package__name
             fail_on_error: False
+    update_named_credential:
+        class_path: cumulusci.tasks.salesforce.update_named_credential.UpdateNamedCredential
+        description: Update named credential parameters
+        group: Metadata Transformations
 
 flows:
     ci_beta:
