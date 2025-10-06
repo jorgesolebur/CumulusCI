@@ -2,18 +2,27 @@ import json
 
 from cumulusci.cli.ui import CliTable
 from cumulusci.core.exceptions import CumulusCIException
-from cumulusci.core.utils import process_list_arg
+from cumulusci.core.utils import process_list_arg, process_bool_arg, determine_managed_mode
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
+from cumulusci.utils import inject_namespace
 
 
 class AssignPermissionSets(BaseSalesforceApiTask):
     task_docs = """
 Assigns Permission Sets whose Names are in ``api_names`` to either the default org user or the user whose Alias is ``user_alias``. This task skips assigning Permission Sets that are already assigned.
+
+Permission Set names can include namespace tokens that will be replaced based on the context:
+- ``%%%NAMESPACE%%%`` is replaced with the package's namespace in managed contexts (e.g., when the package is installed)
+- ``%%%NAMESPACED_ORG%%%`` is replaced with the package's namespace in namespaced orgs only (e.g., packaging orgs)
+- ``%%%NAMESPACE_OR_C%%%`` is replaced with the namespace in managed contexts, or 'c' otherwise
+- ``%%%NAMESPACED_ORG_OR_C%%%`` is replaced with the namespace in namespaced orgs, or 'c' otherwise
+
+The managed mode and namespaced org detection is automatic based on the org context.
     """
 
     task_options = {
         "api_names": {
-            "description": "API Names of desired Permission Sets, separated by commas.",
+            "description": "API Names of desired Permission Sets, separated by commas. Can include namespace tokens like %%%NAMESPACE%%%.",
             "required": True,
         },
         "user_alias": {
@@ -36,7 +45,51 @@ Assigns Permission Sets whose Names are in ``api_names`` to either the default o
             self.options.get("user_alias") or []
         )
 
+    def _init_namespace_injection(self):
+        """Initialize namespace injection options for processing permission set names.
+        
+        This automatically determines managed mode and namespaced org context based on:
+        - Whether the package is installed in the org (managed mode)
+        - Whether we're in a packaging org (namespaced org)
+        """
+        namespace = self.project_config.project__package__namespace
+        
+        # Automatically determine managed mode based on org context
+        managed = determine_managed_mode(
+            self.options, self.project_config, self.org_config
+        )
+        
+        # Automatically determine if we're in a namespaced org (e.g., packaging org)
+        namespaced_org = (
+            bool(namespace) and namespace == getattr(self.org_config, "namespace", None)
+        )
+        
+        # Store in options for use by inject_namespace
+        self.options["namespace_inject"] = namespace
+        self.options["managed"] = managed
+        self.options["namespaced_org"] = namespaced_org
+
+    def _inject_namespace(self, text):
+        """Inject the namespace into the given text if running in managed mode."""
+        if self.org_config is None:
+            return text
+        return inject_namespace(
+            "",
+            text,
+            namespace=self.options.get("namespace_inject"),
+            managed=self.options.get("managed") or False,
+            namespaced_org=self.options.get("namespaced_org"),
+        )[1]
+
     def _run_task(self):
+        # Initialize namespace injection only if tokens are present or options are set
+        if self.org_config and self._needs_namespace_injection():
+            self._init_namespace_injection()
+            # Process namespace tokens in api_names
+            self.options["api_names"] = [
+                self._inject_namespace(api_name) for api_name in self.options["api_names"]
+            ]
+
         users = self._query_existing_assignments()
         users_assigned_perms = {
             user["Id"]: self._get_assigned_perms(user) for user in users
@@ -50,6 +103,14 @@ Assigns Permission Sets whose Names are in ``api_names`` to either the default o
             )
 
         self._insert_assignments(records_to_insert)
+
+    def _needs_namespace_injection(self):
+        """Check if namespace injection is needed based on presence of tokens in api_names."""
+        namespace_tokens = ["%%%NAMESPACE%%%", "%%%NAMESPACED_ORG%%%", "%%%NAMESPACE_OR_C%%%", "%%%NAMESPACED_ORG_OR_C%%%", "%%%NAMESPACE_DOT%%%"]
+        return any(
+            any(token in api_name for token in namespace_tokens)
+            for api_name in self.options["api_names"]
+        )
 
     def _query_existing_assignments(self):
         if not self.options["user_alias"]:
