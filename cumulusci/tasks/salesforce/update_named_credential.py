@@ -166,24 +166,12 @@ class NamedCredentialParameter(CCIOptions):
 
 class TransformNamedCredentialParameter(NamedCredentialParameter):
     def param_value(self, http_header=None):
-        """Get the parameter value"""
-        if self.url:
-            return os.getenv(self.url)
-        if self.authentication:
-            return os.getenv(self.authentication)
-        if self.certificate:
-            return os.getenv(self.certificate)
-        if self.allowed_managed_package_namespaces:
-            return os.getenv(self.allowed_managed_package_namespaces)
-        if http_header:
-            http_header_item = next(
-                (item for item in self.http_header if item.name == http_header), None
-            )
-            if http_header_item:
-                return os.getenv(http_header_item.value)
+        value = super().param_value(http_header)
+        if value:
+            return os.getenv(value)
+        return None
 
 
-NamedCredentialHttpHeader.update_forward_refs()
 NamedCredentialParameter.update_forward_refs()
 TransformNamedCredentialParameter.update_forward_refs()
 
