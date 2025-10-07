@@ -9,11 +9,13 @@ from cumulusci.core.exceptions import TaskOptionsError
 from cumulusci.core.tasks import BaseSalesforceTask
 from cumulusci.tasks.command import Command
 from cumulusci.utils import inject_namespace
-from cumulusci.utils.dependencies.dependency_utilities import determine_managed_mode
+from cumulusci.core.utils import determine_managed_mode
 
 
 class SfdmuTask(BaseSalesforceTask, Command):
     """Execute SFDmu data migration with namespace injection support."""
+
+    salesforce_task = False  # Override to False since we manage our own org requirements
 
     task_options = {
         "source": {
@@ -24,9 +26,13 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "description": "Target org name (CCI org name like dev, beta, qa, etc.) or 'csvfile'",
             "required": True,
         },
-        "p": {
+        "path": {
             "description": "Path to folder containing export.json and other CSV files",
             "required": True,
+        },
+        "additional_params": {
+            "description": "Additional parameters to append to the sf sfdmu command (e.g., '--simulation --noprompt --nowarnings')",
+            "required": False,
         },
     }
 
@@ -34,15 +40,15 @@ class SfdmuTask(BaseSalesforceTask, Command):
         super()._init_options(kwargs)
         
         # Convert path to absolute path
-        self.options["p"] = os.path.abspath(self.options["p"])
+        self.options["path"] = os.path.abspath(self.options["path"])
         
         # Validate that the path exists and contains export.json
-        if not os.path.exists(self.options["p"]):
-            raise TaskOptionsError(f"Path {self.options['p']} does not exist")
+        if not os.path.exists(self.options["path"]):
+            raise TaskOptionsError(f"Path {self.options['path']} does not exist")
         
-        export_json_path = os.path.join(self.options["p"], "export.json")
+        export_json_path = os.path.join(self.options["path"], "export.json")
         if not os.path.exists(export_json_path):
-            raise TaskOptionsError(f"export.json not found in {self.options['p']}")
+            raise TaskOptionsError(f"export.json not found in {self.options['path']}")
 
     def _validate_org(self, org_name):
         """Validate that a CCI org exists and return the org config."""
@@ -84,6 +90,12 @@ class SfdmuTask(BaseSalesforceTask, Command):
                 shutil.copy2(item_path, execute_path)
         
         return execute_path
+
+    def _update_credentials(self):
+        """Override to handle cases where org_config might be None."""
+        # Only update credentials if we have an org_config
+        if self.org_config is not None:
+            super()._update_credentials()
 
     def _inject_namespace_tokens(self, execute_path, target_org_config):
         """Inject namespace tokens into files in execute directory using the same mechanism as Deploy task."""
@@ -158,11 +170,55 @@ class SfdmuTask(BaseSalesforceTask, Command):
                                 target.write(source.read())
                         
                         self.logger.info(f"Applied namespace injection to {file_info.filename}")
+            
+            # Apply %%%ALWAYS_NAMESPACE%%% token replacement
+            if namespace:
+                self._apply_always_namespace_token(execute_path, namespace)
         
         finally:
             # Clean up temporary zipfile
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
+
+    def _apply_always_namespace_token(self, execute_path, namespace):
+        """Apply %%%ALWAYS_NAMESPACE%%% and ___ALWAYS_NAMESPACE___ token replacement to all files in execute directory."""
+        always_namespace_token = "%%%ALWAYS_NAMESPACE%%%"
+        always_namespace_filename_token = "___ALWAYS_NAMESPACE___"
+        namespace_prefix = namespace + "__"
+        
+        # Process all JSON and CSV files in the execute directory
+        for root, dirs, files in os.walk(execute_path):
+            for file in files:
+                if file.endswith(('.json', '.csv')):
+                    file_path = os.path.join(root, file)
+                    
+                    # Check if filename contains the token
+                    if always_namespace_filename_token in file:
+                        # Create new filename with token replaced
+                        new_filename = file.replace(always_namespace_filename_token, namespace_prefix)
+                        new_file_path = os.path.join(root, new_filename)
+                        
+                        # Rename the file
+                        os.rename(file_path, new_file_path)
+                        file_path = new_file_path
+                        file = new_filename
+                        
+                        self.logger.info(f"Applied ___ALWAYS_NAMESPACE___ filename token replacement: {file}")
+                    
+                    # Read file content
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Check if token exists in content
+                    if always_namespace_token in content:
+                        # Replace token with namespace prefix
+                        new_content = content.replace(always_namespace_token, namespace_prefix)
+                        
+                        # Write back to file
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(new_content)
+                        
+                        self.logger.info(f"Applied %%%ALWAYS_NAMESPACE%%% token replacement to {file}")
 
     def _run_task(self):
         """Execute the SFDmu task."""
@@ -182,7 +238,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
             target_sf_org = "csvfile"
         
         # Create execute directory and copy files
-        execute_path = self._create_execute_directory(self.options["p"])
+        execute_path = self._create_execute_directory(self.options["path"])
         self.logger.info(f"Created execute directory at {execute_path}")
         
         # Apply namespace injection
@@ -195,6 +251,13 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "-u", target_sf_org,
             "-p", execute_path
         ]
+        
+        # Append additional parameters if provided
+        if self.options.get("additional_params"):
+            # Split the additional_params string into individual arguments
+            # This handles cases like "-no-warnings -m -t error" -> ["-no-warnings", "-m", "-t", "error"]
+            additional_args = self.options["additional_params"].split()
+            command.extend(additional_args)
         
         self.logger.info(f"Executing: {' '.join(command)}")
         

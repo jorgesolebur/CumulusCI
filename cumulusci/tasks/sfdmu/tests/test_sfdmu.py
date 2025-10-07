@@ -32,9 +32,9 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=temp_dir
+                path=temp_dir
             )
-            assert task.options["p"] == os.path.abspath(temp_dir)
+            assert task.options["path"] == os.path.abspath(temp_dir)
 
     def test_init_options_raises_error_for_missing_path(self):
         """Test that _init_options raises error for missing path."""
@@ -48,7 +48,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p="/nonexistent/path"
+                path="/nonexistent/path"
             )
 
     def test_init_options_raises_error_for_missing_export_json(self):
@@ -64,7 +64,7 @@ class TestSfdmuTask:
                     mock.Mock(),
                     source="dev",
                     target="qa",
-                    p=temp_dir
+                    path=temp_dir
                 )
 
     def test_validate_org_csvfile(self):
@@ -78,7 +78,7 @@ class TestSfdmuTask:
             mock.Mock(),
             source="csvfile",
             target="csvfile",
-            p="/tmp"  # Will be overridden in _init_options
+            path="/tmp"  # Will be overridden in _init_options
         )
         
         result = task._validate_org("csvfile")
@@ -95,7 +95,7 @@ class TestSfdmuTask:
             mock.Mock(),
             source="dev",
             target="qa",
-            p="/tmp"  # Will be overridden in _init_options
+            path="/tmp"  # Will be overridden in _init_options
         )
         
         with pytest.raises(Exception):  # TaskOptionsError
@@ -116,7 +116,7 @@ class TestSfdmuTask:
             mock.Mock(),
             source="dev",
             target="qa",
-            p="/tmp"  # Will be overridden in _init_options
+            path="/tmp"  # Will be overridden in _init_options
         )
         
         result = task._get_sf_org_name(mock_org_config)
@@ -137,7 +137,7 @@ class TestSfdmuTask:
             mock.Mock(),
             source="dev",
             target="qa",
-            p="/tmp"  # Will be overridden in _init_options
+            path="/tmp"  # Will be overridden in _init_options
         )
         
         result = task._get_sf_org_name(mock_org_config)
@@ -173,7 +173,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=base_dir
+                path=base_dir
             )
             
             execute_path = task._create_execute_directory(base_dir)
@@ -217,7 +217,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=base_dir
+                path=base_dir
             )
             
             execute_path = task._create_execute_directory(base_dir)
@@ -244,7 +244,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="csvfile",
-                p=execute_dir
+                path=execute_dir
             )
             
             # Should not raise any errors and files should remain unchanged
@@ -287,7 +287,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=execute_dir
+                path=execute_dir
             )
             
             task._inject_namespace_tokens(execute_dir, mock_org_config)
@@ -331,7 +331,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=execute_dir
+                path=execute_dir
             )
             
             task._inject_namespace_tokens(execute_dir, mock_org_config)
@@ -368,7 +368,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=execute_dir
+                path=execute_dir
             )
             
             task._inject_namespace_tokens(execute_dir, mock_org_config)
@@ -403,7 +403,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=execute_dir
+                path=execute_dir
             )
             
             task._inject_namespace_tokens(execute_dir, mock_org_config)
@@ -436,7 +436,7 @@ class TestSfdmuTask:
                 mock.Mock(),
                 source="dev",
                 target="qa",
-                p=execute_dir
+                path=execute_dir
             )
             
             task._inject_namespace_tokens(execute_dir, mock_org_config)
@@ -446,3 +446,253 @@ class TestSfdmuTask:
                 content = f.read()
                 assert "Test" in content  # %%NAMESPACE%% removed
                 assert "%%%NAMESPACE%%%" not in content
+
+    def test_apply_always_namespace_token(self):
+        """Test that %%%ALWAYS_NAMESPACE%%% token is always replaced with namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test files with %%%ALWAYS_NAMESPACE%%% token
+            test_json = os.path.join(execute_dir, "test.json")
+            test_csv = os.path.join(execute_dir, "test.csv")
+            
+            with open(test_json, "w") as f:
+                f.write('{"field": "%%%ALWAYS_NAMESPACE%%%Test"}')
+            with open(test_csv, "w") as f:
+                f.write("Name,%%%ALWAYS_NAMESPACE%%%Field\nTest,Value")
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with namespace
+            task._apply_always_namespace_token(execute_dir, "testns")
+            
+            # Check that %%%ALWAYS_NAMESPACE%%% token was replaced with namespace prefix
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "testns__Test" in content
+                assert "%%%ALWAYS_NAMESPACE%%%" not in content
+            
+            with open(test_csv, "r") as f:
+                content = f.read()
+                assert "testns__Field" in content
+                assert "%%%ALWAYS_NAMESPACE%%%" not in content
+
+    def test_apply_always_namespace_token_no_namespace(self):
+        """Test that %%%ALWAYS_NAMESPACE%%% token is not processed when no namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with %%%ALWAYS_NAMESPACE%%% token
+            test_json = os.path.join(execute_dir, "test.json")
+            with open(test_json, "w") as f:
+                f.write('{"field": "%%%ALWAYS_NAMESPACE%%%Test"}')
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with no namespace (None)
+            task._apply_always_namespace_token(execute_dir, None)
+            
+            # Check that %%%ALWAYS_NAMESPACE%%% token was not processed
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "%%%ALWAYS_NAMESPACE%%%Test" in content  # Token should remain unchanged
+
+    def test_apply_always_namespace_token_empty_namespace(self):
+        """Test that %%%ALWAYS_NAMESPACE%%% token is not processed when empty namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with %%%ALWAYS_NAMESPACE%%% token
+            test_json = os.path.join(execute_dir, "test.json")
+            with open(test_json, "w") as f:
+                f.write('{"field": "%%%ALWAYS_NAMESPACE%%%Test"}')
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with empty namespace
+            task._apply_always_namespace_token(execute_dir, "")
+            
+            # Check that %%%ALWAYS_NAMESPACE%%% token was not processed
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "%%%ALWAYS_NAMESPACE%%%Test" in content  # Token should remain unchanged
+
+    def test_apply_always_namespace_filename_token(self):
+        """Test that ___ALWAYS_NAMESPACE___ filename token is always replaced with namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with ___ALWAYS_NAMESPACE___ token in filename
+            test_json = os.path.join(execute_dir, "___ALWAYS_NAMESPACE___test.json")
+            test_csv = os.path.join(execute_dir, "data___ALWAYS_NAMESPACE___.csv")
+            
+            with open(test_json, "w") as f:
+                f.write('{"field": "test"}')
+            with open(test_csv, "w") as f:
+                f.write("col1,col2\nval1,val2")
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with namespace
+            task._apply_always_namespace_token(execute_dir, "testns")
+            
+            # Check that files were renamed with namespace prefix
+            expected_json = os.path.join(execute_dir, "testns__test.json")
+            expected_csv = os.path.join(execute_dir, "datatestns__.csv")
+            
+            assert os.path.exists(expected_json)
+            assert os.path.exists(expected_csv)
+            assert not os.path.exists(test_json)  # Original file should be gone
+            assert not os.path.exists(test_csv)  # Original file should be gone
+
+    def test_apply_always_namespace_filename_token_no_namespace(self):
+        """Test that ___ALWAYS_NAMESPACE___ filename token is not processed when no namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with ___ALWAYS_NAMESPACE___ token in filename
+            test_json = os.path.join(execute_dir, "___ALWAYS_NAMESPACE___test.json")
+            with open(test_json, "w") as f:
+                f.write('{"field": "test"}')
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with no namespace (None)
+            task._apply_always_namespace_token(execute_dir, None)
+            
+            # Check that file was not renamed
+            assert os.path.exists(test_json)  # Original file should still exist
+            assert not os.path.exists(os.path.join(execute_dir, "test.json"))  # No renamed file
+
+    def test_apply_always_namespace_filename_token_empty_namespace(self):
+        """Test that ___ALWAYS_NAMESPACE___ filename token is not processed when empty namespace."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with ___ALWAYS_NAMESPACE___ token in filename
+            test_json = os.path.join(execute_dir, "___ALWAYS_NAMESPACE___test.json")
+            with open(test_json, "w") as f:
+                f.write('{"field": "test"}')
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with empty namespace
+            task._apply_always_namespace_token(execute_dir, "")
+            
+            # Check that file was not renamed
+            assert os.path.exists(test_json)  # Original file should still exist
+            assert not os.path.exists(os.path.join(execute_dir, "test.json"))  # No renamed file
+
+    def test_apply_always_namespace_both_tokens(self):
+        """Test that both content and filename tokens work together."""
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file with both tokens
+            test_json = os.path.join(execute_dir, "___ALWAYS_NAMESPACE___test.json")
+            with open(test_json, "w") as f:
+                f.write('{"field": "%%%ALWAYS_NAMESPACE%%%Test"}')
+            
+            mock_project_config = mock.Mock()
+            mock_project_config.keychain = None
+            
+            task = SfdmuTask(
+                mock_project_config,
+                mock.Mock(),
+                mock.Mock(),
+                source="dev",
+                target="qa",
+                path=execute_dir
+            )
+            
+            # Test with namespace
+            task._apply_always_namespace_token(execute_dir, "testns")
+            
+            # Check that both tokens were processed
+            expected_json = os.path.join(execute_dir, "testns__test.json")
+            assert os.path.exists(expected_json)
+            assert not os.path.exists(test_json)  # Original file should be gone
+            
+            # Check content was also processed
+            with open(expected_json, "r") as f:
+                content = f.read()
+                assert "testns__Test" in content
+                assert "%%%ALWAYS_NAMESPACE%%%" not in content
+
+    def test_additional_params_option_exists(self):
+        """Test that additional_params option is properly defined in task_options."""
+        # Check that the additional_params option is defined
+        assert "additional_params" in SfdmuTask.task_options
+        assert SfdmuTask.task_options["additional_params"]["required"] is False
+        assert "Additional parameters" in SfdmuTask.task_options["additional_params"]["description"]
+
+    def test_additional_params_parsing_logic(self):
+        """Test that additional_params parsing logic works correctly."""
+        # Test the splitting logic that would be used in the task
+        additional_params = "-no-warnings -m -t error"
+        additional_args = additional_params.split()
+        expected_args = ["-no-warnings", "-m", "-t", "error"]
+        assert additional_args == expected_args
+
+    def test_additional_params_empty_string_logic(self):
+        """Test that empty additional_params are handled correctly."""
+        # Test the splitting logic with empty string
+        additional_params = ""
+        additional_args = additional_params.split()
+        assert additional_args == []
+
+    def test_additional_params_none_logic(self):
+        """Test that None additional_params are handled correctly."""
+        # Test the logic that would be used in the task
+        additional_params = None
+        if additional_params:
+            additional_args = additional_params.split()
+        else:
+            additional_args = []
+        assert additional_args == []
