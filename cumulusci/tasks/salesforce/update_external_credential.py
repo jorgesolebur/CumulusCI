@@ -203,8 +203,11 @@ class ExternalCredentialParameter(CCIOptions):
             ext_cred_param["parameterValue"] = None
             if self.named_principal.sequence_number is not None:
                 ext_cred_param["sequenceNumber"] = self.named_principal.sequence_number
-            if self.named_principal.group is not None:
-                ext_cred_param["parameterGroup"] = self.named_principal.group
+            ext_cred_param["parameterGroup"] = (
+                self.named_principal.group
+                if self.named_principal.group is not None
+                else self.named_principal.name
+            )
 
         if self.per_user_principal is not None:
             ext_cred_param["parameterType"] = "PerUserPrincipal"
