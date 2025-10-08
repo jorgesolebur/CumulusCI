@@ -35,32 +35,6 @@ The task supports the following namespace tokens:
 - `%%%NAMESPACED_ORG%%%` - Replaced with namespaced org prefix
 - `___NAMESPACE___` - Replaced in filenames
 - `___NAMESPACED_ORG___` - Replaced in filenames
-- `%%%ALWAYS_NAMESPACE%%%` - **Always** replaced with namespace prefix (if namespace exists), regardless of managed/unmanaged context
-- `___ALWAYS_NAMESPACE___` - **Always** replaced in filenames with namespace prefix (if namespace exists), regardless of managed/unmanaged context
-
-### Special Tokens: %%%ALWAYS_NAMESPACE%%% and ___ALWAYS_NAMESPACE___
-
-The `%%%ALWAYS_NAMESPACE%%%` and `___ALWAYS_NAMESPACE___` tokens are processed after the standard namespace injection and will always be replaced with the namespace prefix (e.g., `myns__`) if a namespace is available, regardless of whether the deployment is in managed or unmanaged mode. This is useful when you need to ensure namespace prefixes are always applied to certain fields or filenames.
-
-**Content Token Example:**
-```json
-{
-  "object": "%%%ALWAYS_NAMESPACE%%%CustomObject__c",
-  "field": "%%%NAMESPACE%%%CustomField__c"
-}
-```
-
-**Filename Token Example:**
-```
-___ALWAYS_NAMESPACE___data.json
-mydata___ALWAYS_NAMESPACE___.csv
-```
-
-In these examples:
-- `%%%ALWAYS_NAMESPACE%%%CustomObject__c` will always become `myns__CustomObject__c` (if namespace is `myns`)
-- `%%%NAMESPACE%%%CustomField__c` will become `myns__CustomField__c` in managed mode or `CustomField__c` in unmanaged mode
-- `___ALWAYS_NAMESPACE___data.json` will always become `myns__data.json` (if namespace is `myns`)
-- `mydata___ALWAYS_NAMESPACE___.csv` will always become `mydatamyns__.csv` (if namespace is `myns`)
 
 ## Example
 

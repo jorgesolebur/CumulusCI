@@ -171,54 +171,12 @@ class SfdmuTask(BaseSalesforceTask, Command):
                         
                         self.logger.info(f"Applied namespace injection to {file_info.filename}")
             
-            # Apply %%%ALWAYS_NAMESPACE%%% token replacement
-            if namespace:
-                self._apply_always_namespace_token(execute_path, namespace)
         
         finally:
             # Clean up temporary zipfile
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
 
-    def _apply_always_namespace_token(self, execute_path, namespace):
-        """Apply %%%ALWAYS_NAMESPACE%%% and ___ALWAYS_NAMESPACE___ token replacement to all files in execute directory."""
-        always_namespace_token = "%%%ALWAYS_NAMESPACE%%%"
-        always_namespace_filename_token = "___ALWAYS_NAMESPACE___"
-        namespace_prefix = namespace + "__"
-        
-        # Process all JSON and CSV files in the execute directory
-        for root, dirs, files in os.walk(execute_path):
-            for file in files:
-                if file.endswith(('.json', '.csv')):
-                    file_path = os.path.join(root, file)
-                    
-                    # Check if filename contains the token
-                    if always_namespace_filename_token in file:
-                        # Create new filename with token replaced
-                        new_filename = file.replace(always_namespace_filename_token, namespace_prefix)
-                        new_file_path = os.path.join(root, new_filename)
-                        
-                        # Rename the file
-                        os.rename(file_path, new_file_path)
-                        file_path = new_file_path
-                        file = new_filename
-                        
-                        self.logger.info(f"Applied ___ALWAYS_NAMESPACE___ filename token replacement: {file}")
-                    
-                    # Read file content
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Check if token exists in content
-                    if always_namespace_token in content:
-                        # Replace token with namespace prefix
-                        new_content = content.replace(always_namespace_token, namespace_prefix)
-                        
-                        # Write back to file
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(new_content)
-                        
-                        self.logger.info(f"Applied %%%ALWAYS_NAMESPACE%%% token replacement to {file}")
 
     def _run_task(self):
         """Execute the SFDmu task."""
