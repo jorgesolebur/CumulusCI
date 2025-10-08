@@ -416,6 +416,190 @@ class TestCreatePermissionSet:
         table.assert_called_once()
         assert expected_table_data in table.call_args[0]
 
+    @responses.activate
+    def test_namespace_injection_managed(self):
+        """Test that %%%NAMESPACE%%% token gets replaced in managed context"""
+        task = create_task(
+            AssignPermissionSets,
+            {
+                "api_names": "%%%NAMESPACE%%%PermSet1,PermSet2",
+            },
+        )
+        # Simulate managed context by setting the namespace in project config
+        task.project_config.config["project"]["package"]["namespace"] = "testns"
+        # Simulate that the package is installed (managed mode)
+        task.org_config._installed_packages = {"testns": "1.0"}
+        task.org_config.namespace = None  # Not a packaging org
+
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C%28SELECT+PermissionSetId+FROM+PermissionSetAssignments%29+FROM+User+WHERE+Username+%3D+%27test-cci%40example.com%27",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 1,
+                "records": [
+                    {
+                        "Id": "005000000000000",
+                        "PermissionSetAssignments": None,
+                    }
+                ],
+            },
+        )
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27testns__PermSet1%27%2C+%27PermSet2%27%29",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 2,
+                "records": [
+                    {
+                        "Id": "0PS000000000000",
+                        "Name": "testns__PermSet1",
+                    },
+                    {
+                        "Id": "0PS000000000001",
+                        "Name": "PermSet2",
+                    },
+                ],
+            },
+        )
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=200,
+            json=[
+                {"id": "0Pa000000000000", "success": True, "errors": []},
+                {"id": "0Pa000000000001", "success": True, "errors": []},
+            ],
+        )
+
+        task()
+
+        assert len(responses.calls) == 3
+        # Verify that the SOQL query contains the namespaced permission set name
+        assert "testns__PermSet1" in responses.calls[1].request.url
+
+    @responses.activate
+    def test_namespace_injection_unmanaged(self):
+        """Test that %%%NAMESPACE%%% token gets stripped in unmanaged context"""
+        task = create_task(
+            AssignPermissionSets,
+            {
+                "api_names": "%%%NAMESPACE%%%PermSet1",
+            },
+        )
+        # Simulate unmanaged context (scratch org) - no installed packages
+        task.project_config.config["project"]["package"]["namespace"] = "testns"
+        task.org_config._installed_packages = {}
+        task.org_config.namespace = None  # Not a packaging org
+
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C%28SELECT+PermissionSetId+FROM+PermissionSetAssignments%29+FROM+User+WHERE+Username+%3D+%27test-cci%40example.com%27",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 1,
+                "records": [
+                    {
+                        "Id": "005000000000000",
+                        "PermissionSetAssignments": None,
+                    }
+                ],
+            },
+        )
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%29",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 1,
+                "records": [
+                    {
+                        "Id": "0PS000000000000",
+                        "Name": "PermSet1",
+                    },
+                ],
+            },
+        )
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=200,
+            json=[
+                {"id": "0Pa000000000000", "success": True, "errors": []},
+            ],
+        )
+
+        task()
+
+        assert len(responses.calls) == 3
+        # Verify that the SOQL query does NOT contain the namespace prefix
+        assert "testns__" not in responses.calls[1].request.url
+        assert "PermSet1" in responses.calls[1].request.url
+
+    @responses.activate
+    def test_namespaced_org_token(self):
+        """Test that %%%NAMESPACED_ORG%%% token gets replaced in namespaced org context"""
+        task = create_task(
+            AssignPermissionSets,
+            {
+                "api_names": "%%%NAMESPACED_ORG%%%PermSet1",
+            },
+        )
+        # Simulate namespaced org context (packaging org)
+        task.project_config.config["project"]["package"]["namespace"] = "testns"
+        task.org_config._installed_packages = {}
+        task.org_config.namespace = "testns"  # This makes it a namespaced org
+
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C%28SELECT+PermissionSetId+FROM+PermissionSetAssignments%29+FROM+User+WHERE+Username+%3D+%27test-cci%40example.com%27",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 1,
+                "records": [
+                    {
+                        "Id": "005000000000000",
+                        "PermissionSetAssignments": None,
+                    }
+                ],
+            },
+        )
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27testns__PermSet1%27%29",
+            status=200,
+            json={
+                "done": True,
+                "totalSize": 1,
+                "records": [
+                    {
+                        "Id": "0PS000000000000",
+                        "Name": "testns__PermSet1",
+                    },
+                ],
+            },
+        )
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=200,
+            json=[
+                {"id": "0Pa000000000000", "success": True, "errors": []},
+            ],
+        )
+
+        task()
+
+        assert len(responses.calls) == 3
+        # Verify that the SOQL query contains the namespaced permission set name
+        assert "testns__PermSet1" in responses.calls[1].request.url
+
 
 class TestCreatePermissionSetLicense:
     @responses.activate
