@@ -2,7 +2,7 @@ import json
 
 from cumulusci.cli.ui import CliTable
 from cumulusci.core.exceptions import CumulusCIException
-from cumulusci.core.utils import process_list_arg, process_bool_arg, determine_managed_mode
+from cumulusci.core.utils import determine_managed_mode, process_list_arg
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils import inject_namespace
 
@@ -47,23 +47,23 @@ The managed mode and namespaced org detection is automatic based on the org cont
 
     def _init_namespace_injection(self):
         """Initialize namespace injection options for processing permission set names.
-        
+
         This automatically determines managed mode and namespaced org context based on:
         - Whether the package is installed in the org (managed mode)
         - Whether we're in a packaging org (namespaced org)
         """
         namespace = self.project_config.project__package__namespace
-        
+
         # Automatically determine managed mode based on org context
         managed = determine_managed_mode(
             self.options, self.project_config, self.org_config
         )
-        
+
         # Automatically determine if we're in a namespaced org (e.g., packaging org)
-        namespaced_org = (
-            bool(namespace) and namespace == getattr(self.org_config, "namespace", None)
+        namespaced_org = bool(namespace) and namespace == getattr(
+            self.org_config, "namespace", None
         )
-        
+
         # Store in options for use by inject_namespace
         self.options["namespace_inject"] = namespace
         self.options["managed"] = managed
@@ -87,7 +87,8 @@ The managed mode and namespaced org detection is automatic based on the org cont
             self._init_namespace_injection()
             # Process namespace tokens in api_names
             self.options["api_names"] = [
-                self._inject_namespace(api_name) for api_name in self.options["api_names"]
+                self._inject_namespace(api_name)
+                for api_name in self.options["api_names"]
             ]
 
         users = self._query_existing_assignments()
@@ -106,7 +107,13 @@ The managed mode and namespaced org detection is automatic based on the org cont
 
     def _needs_namespace_injection(self):
         """Check if namespace injection is needed based on presence of tokens in api_names."""
-        namespace_tokens = ["%%%NAMESPACE%%%", "%%%NAMESPACED_ORG%%%", "%%%NAMESPACE_OR_C%%%", "%%%NAMESPACED_ORG_OR_C%%%", "%%%NAMESPACE_DOT%%%"]
+        namespace_tokens = [
+            "%%%NAMESPACE%%%",
+            "%%%NAMESPACED_ORG%%%",
+            "%%%NAMESPACE_OR_C%%%",
+            "%%%NAMESPACED_ORG_OR_C%%%",
+            "%%%NAMESPACE_DOT%%%",
+        ]
         return any(
             any(token in api_name for token in namespace_tokens)
             for api_name in self.options["api_names"]
