@@ -3,19 +3,19 @@
 import os
 import shutil
 import subprocess
-from pathlib import Path
 
 from cumulusci.core.exceptions import TaskOptionsError
 from cumulusci.core.tasks import BaseSalesforceTask
-from cumulusci.tasks.command import Command
-from cumulusci.utils import inject_namespace
 from cumulusci.core.utils import determine_managed_mode
+from cumulusci.tasks.command import Command
 
 
 class SfdmuTask(BaseSalesforceTask, Command):
     """Execute SFDmu data migration with namespace injection support."""
 
-    salesforce_task = False  # Override to False since we manage our own org requirements
+    salesforce_task = (
+        False  # Override to False since we manage our own org requirements
+    )
 
     task_options = {
         "source": {
@@ -38,14 +38,14 @@ class SfdmuTask(BaseSalesforceTask, Command):
 
     def _init_options(self, kwargs):
         super()._init_options(kwargs)
-        
+
         # Convert path to absolute path
         self.options["path"] = os.path.abspath(self.options["path"])
-        
+
         # Validate that the path exists and contains export.json
         if not os.path.exists(self.options["path"]):
             raise TaskOptionsError(f"Path {self.options['path']} does not exist")
-        
+
         export_json_path = os.path.join(self.options["path"], "export.json")
         if not os.path.exists(export_json_path):
             raise TaskOptionsError(f"export.json not found in {self.options['path']}")
@@ -54,7 +54,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
         """Validate that a CCI org exists and return the org config."""
         if org_name == "csvfile":
             return None
-        
+
         try:
             if self.project_config.keychain is None:
                 raise TaskOptionsError("No keychain available")
@@ -65,30 +65,30 @@ class SfdmuTask(BaseSalesforceTask, Command):
 
     def _get_sf_org_name(self, org_config):
         """Get the SF org name from org config."""
-        if hasattr(org_config, 'sfdx_alias') and org_config.sfdx_alias:
+        if hasattr(org_config, "sfdx_alias") and org_config.sfdx_alias:
             return org_config.sfdx_alias
-        elif hasattr(org_config, 'username') and org_config.username:
+        elif hasattr(org_config, "username") and org_config.username:
             return org_config.username
         else:
-            raise TaskOptionsError(f"Could not determine SF org name for org config")
+            raise TaskOptionsError("Could not determine SF org name for org config")
 
     def _create_execute_directory(self, base_path):
         """Create /execute directory and copy files from base_path."""
         execute_path = os.path.join(base_path, "execute")
-        
+
         # Remove existing execute directory if it exists
         if os.path.exists(execute_path):
             shutil.rmtree(execute_path)
-        
+
         # Create execute directory
         os.makedirs(execute_path, exist_ok=True)
-        
+
         # Copy only files (not directories) from base_path to execute
         for item in os.listdir(base_path):
             item_path = os.path.join(base_path, item)
-            if os.path.isfile(item_path):
+            if os.path.isfile(item_path) and item.endswith((".json", ".csv")):
                 shutil.copy2(item_path, execute_path)
-        
+
         return execute_path
 
     def _update_credentials(self):
@@ -101,143 +101,156 @@ class SfdmuTask(BaseSalesforceTask, Command):
         """Inject namespace tokens into files in execute directory using the same mechanism as Deploy task."""
         if target_org_config is None:  # csvfile case
             return
-        
+
         # Get namespace information
         namespace = self.project_config.project__package__namespace
         managed = determine_managed_mode(
             self.options, self.project_config, target_org_config
         )
-        namespaced_org = (
-            bool(namespace) and namespace == getattr(target_org_config, 'namespace', None)
+        namespaced_org = bool(namespace) and namespace == getattr(
+            target_org_config, "namespace", None
         )
-        
+
         # Create a temporary zipfile with all files from execute directory
         import tempfile
         import zipfile
-        from cumulusci.core.source_transforms.transforms import NamespaceInjectionTransform, NamespaceInjectionOptions
+
         from cumulusci.core.dependencies.utils import TaskContext
-        
-        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+        from cumulusci.core.source_transforms.transforms import (
+            NamespaceInjectionOptions,
+            NamespaceInjectionTransform,
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_zip:
             temp_zip_path = temp_zip.name
-        
+
         try:
             # Create zipfile with all files from execute directory
-            with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for root, dirs, files in os.walk(execute_path):
                     for file in files:
-                        if file.endswith(('.json', '.csv')):
+                        if file.endswith((".json", ".csv")):
                             file_path = os.path.join(root, file)
                             # Calculate relative path from execute_path
                             rel_path = os.path.relpath(file_path, execute_path)
                             zf.write(file_path, rel_path)
-            
+
             # Apply namespace injection using the same mechanism as Deploy task
-            with zipfile.ZipFile(temp_zip_path, 'r') as zf:
+            with zipfile.ZipFile(temp_zip_path, "r") as zf:
                 # Create namespace injection options
                 options = NamespaceInjectionOptions(
                     namespace_tokenize=None,
                     namespace_inject=namespace,
                     namespace_strip=None,
                     unmanaged=not managed,
-                    namespaced_org=namespaced_org
+                    namespaced_org=namespaced_org,
                 )
-                
+
                 # Create transform
                 transform = NamespaceInjectionTransform(options)
-                
+
                 # Create task context
-                context = TaskContext(target_org_config, self.project_config, self.logger)
-                
+                context = TaskContext(
+                    target_org_config, self.project_config, self.logger
+                )
+
                 # Apply namespace injection
                 new_zf = transform.process(zf, context)
-                
+
                 # Extract processed files back to execute directory
                 # First, remove all existing files
                 for root, dirs, files in os.walk(execute_path):
                     for file in files:
-                        if file.endswith(('.json', '.csv')):
+                        if file.endswith((".json", ".csv")):
                             os.remove(os.path.join(root, file))
-                
+
                 # Extract processed files
                 for file_info in new_zf.infolist():
-                    if file_info.filename.endswith(('.json', '.csv')):
+                    if file_info.filename.endswith((".json", ".csv")):
                         # Extract to execute directory
                         target_path = os.path.join(execute_path, file_info.filename)
                         # Ensure directory exists
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
                         with new_zf.open(file_info) as source:
-                            with open(target_path, 'wb') as target:
+                            with open(target_path, "wb") as target:
                                 target.write(source.read())
-                        
-                        self.logger.info(f"Applied namespace injection to {file_info.filename}")
-            
-        
+
+                        self.logger.info(
+                            f"Applied namespace injection to {file_info.filename}"
+                        )
+
         finally:
             # Clean up temporary zipfile
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
-
 
     def _run_task(self):
         """Execute the SFDmu task."""
         # Validate source and target orgs
         source_org_config = self._validate_org(self.options["source"])
         target_org_config = self._validate_org(self.options["target"])
-        
+
         # Get SF org names
         if source_org_config:
             source_sf_org = self._get_sf_org_name(source_org_config)
         else:
             source_sf_org = "csvfile"
-            
+
         if target_org_config:
             target_sf_org = self._get_sf_org_name(target_org_config)
         else:
             target_sf_org = "csvfile"
-        
+
         # Create execute directory and copy files
         execute_path = self._create_execute_directory(self.options["path"])
         self.logger.info(f"Created execute directory at {execute_path}")
-        
+
         # Apply namespace injection
         self._inject_namespace_tokens(execute_path, target_org_config)
-        
+
         # Build and execute SFDmu command
         command = [
-            "sf", "sfdmu", "run",
-            "-s", source_sf_org,
-            "-u", target_sf_org,
-            "-p", execute_path
+            "sf",
+            "sfdmu",
+            "run",
+            "-s",
+            source_sf_org,
+            "-u",
+            target_sf_org,
+            "-p",
+            execute_path,
         ]
-        
+
         # Append additional parameters if provided
         if self.options.get("additional_params"):
             # Split the additional_params string into individual arguments
             # This handles cases like "-no-warnings -m -t error" -> ["-no-warnings", "-m", "-t", "error"]
             additional_args = self.options["additional_params"].split()
             command.extend(additional_args)
-        
+
         self.logger.info(f"Executing: {' '.join(command)}")
-        
+
         # Execute the command with real-time output
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
-            bufsize=1
+            bufsize=1,
         )
-        
+
         # Stream output in real-time
         if process.stdout:
-            for line in iter(process.stdout.readline, ''):
+            for line in iter(process.stdout.readline, ""):
                 if line:
                     self.logger.info(line.rstrip())
-        
+
         process.wait()
-        
+
         # Check return code
         if process.returncode != 0:
-            raise TaskOptionsError(f"SFDmu command failed with return code {process.returncode}")
-        
+            raise TaskOptionsError(
+                f"SFDmu command failed with return code {process.returncode}"
+            )
+
         self.logger.info("SFDmu task completed successfully")

@@ -245,7 +245,7 @@ def inject_namespace(
 ):
     """Replaces %%%NAMESPACE%%% in file content and ___NAMESPACE___ in file name
     with either '' if no namespace is provided or 'namespace__' if provided.
-    
+
     Also handles:
     - %%%MANAGED_OR_NAMESPACED_ORG%%% and ___MANAGED_OR_NAMESPACED_ORG___ tokens
       which are replaced with 'namespace__' if managed=True OR namespaced_org=True
@@ -268,7 +268,7 @@ def inject_namespace(
     # Handle tokens %%%NAMESPACED_ORG%%% and ___NAMESPACED_ORG___
     namespaced_org_token = "%%%NAMESPACED_ORG%%%"
     namespaced_org_file_token = "___NAMESPACED_ORG___"
-    namespaced_org = namespace + "__" if namespaced_org else ""
+    namespaced_org = (namespace + "__") if namespaced_org and namespace else ""
 
     # Handle token %%%NAMESPACE_OR_C%%% for lightning components
     namespace_or_c_token = "%%%NAMESPACE_OR_C%%%"
@@ -278,11 +278,12 @@ def inject_namespace(
     namespaced_org_or_c_token = "%%%NAMESPACED_ORG_OR_C%%%"
     namespaced_org_or_c = namespace if namespaced_org else "c"
 
-
     # Handle new tokens %%%MANAGED_OR_NAMESPACED_ORG%%% and ___MANAGED_OR_NAMESPACED_ORG___
     managed_or_namespaced_org_token = "%%%MANAGED_OR_NAMESPACED_ORG%%%"
     managed_or_namespaced_org_file_token = "___MANAGED_OR_NAMESPACED_ORG___"
-    managed_or_namespaced_org = namespace + "__" if ((managed) or (namespaced_org)) else ""
+    managed_or_namespaced_org = (
+        (namespace + "__") if ((managed) or (namespaced_org)) and namespace else ""
+    )
 
     orig_name = name
     prev_content = content
@@ -336,7 +337,9 @@ def inject_namespace(
 
     # Replace new managed_or_namespaced_org token in content
     prev_content = content
-    content = content.replace(managed_or_namespaced_org_token, managed_or_namespaced_org)
+    content = content.replace(
+        managed_or_namespaced_org_token, managed_or_namespaced_org
+    )
     if logger and content != prev_content:
         logger.info(
             f'  {name}: Replaced {managed_or_namespaced_org_token} with "{managed_or_namespaced_org}"'
