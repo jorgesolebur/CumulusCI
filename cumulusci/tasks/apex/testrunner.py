@@ -10,7 +10,12 @@ from cumulusci.core.exceptions import (
     CumulusCIException,
     TaskOptionsError,
 )
-from cumulusci.core.utils import decode_to_unicode, process_bool_arg, process_list_arg, determine_managed_mode
+from cumulusci.core.utils import (
+    decode_to_unicode,
+    determine_managed_mode,
+    process_bool_arg,
+    process_list_arg,
+)
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils.http.requests_utils import safe_json_from_response
 

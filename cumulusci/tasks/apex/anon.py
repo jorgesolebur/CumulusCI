@@ -4,7 +4,7 @@ from cumulusci.core.exceptions import (
     SalesforceException,
     TaskOptionsError,
 )
-from cumulusci.core.utils import process_bool_arg, determine_managed_mode
+from cumulusci.core.utils import determine_managed_mode, process_bool_arg
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils import in_directory, inject_namespace
 from cumulusci.utils.http.requests_utils import safe_json_from_response

@@ -189,7 +189,7 @@ def validate_service(options: dict, keychain) -> dict:
     server_domain = options.get("server_domain", None)
 
     gh = _determine_github_client(server_domain, {"token": token})
-    if type(gh) == GitHubEnterprise:
+    if isinstance(gh, GitHubEnterprise):
         validate_gh_enterprise(server_domain, keychain)
     try:
         authed_user = gh.me()

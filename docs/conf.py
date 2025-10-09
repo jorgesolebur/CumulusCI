@@ -237,8 +237,8 @@ latex_engine = "xelatex"
 
 
 latex_elements = {
-    'preamble': r'''\renewcommand{\familydefault}{\sfdefault}  % Set default font to sans-serif
-''',
+    "preamble": r"""\renewcommand{\familydefault}{\sfdefault}  % Set default font to sans-serif
+""",
 }
 
 

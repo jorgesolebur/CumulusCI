@@ -6,7 +6,7 @@ from pathlib import Path
 
 from cumulusci.cli.ui import CliTable
 from cumulusci.core.exceptions import SalesforceException
-from cumulusci.core.utils import process_bool_arg, process_list_arg, determine_managed_mode
+from cumulusci.core.utils import determine_managed_mode, process_list_arg
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils import inject_namespace
 

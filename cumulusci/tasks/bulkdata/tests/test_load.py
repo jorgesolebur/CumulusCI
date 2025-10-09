@@ -2715,8 +2715,6 @@ class TestLoadData:
         chunks_index = 0
 
         def fetchmany(batch_size):
-            nonlocal chunks_index
-
             assert 200 == batch_size
 
             # _generate_contact_id_map_for_person_accounts should break if fetchmany returns falsy.

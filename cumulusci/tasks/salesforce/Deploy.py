@@ -12,7 +12,11 @@ from cumulusci.core.source_transforms.transforms import (
     SourceTransform,
     SourceTransformList,
 )
-from cumulusci.core.utils import process_bool_arg, process_list_arg, determine_managed_mode
+from cumulusci.core.utils import (
+    determine_managed_mode,
+    process_bool_arg,
+    process_list_arg,
+)
 from cumulusci.salesforce_api.metadata import ApiDeploy, ApiRetrieveUnpackaged
 from cumulusci.salesforce_api.package_zip import MetadataPackageZipBuilder
 from cumulusci.salesforce_api.rest_deploy import RestDeploy

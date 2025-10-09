@@ -1,1 +1,8 @@
 Test*.yaml
+
+# Template files that are not pure JSON/YAML
+cumulusci/files/templates/**/*
+docs/diagram/presentation.json
+cumulusci/tasks/release_notes/tests/change_notes/full/example1.md
+
+docs/**/*

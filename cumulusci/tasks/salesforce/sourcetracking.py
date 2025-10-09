@@ -312,7 +312,7 @@ def retrieve_components(
                 "5",
                 "--ignore-conflicts",
             ]
-            
+
             # Only add --output-dir if output_dir was specified
             if output_dir:
                 sfdx_args.extend(["--output-dir", retrieve_target])

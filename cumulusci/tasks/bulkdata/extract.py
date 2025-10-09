@@ -213,7 +213,6 @@ class ExtractData(SqlAlchemyMixin, BaseSalesforceApiTask):
             IsPersonAccount_index = columns.index(mapping.fields["IsPersonAccount"])
 
             def strip_name_field(record):
-                nonlocal Name_index, IsPersonAccount_index
                 if record[IsPersonAccount_index].lower() == "true":
                     record[Name_index] = ""
                 return record
