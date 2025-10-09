@@ -2,7 +2,6 @@ import os
 from typing import Any, Dict, List, Optional
 
 from pydantic import root_validator
-from simple_salesforce.exceptions import SalesforceResourceNotFound
 
 from cumulusci.core.exceptions import SalesforceDXException
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
@@ -537,40 +536,27 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
                 f"{namespace}{self.parsed_options.name}"
             )
 
-            try:
-                credential_response = self.connect._call_salesforce(
-                    method="GET",
-                    url=f"{self.connect.base_url}named-credentials/credential",
-                    params=credential_param,
-                )
+            self.logger.info(f"Managing credential for {param.named_principal.name}...")
 
-                credential = credential_response.json()
-                credential.pop("authenticationStatus")
-                credential["credentials"] = param.get_credential_parameter()
+            credential_response = self.connect._call_salesforce(
+                method="GET",
+                url=f"{self.connect.base_url}named-credentials/credential",
+                params=credential_param,
+            )
 
-                response = self.connect._call_salesforce(
-                    method="PUT",
-                    url=f"{self.connect.base_url}named-credentials/credential",
-                    json=credential,
-                )
+            credential = credential_response.json()
+            credential.pop("authenticationStatus")
+            http_verb = "PUT" if credential["credentials"] else "POST"
+            credential["credentials"] = param.get_credential_parameter()
 
-                if not response.ok:
-                    msg = f"Failed to update credential {param.named_principal.name}: {response.json()}"
-                    raise SalesforceDXException(msg)
+            response = self.connect._call_salesforce(
+                method=http_verb,
+                url=f"{self.connect.base_url}named-credentials/credential",
+                json=credential,
+            )
 
-                self.logger.info(f"Updated credential {param.named_principal.name}")
+            if not response.ok:
+                msg = f"Failed to update credential {param.named_principal.name}: {response.json()}"
+                raise SalesforceDXException(msg)
 
-            except SalesforceResourceNotFound:
-
-                response = self.connect._call_salesforce(
-                    method="POST",
-                    url=f"{self.connect.base_url}named-credentials/credential",
-                    json=param.get_credential(f"{namespace}{self.parsed_options.name}"),
-                )
-
-                if not response.ok:
-                    msg = f"Failed to create credential {param.named_principal.name}: {response.json()}"
-                    raise SalesforceDXException(msg)
-
-                self.logger.info(f"Created credential for {param.named_principal.name}")
-                continue
+            self.logger.info(f"Updated credential {param.named_principal.name}")
