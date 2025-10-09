@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from cumulusci.tasks.bulkdata.select_utils import (
@@ -617,6 +619,10 @@ def test_vectorize_records_mixed_numerical_boolean_categorical():
 @pytest.mark.skipif(
     not PANDAS_AVAILABLE or not OPTIONAL_DEPENDENCIES_AVAILABLE,
     reason="requires optional dependencies for annoy",
+)
+@pytest.mark.skipif(
+    sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
+    reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
 )
 def test_annoy_post_process():
     # Test data
