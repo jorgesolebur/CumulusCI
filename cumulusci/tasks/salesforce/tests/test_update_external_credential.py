@@ -381,7 +381,13 @@ class TestUpdateExternalCredential:
                 "principalType": "NamedPrincipal",
                 "principalName": "MyPrincipal",
                 "externalCredential": "testExtCred",
-                "authenticationStatus": "Valid",
+                "authenticationStatus": "Configured",
+                "credentials": {
+                    "clientId": {
+                        "value": "client123",
+                        "encrypted": False,
+                    },
+                },
             },
             status=200,
         )
@@ -452,8 +458,14 @@ class TestUpdateExternalCredential:
         responses.add(
             method="GET",
             url=f"{connect_url}/named-credentials/credential",
-            json={"error": "Not Found"},
-            status=404,
+            json={
+                "principalType": "NamedPrincipal",
+                "principalName": "MyPrincipal",
+                "externalCredential": "testExtCred",
+                "authenticationStatus": "Configured",
+                "credentials": {},
+            },
+            status=200,
         )
 
         # Mock create credential
