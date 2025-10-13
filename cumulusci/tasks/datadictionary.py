@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 from unittest.mock import Mock
 from zipfile import ZipFile
 
-from pydantic import BaseModel
+from pydantic.v1 import BaseModel
 
 from cumulusci.core.config.project_config import BaseProjectConfig
 from cumulusci.core.dependencies import parse_dependencies
