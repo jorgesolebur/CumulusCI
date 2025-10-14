@@ -765,6 +765,10 @@ tasks:
         description: Get all environment variables from a target JSON file and generates a .env file that can be used to set up the environment variables for the deployment
         class_path: cumulusci.tasks.utility.secretsToEnv.SecretsToEnv
         group: Utilities
+    directory_recreator:
+        description: Remove and recreate a directory
+        class_path: cumulusci.tasks.utility.directoryRecreator.DirectoryRecreator
+        group: Utilities
     download_extract:
         description: Downloads files and folders from a VCS repository.
         class_path: cumulusci.tasks.vcs.download_extract.DownloadExtract
