@@ -92,6 +92,7 @@ select = [
     "numpy",
     "pandas",
     "scikit-learn",
+    "boto3"
 ]
 
 [project.scripts]
