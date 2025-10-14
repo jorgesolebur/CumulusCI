@@ -75,8 +75,8 @@ class SecretsToEnv(BaseTask):
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
 
-        # Write env file
-        with open(output_file, "w") as env_file:
+        # Write env file with UTF-8 encoding to support Unicode characters
+        with open(output_file, "w", encoding="utf-8") as env_file:
             for key, value in self.env_values.items():
                 env_file.write(f'{key}="{value}"\n')
 
