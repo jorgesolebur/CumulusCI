@@ -2,6 +2,21 @@
 
 <!-- latest-start -->
 
+## v5.0.26 (2025-10-14)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix lint issues. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#95](https://github.com/jorgesolebur/CumulusCI/pull/95)
+* Fix failing test on Mac with Python 3.11 and 3.13 by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#97](https://github.com/jorgesolebur/CumulusCI/pull/97)
+* Feature/secret manager by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#99](https://github.com/jorgesolebur/CumulusCI/pull/99)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.25...v5.0.26
+
+
+<!-- latest-stop -->
+
 ## v5.0.25 (2025-10-09)
 
 <!-- Release notes generated using configuration in .github/release.yml at main -->
@@ -16,8 +31,6 @@
 - PM-2203 Create a CCI task for CCI to wrap SFDMU and apply namespace token replacement before executing sf sfdmu run command by [@jorgesolebur](https://github.com/jorgesolebur) in [#88](https://github.com/jorgesolebur/CumulusCI/pull/88)
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.24...v5.0.25
-
-<!-- latest-stop -->
 
 ## v5.0.24 (2025-09-29)
 
