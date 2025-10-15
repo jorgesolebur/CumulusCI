@@ -3,6 +3,7 @@
 import html
 import io
 import json
+import os
 import re
 
 from cumulusci.core.exceptions import (
@@ -171,12 +172,21 @@ class RunApexTests(BaseSalesforceApiTask):
         "required_per_class_code_coverage_percent": {
             "description": "Require at least X percent code coverage for every class in the org.",
         },
+        "required_individual_class_code_coverage_percent": {
+            "description": "Dictionary mapping test class names to their minimum coverage percentage requirements. "
+            "Takes priority over required_per_class_code_coverage_percent for specified classes.",
+        },
         "verbose": {
             "description": "By default, only failures get detailed output. "
             "Set verbose to True to see all passed test methods."
         },
         "test_suite_names": {
             "description": "Accepts a comma-separated list of test suite names. Only runs test classes that are part of the test suites specified."
+        },
+        "package_only": {
+            "description": "If True, only run test classes that exist in the default package directory (force-app/ or src/). "
+            "This filters test classes from the org that match test_name_match but are not part of the local project. "
+            "Defaults to False."
         },
     }
 
@@ -229,6 +239,10 @@ class RunApexTests(BaseSalesforceApiTask):
             self.options.get("retry_always") or False
         )
 
+        self.options["package_only"] = process_bool_arg(
+            self.options.get("package_only") or False
+        )
+
         self.verbose = process_bool_arg(self.options.get("verbose") or False)
 
         self.counts = {}
@@ -248,6 +262,26 @@ class RunApexTests(BaseSalesforceApiTask):
         self.required_per_class_code_coverage_percent = int(
             self.options.get("required_per_class_code_coverage_percent", 0)
         )
+        
+        # Parse individual class coverage requirements
+        self.required_individual_class_code_coverage_percent = {}
+        if "required_individual_class_code_coverage_percent" in self.options:
+            individual_coverage = self.options["required_individual_class_code_coverage_percent"]
+            if isinstance(individual_coverage, dict):
+                # Validate that all values are integers or can be converted to integers
+                try:
+                    self.required_individual_class_code_coverage_percent = {
+                        class_name: int(coverage)
+                        for class_name, coverage in individual_coverage.items()
+                    }
+                except (ValueError, TypeError) as e:
+                    raise TaskOptionsError(
+                        f"Invalid value in required_individual_class_code_coverage_percent: {e}"
+                    )
+            else:
+                raise TaskOptionsError(
+                    "required_individual_class_code_coverage_percent must be a dictionary mapping class names to coverage percentages"
+                )
         # Raises a TaskOptionsError when the user provides both test_suite_names and test_name_match.
         if (self.options["test_suite_names"]) and (
             self.options["test_name_match"] is not None
@@ -381,6 +415,52 @@ class RunApexTests(BaseSalesforceApiTask):
         result = self.tooling.query_all(query2)
         self.logger.info("Found {} test classes".format(result["totalSize"]))
         return result
+
+    def _class_exists_in_package(self, class_name):
+        """Check if an Apex class exists in the default package directory."""
+        package_path = self.project_config.default_package_path
+        
+        # Walk through the package directory to find .cls files
+        for root, dirs, files in os.walk(package_path):
+            for file in files:
+                if file.endswith('.cls'):
+                    # Extract class name from filename (remove .cls extension)
+                    file_class_name = file[:-4]
+                    if file_class_name == class_name:
+                        return True
+        return False
+
+    def _filter_package_classes(self, test_classes):
+        """Filter test classes to only include those that exist in the package directory."""
+        if not self.options.get("package_only"):
+            return test_classes
+        
+        filtered_records = []
+        excluded_count = 0
+        
+        for record in test_classes["records"]:
+            class_name = record["Name"]
+            if self._class_exists_in_package(class_name):
+                filtered_records.append(record)
+            else:
+                excluded_count += 1
+                self.logger.debug(
+                    f"Excluding test class '{class_name}' - not found in package directory"
+                )
+        
+        if excluded_count > 0:
+            self.logger.info(
+                f"Excluded {excluded_count} test class(es) not in package directory"
+            )
+        
+        # Update the result with filtered records
+        filtered_result = {
+            "totalSize": len(filtered_records),
+            "records": filtered_records,
+            "done": test_classes.get("done", True),
+        }
+        
+        return filtered_result
 
     def _get_test_methods_for_class(self, class_name):
         result = self.tooling.query(
@@ -620,6 +700,11 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _run_task(self):
         result = self._get_test_classes()
+        
+        # Apply package_only filter if enabled
+        if self.options.get("package_only"):
+            result = self._filter_package_classes(result)
+        
         if result["totalSize"] == 0:
             return
         for test_class in result["records"]:
@@ -680,13 +765,14 @@ class RunApexTests(BaseSalesforceApiTask):
         class_level_coverage_failures = {}
 
         # Query for Class level code coverage using the aggregate
-        if self.required_per_class_code_coverage_percent:
+        if self.required_per_class_code_coverage_percent or self.required_individual_class_code_coverage_percent:
             test_classes = self.tooling.query(
                 "SELECT ApexClassOrTrigger.Name, ApexClassOrTriggerId, NumLinesCovered, NumLinesUncovered FROM ApexCodeCoverageAggregate ORDER BY ApexClassOrTrigger.Name ASC"
             )["records"]
 
             coverage_percentage = 0
             for class_level in test_classes:
+                class_name = class_level["ApexClassOrTrigger"]["Name"]
                 total = (
                     class_level["NumLinesCovered"] + class_level["NumLinesUncovered"]
                 )
@@ -698,26 +784,47 @@ class RunApexTests(BaseSalesforceApiTask):
                         2,
                     )
 
-                if coverage_percentage < self.required_per_class_code_coverage_percent:
-                    class_level_coverage_failures[
-                        class_level["ApexClassOrTrigger"]["Name"]
-                    ] = coverage_percentage
+                # Determine the required coverage for this class using fallback logic
+                required_coverage = None
+                if class_name in self.required_individual_class_code_coverage_percent:
+                    # Individual class requirement takes priority
+                    required_coverage = self.required_individual_class_code_coverage_percent[class_name]
+                elif self.required_per_class_code_coverage_percent:
+                    # Fall back to global per-class requirement
+                    required_coverage = self.required_per_class_code_coverage_percent
+                
+                # Only check if a requirement is defined for this class
+                if required_coverage is not None and coverage_percentage < required_coverage:
+                    class_level_coverage_failures[class_name] = {
+                        "actual": coverage_percentage,
+                        "required": required_coverage
+                    }
 
         # Query for OrgWide coverage
         result = self.tooling.query("SELECT PercentCovered FROM ApexOrgWideCoverage")
         coverage = result["records"][0]["PercentCovered"]
 
         errors = []
-        if self.required_per_class_code_coverage_percent:
+        if self.required_per_class_code_coverage_percent or self.required_individual_class_code_coverage_percent:
             if class_level_coverage_failures:
-                for class_name in class_level_coverage_failures.keys():
+                for class_name, coverage_info in class_level_coverage_failures.items():
                     errors.append(
-                        f"{class_name}'s code coverage of {class_level_coverage_failures[class_name]}% is below required level of {self.required_per_class_code_coverage_percent}."
+                        f"{class_name}'s code coverage of {coverage_info['actual']}% is below required level of {coverage_info['required']}%."
                     )
             else:
-                self.logger.info(
-                    f"All classes meet code coverage expectations of {self.required_per_class_code_coverage_percent}% ."
-                )
+                # Build a message about what requirements were met
+                if self.required_per_class_code_coverage_percent and self.required_individual_class_code_coverage_percent:
+                    self.logger.info(
+                        f"All classes meet code coverage expectations (global: {self.required_per_class_code_coverage_percent}%, individual class requirements also satisfied)."
+                    )
+                elif self.required_per_class_code_coverage_percent:
+                    self.logger.info(
+                        f"All classes meet code coverage expectations of {self.required_per_class_code_coverage_percent}%."
+                    )
+                elif self.required_individual_class_code_coverage_percent:
+                    self.logger.info(
+                        "All classes with individual coverage requirements meet their expectations."
+                    )
 
         if coverage < self.code_coverage_level:
             errors.append(
