@@ -183,10 +183,10 @@ class RunApexTests(BaseSalesforceApiTask):
         "test_suite_names": {
             "description": "Accepts a comma-separated list of test suite names. Only runs test classes that are part of the test suites specified."
         },
-        "package_only": {
-            "description": "If True, only run test classes that exist in the default package directory (force-app/ or src/). "
-            "This filters test classes from the org that match test_name_match but are not part of the local project. "
-            "Defaults to False."
+        "dynamic_filter": {
+            "description": "Defines a dynamic filter to apply to test classes. Supported values: 'package_only' - only runs test classes "
+            "that exist in the default package directory (force-app/ or src/), filtering out classes from the org that match "
+            "test_name_match but are not part of the local project. Additional filter values will be supported in the future."
         },
     }
 
@@ -239,9 +239,8 @@ class RunApexTests(BaseSalesforceApiTask):
             self.options.get("retry_always") or False
         )
 
-        self.options["package_only"] = process_bool_arg(
-            self.options.get("package_only") or False
-        )
+        # Process the dynamic_filter option
+        self.options["dynamic_filter"] = self.options.get("dynamic_filter", None)
 
         self.verbose = process_bool_arg(self.options.get("verbose") or False)
 
@@ -432,7 +431,7 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _filter_package_classes(self, test_classes):
         """Filter test classes to only include those that exist in the package directory."""
-        if not self.options.get("package_only"):
+        if self.options.get("dynamic_filter") != "package_only":
             return test_classes
         
         filtered_records = []
@@ -701,8 +700,8 @@ class RunApexTests(BaseSalesforceApiTask):
     def _run_task(self):
         result = self._get_test_classes()
         
-        # Apply package_only filter if enabled
-        if self.options.get("package_only"):
+        # Apply dynamic filters if enabled
+        if self.options.get("dynamic_filter"):
             result = self._filter_package_classes(result)
         
         if result["totalSize"] == 0:

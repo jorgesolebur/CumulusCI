@@ -2,6 +2,18 @@
 
 <!-- latest-start -->
 
+## v5.0.27 (2025-10-16)
+
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+
+### Changes
+
+- Add `dynamic_filter` option to `run_tests` task to replace `package_only`, enabling extensible test filtering (e.g., `dynamic_filter: "package_only"`)
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.26...v5.0.27
+
 ## v5.0.26 (2025-10-14)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 

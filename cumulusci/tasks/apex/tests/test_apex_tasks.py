@@ -972,7 +972,7 @@ class TestRunApexTests(MockLoggerMixin):
         assert task.result is None
 
     def test_package_only_filter__filters_classes_not_in_package(self):
-        """Test that package_only filters out classes not in the package directory"""
+        """Test that dynamic_filter='package_only' filters out classes not in the package directory"""
         from unittest.mock import PropertyMock
         
         # Create temporary directory structure with some test class files
@@ -988,9 +988,9 @@ class TestRunApexTests(MockLoggerMixin):
             with open(os.path.join(classes_dir, "TestClass2.cls"), "w") as f:
                 f.write("public class TestClass2 {}")
             
-            # Setup task with package_only option
+            # Setup task with dynamic_filter='package_only' option
             task_config = TaskConfig(
-                {"options": {"test_name_match": "%_TEST", "package_only": True}}
+                {"options": {"test_name_match": "%_TEST", "dynamic_filter": "package_only"}}
             )
             task = RunApexTests(self.project_config, task_config, self.org_config)
             
@@ -1027,9 +1027,9 @@ class TestRunApexTests(MockLoggerMixin):
             shutil.rmtree(tmpdir)
 
     def test_package_only_filter__disabled_returns_all_classes(self):
-        """Test that when package_only is False, all classes are returned"""
+        """Test that when dynamic_filter is not set to 'package_only', all classes are returned"""
         task_config = TaskConfig(
-            {"options": {"test_name_match": "%_TEST", "package_only": False}}
+            {"options": {"test_name_match": "%_TEST"}}
         )
         task = RunApexTests(self.project_config, task_config, self.org_config)
         
