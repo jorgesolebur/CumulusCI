@@ -542,6 +542,66 @@ class TestSimpleTestFlowCoordinator(AbstractFlowCoordinatorTest):
         flow.run(self.org_config)
         assert len(flow.results) == 0
 
+    def test_run__when_condition_with_env_var_true(self):
+        """A flow step runs when env var condition evaluates to True"""
+        import os
+        with mock.patch.dict(os.environ, {"RUN_TASK": "true"}):
+            flow_config = FlowConfig({
+                "steps": {1: {"task": "pass_name", "when": "env.get('RUN_TASK') == 'true'"}}
+            })
+            flow = FlowCoordinator(self.project_config, flow_config)
+            flow.run(self.org_config)
+            assert len(flow.results) == 1
+
+    def test_run__when_condition_with_env_var_false(self):
+        """A flow step is skipped when env var condition evaluates to False"""
+        import os
+        with mock.patch.dict(os.environ, {"RUN_TASK": "false"}):
+            flow_config = FlowConfig({
+                "steps": {1: {"task": "pass_name", "when": "env.get('RUN_TASK') == 'true'"}}
+            })
+            flow = FlowCoordinator(self.project_config, flow_config)
+            flow.run(self.org_config)
+            assert len(flow.results) == 0
+
+    def test_run__when_condition_with_env_var_default(self):
+        """A flow step uses default value when env var is not set"""
+        import os
+        # Make sure the env var is not set
+        if "UNDEFINED_VAR" in os.environ:
+            del os.environ["UNDEFINED_VAR"]
+        flow_config = FlowConfig({
+            "steps": {1: {"task": "pass_name", "when": "env.get('UNDEFINED_VAR', 'default') == 'default'"}}
+        })
+        flow = FlowCoordinator(self.project_config, flow_config)
+        flow.run(self.org_config)
+        assert len(flow.results) == 1
+
+    def test_run__when_condition_with_env_var_and_org_config(self):
+        """A flow step can combine env vars with org_config in when condition"""
+        import os
+        with mock.patch.dict(os.environ, {"DEPLOY_TO_SCRATCH": "true"}):
+            flow_config = FlowConfig({
+                "steps": {1: {"task": "pass_name", "when": "org_config.scratch and env.get('DEPLOY_TO_SCRATCH') == 'true'"}}
+            })
+            flow = FlowCoordinator(self.project_config, flow_config)
+            # Set org_config.scratch to True
+            self.org_config.config["scratch"] = True
+            flow.run(self.org_config)
+            assert len(flow.results) == 1
+
+    def test_run__when_condition_with_missing_env_var_is_none(self):
+        """A flow step can check if env var exists using 'is not none'"""
+        import os
+        # Test when var is set
+        with mock.patch.dict(os.environ, {"MY_VAR": "value"}):
+            flow_config = FlowConfig({
+                "steps": {1: {"task": "pass_name", "when": "env.get('MY_VAR') is not none"}}
+            })
+            flow = FlowCoordinator(self.project_config, flow_config)
+            flow.run(self.org_config)
+            assert len(flow.results) == 1
+
     def test_run__task_raises_exception_fail(self):
         """A flow aborts when a task raises an exception"""
 

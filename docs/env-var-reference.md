@@ -5,6 +5,25 @@ being run inside of web applications, such as MetaCI, MetaDeploy, and
 Metecho. The following is a reference list of available environment
 variables that can be set.
 
+## Custom Environment Variables in Flow Conditions
+
+You can use any custom environment variable in flow `when` conditions using the `env` object.
+This allows you to control flow execution based on environment settings from your CI/CD pipeline
+or local development environment.
+
+```yaml
+flows:
+    my_flow:
+        steps:
+            1:
+                task: my_task
+                when: env.get('MY_CUSTOM_VAR') == 'value'
+```
+
+See the [when clauses documentation](config.md#when-clauses) for more details and examples.
+
+## CumulusCI Built-in Environment Variables
+
 ## `CUMULUSCI_AUTO_DETECT`
 
 Set this environment variable to autodetect branch and commit
