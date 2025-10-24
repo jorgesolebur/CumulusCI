@@ -974,32 +974,39 @@ class TestRunApexTests(MockLoggerMixin):
     def test_package_only_filter__filters_classes_not_in_package(self):
         """Test that dynamic_filter='package_only' filters out classes not in the package directory"""
         from unittest.mock import PropertyMock
-        
+
         # Create temporary directory structure with some test class files
         tmpdir = tempfile.mkdtemp()
         try:
             # Create a mock force-app directory structure
             classes_dir = os.path.join(tmpdir, "main", "default", "classes")
             os.makedirs(classes_dir)
-            
+
             # Create two test class files
             with open(os.path.join(classes_dir, "TestClass1.cls"), "w") as f:
                 f.write("public class TestClass1 {}")
             with open(os.path.join(classes_dir, "TestClass2.cls"), "w") as f:
                 f.write("public class TestClass2 {}")
-            
+
             # Setup task with dynamic_filter='package_only' option
             task_config = TaskConfig(
-                {"options": {"test_name_match": "%_TEST", "dynamic_filter": "package_only"}}
+                {
+                    "options": {
+                        "test_name_match": "%_TEST",
+                        "dynamic_filter": "package_only",
+                    }
+                }
             )
             task = RunApexTests(self.project_config, task_config, self.org_config)
-            
+
             # Mock the default_package_path property to point to our temp directory
             with patch.object(
-                type(task.project_config), "default_package_path", new_callable=PropertyMock
+                type(task.project_config),
+                "default_package_path",
+                new_callable=PropertyMock,
             ) as mock_path:
                 mock_path.return_value = tmpdir
-                
+
                 # Create mock test classes result with 3 classes, but only 2 exist in package
                 mock_classes = {
                     "totalSize": 3,
@@ -1010,14 +1017,14 @@ class TestRunApexTests(MockLoggerMixin):
                         {"Id": "01p000003", "Name": "TestClass3"},  # Not in package
                     ],
                 }
-                
+
                 # Test the filter method
                 filtered = task._filter_package_classes(mock_classes)
-                
+
                 # Verify only 2 classes are returned
                 assert filtered["totalSize"] == 2
                 assert len(filtered["records"]) == 2
-                
+
                 # Verify the correct classes were kept
                 filtered_names = [record["Name"] for record in filtered["records"]]
                 assert "TestClass1" in filtered_names
@@ -1028,11 +1035,9 @@ class TestRunApexTests(MockLoggerMixin):
 
     def test_package_only_filter__disabled_returns_all_classes(self):
         """Test that when dynamic_filter is not set to 'package_only', all classes are returned"""
-        task_config = TaskConfig(
-            {"options": {"test_name_match": "%_TEST"}}
-        )
+        task_config = TaskConfig({"options": {"test_name_match": "%_TEST"}})
         task = RunApexTests(self.project_config, task_config, self.org_config)
-        
+
         mock_classes = {
             "totalSize": 3,
             "done": True,
@@ -1042,34 +1047,36 @@ class TestRunApexTests(MockLoggerMixin):
                 {"Id": "01p000003", "Name": "TestClass3"},
             ],
         }
-        
+
         # Test the filter method - should return all classes unchanged
         filtered = task._filter_package_classes(mock_classes)
-        
+
         assert filtered["totalSize"] == 3
         assert len(filtered["records"]) == 3
 
     def test_class_exists_in_package__finds_class(self):
         """Test that _class_exists_in_package correctly finds classes in subdirectories"""
         from unittest.mock import PropertyMock
-        
+
         tmpdir = tempfile.mkdtemp()
         try:
             # Create nested directory structure
             classes_dir = os.path.join(tmpdir, "main", "default", "classes")
             os.makedirs(classes_dir)
-            
+
             # Create a test class file
             with open(os.path.join(classes_dir, "MyTestClass.cls"), "w") as f:
                 f.write("public class MyTestClass {}")
-            
+
             task = RunApexTests(self.project_config, self.task_config, self.org_config)
-            
+
             with patch.object(
-                type(task.project_config), "default_package_path", new_callable=PropertyMock
+                type(task.project_config),
+                "default_package_path",
+                new_callable=PropertyMock,
             ) as mock_path:
                 mock_path.return_value = tmpdir
-                
+
                 # Should find the class
                 assert task._class_exists_in_package("MyTestClass") is True
                 # Should not find non-existent class
@@ -1091,7 +1098,7 @@ class TestRunApexTests(MockLoggerMixin):
             }
         )
         task = RunApexTests(self.project_config, task_config, self.org_config)
-        
+
         assert task.required_individual_class_code_coverage_percent == {
             "TestClass1": 75,
             "TestClass2": 80,
@@ -1136,7 +1143,7 @@ class TestRunApexTests(MockLoggerMixin):
             "TestClass2": 30,  # Lower than global
         }
         task.tooling = Mock()
-        
+
         # Mock class coverage: TestClass1 has 60% (fails individual req of 75%)
         # TestClass2 has 40% (passes individual req of 30%)
         # TestClass3 has 45% (fails global req of 50%)
@@ -1165,16 +1172,16 @@ class TestRunApexTests(MockLoggerMixin):
 
         with pytest.raises(ApexTestException) as e:
             task._check_code_coverage()
-        
+
         error_message = str(e.value)
         # TestClass1 should fail with 60% vs required 75% (individual)
         assert "TestClass1" in error_message
         assert "60.0%" in error_message
         assert "75%" in error_message
-        
+
         # TestClass2 should pass (40% >= 30% individual requirement)
         assert "TestClass2" not in error_message
-        
+
         # TestClass3 should fail with 45% vs required 50% (global)
         assert "TestClass3" in error_message
         assert "45.0%" in error_message
@@ -1186,7 +1193,7 @@ class TestRunApexTests(MockLoggerMixin):
         task.required_per_class_code_coverage_percent = 60
         task.required_individual_class_code_coverage_percent = {}
         task.tooling = Mock()
-        
+
         # TestClass1 has 55% coverage - should fail global requirement of 60%
         task.tooling.query.side_effect = [
             {
@@ -1203,7 +1210,7 @@ class TestRunApexTests(MockLoggerMixin):
 
         with pytest.raises(ApexTestException) as e:
             task._check_code_coverage()
-        
+
         error_message = str(e.value)
         assert "TestClass1" in error_message
         assert "55.0%" in error_message
@@ -1217,7 +1224,7 @@ class TestRunApexTests(MockLoggerMixin):
             "TestClass1": 75  # Only TestClass1 has requirement
         }
         task.tooling = Mock()
-        
+
         # TestClass1 has 80% (passes), TestClass2 has 10% (no requirement, should not fail)
         task.tooling.query.side_effect = [
             {
@@ -1246,7 +1253,7 @@ class TestRunApexTests(MockLoggerMixin):
         task.required_per_class_code_coverage_percent = 0
         task.required_individual_class_code_coverage_percent = {"TestClass1": 75}
         task.tooling = Mock()
-        
+
         task.tooling.query.side_effect = [
             {
                 "records": [
@@ -1261,7 +1268,7 @@ class TestRunApexTests(MockLoggerMixin):
         ]
 
         task._check_code_coverage()
-        
+
         # Check that appropriate success message was logged
         log_messages = [call[0][0] for call in task.logger.info.call_args_list]
         assert any("individual coverage requirements" in msg for msg in log_messages)
@@ -1272,7 +1279,7 @@ class TestRunApexTests(MockLoggerMixin):
         task.required_per_class_code_coverage_percent = 50
         task.required_individual_class_code_coverage_percent = {"TestClass1": 75}
         task.tooling = Mock()
-        
+
         task.tooling.query.side_effect = [
             {
                 "records": [
@@ -1292,7 +1299,7 @@ class TestRunApexTests(MockLoggerMixin):
         ]
 
         task._check_code_coverage()
-        
+
         # Check that appropriate success message was logged
         log_messages = [call[0][0] for call in task.logger.info.call_args_list]
         assert any("global: 50%" in msg and "individual" in msg for msg in log_messages)
@@ -1307,7 +1314,7 @@ class TestRunApexTests(MockLoggerMixin):
             "AnotherMissingClass_TEST": 95,  # This also doesn't exist
         }
         task.tooling = Mock()
-        
+
         # Mock query returns only ExistingClass_TEST (the other two don't exist)
         task.tooling.query.side_effect = [
             {
@@ -1327,10 +1334,10 @@ class TestRunApexTests(MockLoggerMixin):
             {"records": [{"PercentCovered": 90}]},
         ]
 
-        # Should not raise any exception even though NonExistentClass_TEST and 
+        # Should not raise any exception even though NonExistentClass_TEST and
         # AnotherMissingClass_TEST are in individual requirements but not in the org
         task._check_code_coverage()
-        
+
         # Verify the existing classes were checked correctly
         # ExistingClass_TEST: 85% >= 80% (individual req) - Pass
         # OtherClass_TEST: 70% >= 60% (global req) - Pass
