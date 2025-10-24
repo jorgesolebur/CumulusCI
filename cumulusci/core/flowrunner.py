@@ -53,6 +53,7 @@ Option values/overrides can be passed in at a number of levels, in increasing or
 
 import copy
 import logging
+import os
 from collections import defaultdict
 from operator import attrgetter
 from typing import (
@@ -543,6 +544,7 @@ class FlowCoordinator:
             self._jinja2_context = {
                 "project_config": project_config,
                 "org_config": org_config,
+                "env": dict(os.environ),
             }
             self._context_project_config = project_config
             self._context_org_config = org_config

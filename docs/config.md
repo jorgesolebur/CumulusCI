@@ -485,6 +485,46 @@ clauses. For example, it's common to reference `org_config.scratch`
 when building automation that needs to behave differently in a scratch
 org and a persistent org.
 
+#### Using Environment Variables in `when` Clauses
+
+You can also reference environment variables in `when` conditions using the `env` object.
+This is particularly useful for controlling flow behavior from CI/CD pipelines or for
+feature flags.
+
+```yaml
+flows:
+    conditional_deploy:
+        steps:
+            1:
+                task: deploy
+                when: env.get('DEPLOY_ENABLED') == 'true'
+            2:
+                task: run_tests
+                when: env.get('SKIP_TESTS') != 'true'
+```
+
+The `env` object provides access to all environment variables via the `.get()` method,
+which safely returns `None` if a variable is not set. You can also provide a default value:
+
+```yaml
+steps:
+    1:
+        task: my_task
+        when: env.get('ENVIRONMENT', 'dev') == 'production'
+```
+
+You can combine environment variables with other objects in complex conditions:
+
+```yaml
+steps:
+    1:
+        task: deploy_post_unpackaged
+        when: not org_config.has_minimum_package_version(env.get('PACKAGE_NAME'), env.get('PACKAGE_VERSION'))
+    2:
+        task: load_data
+        when: org_config.scratch and env.get('LOAD_TEST_DATA') == 'true'
+```
+
 `when` clauses are frequently used in CumulusCI's standard library to
 conditionally run a step in a flow based on the source code format of
 the project. Below is the configuration for the standard library flow
