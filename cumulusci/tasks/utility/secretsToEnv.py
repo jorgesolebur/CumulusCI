@@ -19,8 +19,8 @@ class SecretsToEnv(BaseTask):
     class Options(CCIOptions):
         env_path: Path = Field("./.env", description="Path to the .env file")
         secrets_provider: str = Field(
-            "local",
-            description="Secrets provider type i.e local, ado_variables, aws_secrets. Defaults to 'local'",
+            None,
+            description='Secrets provider type i.e local, ado_variables, aws_secrets. Default value is None, which will use the secrets type from the environment variable CUMULUSCI_SECRETS_TYPE if it is set, otherwise it will use the "local" provider.',
         )
         provider_options: MappingOption = Field({}, description="Provider options")
         secrets: Union[ListOfStringsOption, MappingOption] = Field(
@@ -33,7 +33,9 @@ class SecretsToEnv(BaseTask):
     def _init_options(self, kwargs):
         super()._init_options(kwargs)
         self.provider = CredentialManager.get_provider(
-            self.parsed_options.secrets_provider, **self.parsed_options.provider_options
+            self.parsed_options.secrets_provider
+            or CredentialManager.load_secrets_type_from_environment(),
+            **self.parsed_options.provider_options,
         )
         self.env_values = dotenv_values(self.parsed_options.env_path)
 

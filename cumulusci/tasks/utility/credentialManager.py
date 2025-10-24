@@ -224,7 +224,7 @@ class CredentialManager:
     env_secrets_type = "CUMULUSCI_SECRETS_TYPE"
 
     @staticmethod
-    def _load_secrets_type_from_environment() -> str:
+    def load_secrets_type_from_environment() -> str:
         """Load any secrets specified by environment variables"""
         provider_type = os.getenv(CredentialManager.env_secrets_type)
 
@@ -240,7 +240,7 @@ class CredentialManager:
         """
         if not provider_type:
             # If no config is provided, load the secrets from the environment
-            provider_type = CredentialManager._load_secrets_type_from_environment()
+            provider_type = CredentialManager.load_secrets_type_from_environment()
 
         # Check if the requested provider type exists in our registry
         if provider_type not in CredentialProvider._registry:
