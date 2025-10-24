@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.27 (2025-10-24)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix default secret provider to load from env when not set. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#103](https://github.com/jorgesolebur/CumulusCI/pull/103)
+* PM-2264 - Supporting env variables in when conditions in tasks by [@jorgesolebur](https://github.com/jorgesolebur) in [#102](https://github.com/jorgesolebur/CumulusCI/pull/102)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.26...v5.0.27
+
+
+<!-- latest-stop -->
+
 ## v5.0.26 (2025-10-14)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -14,8 +28,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.25...v5.0.26
 
-
-<!-- latest-stop -->
 
 ## v5.0.25 (2025-10-09)
 
