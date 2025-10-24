@@ -29,7 +29,7 @@ class TestSecretsToEnvOptions:
             )
 
             assert task.parsed_options.env_path == Path(env_path)
-            assert task.parsed_options.secrets_provider == "local"
+            assert task.parsed_options.secrets_provider is None
             assert task.parsed_options.provider_options == {}
             assert task.parsed_options.secrets == []
 

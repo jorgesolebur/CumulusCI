@@ -427,19 +427,19 @@ class TestCredentialManager:
     @mock.patch.dict(os.environ, {"CUMULUSCI_SECRETS_TYPE": "local"})
     def test_load_secrets_type_from_environment(self):
         """Test loading secrets type from environment variable."""
-        provider_type = CredentialManager._load_secrets_type_from_environment()
+        provider_type = CredentialManager.load_secrets_type_from_environment()
         assert provider_type == "local"
 
     @mock.patch.dict(os.environ, {"CUMULUSCI_SECRETS_TYPE": "AWS_SECRETS"})
     def test_load_secrets_type_case_insensitive(self):
         """Test loading secrets type is case insensitive."""
-        provider_type = CredentialManager._load_secrets_type_from_environment()
+        provider_type = CredentialManager.load_secrets_type_from_environment()
         assert provider_type == "aws_secrets"
 
     @mock.patch.dict(os.environ, {}, clear=True)
     def test_load_secrets_type_defaults_to_local(self):
         """Test loading secrets type defaults to 'local' when not set."""
-        provider_type = CredentialManager._load_secrets_type_from_environment()
+        provider_type = CredentialManager.load_secrets_type_from_environment()
         assert provider_type == "local"
 
     @mock.patch.dict(os.environ, {"CUMULUSCI_SECRETS_TYPE": "environment"})
