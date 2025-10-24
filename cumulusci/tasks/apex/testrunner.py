@@ -261,11 +261,13 @@ class RunApexTests(BaseSalesforceApiTask):
         self.required_per_class_code_coverage_percent = int(
             self.options.get("required_per_class_code_coverage_percent", 0)
         )
-        
+
         # Parse individual class coverage requirements
         self.required_individual_class_code_coverage_percent = {}
         if "required_individual_class_code_coverage_percent" in self.options:
-            individual_coverage = self.options["required_individual_class_code_coverage_percent"]
+            individual_coverage = self.options[
+                "required_individual_class_code_coverage_percent"
+            ]
             if isinstance(individual_coverage, dict):
                 # Validate that all values are integers or can be converted to integers
                 try:
@@ -418,11 +420,11 @@ class RunApexTests(BaseSalesforceApiTask):
     def _class_exists_in_package(self, class_name):
         """Check if an Apex class exists in the default package directory."""
         package_path = self.project_config.default_package_path
-        
+
         # Walk through the package directory to find .cls files
         for root, dirs, files in os.walk(package_path):
             for file in files:
-                if file.endswith('.cls'):
+                if file.endswith(".cls"):
                     # Extract class name from filename (remove .cls extension)
                     file_class_name = file[:-4]
                     if file_class_name == class_name:
@@ -433,10 +435,10 @@ class RunApexTests(BaseSalesforceApiTask):
         """Filter test classes to only include those that exist in the package directory."""
         if self.options.get("dynamic_filter") != "package_only":
             return test_classes
-        
+
         filtered_records = []
         excluded_count = 0
-        
+
         for record in test_classes["records"]:
             class_name = record["Name"]
             if self._class_exists_in_package(class_name):
@@ -446,19 +448,19 @@ class RunApexTests(BaseSalesforceApiTask):
                 self.logger.debug(
                     f"Excluding test class '{class_name}' - not found in package directory"
                 )
-        
+
         if excluded_count > 0:
             self.logger.info(
                 f"Excluded {excluded_count} test class(es) not in package directory"
             )
-        
+
         # Update the result with filtered records
         filtered_result = {
             "totalSize": len(filtered_records),
             "records": filtered_records,
             "done": test_classes.get("done", True),
         }
-        
+
         return filtered_result
 
     def _get_test_methods_for_class(self, class_name):
@@ -699,11 +701,11 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _run_task(self):
         result = self._get_test_classes()
-        
+
         # Apply dynamic filters if enabled
         if self.options.get("dynamic_filter"):
             result = self._filter_package_classes(result)
-        
+
         if result["totalSize"] == 0:
             return
         for test_class in result["records"]:
@@ -764,7 +766,10 @@ class RunApexTests(BaseSalesforceApiTask):
         class_level_coverage_failures = {}
 
         # Query for Class level code coverage using the aggregate
-        if self.required_per_class_code_coverage_percent or self.required_individual_class_code_coverage_percent:
+        if (
+            self.required_per_class_code_coverage_percent
+            or self.required_individual_class_code_coverage_percent
+        ):
             test_classes = self.tooling.query(
                 "SELECT ApexClassOrTrigger.Name, ApexClassOrTriggerId, NumLinesCovered, NumLinesUncovered FROM ApexCodeCoverageAggregate ORDER BY ApexClassOrTrigger.Name ASC"
             )["records"]
@@ -787,16 +792,21 @@ class RunApexTests(BaseSalesforceApiTask):
                 required_coverage = None
                 if class_name in self.required_individual_class_code_coverage_percent:
                     # Individual class requirement takes priority
-                    required_coverage = self.required_individual_class_code_coverage_percent[class_name]
+                    required_coverage = (
+                        self.required_individual_class_code_coverage_percent[class_name]
+                    )
                 elif self.required_per_class_code_coverage_percent:
                     # Fall back to global per-class requirement
                     required_coverage = self.required_per_class_code_coverage_percent
-                
+
                 # Only check if a requirement is defined for this class
-                if required_coverage is not None and coverage_percentage < required_coverage:
+                if (
+                    required_coverage is not None
+                    and coverage_percentage < required_coverage
+                ):
                     class_level_coverage_failures[class_name] = {
                         "actual": coverage_percentage,
-                        "required": required_coverage
+                        "required": required_coverage,
                     }
 
         # Query for OrgWide coverage
@@ -804,7 +814,10 @@ class RunApexTests(BaseSalesforceApiTask):
         coverage = result["records"][0]["PercentCovered"]
 
         errors = []
-        if self.required_per_class_code_coverage_percent or self.required_individual_class_code_coverage_percent:
+        if (
+            self.required_per_class_code_coverage_percent
+            or self.required_individual_class_code_coverage_percent
+        ):
             if class_level_coverage_failures:
                 for class_name, coverage_info in class_level_coverage_failures.items():
                     errors.append(
@@ -812,7 +825,10 @@ class RunApexTests(BaseSalesforceApiTask):
                     )
             else:
                 # Build a message about what requirements were met
-                if self.required_per_class_code_coverage_percent and self.required_individual_class_code_coverage_percent:
+                if (
+                    self.required_per_class_code_coverage_percent
+                    and self.required_individual_class_code_coverage_percent
+                ):
                     self.logger.info(
                         f"All classes meet code coverage expectations (global: {self.required_per_class_code_coverage_percent}%, individual class requirements also satisfied)."
                     )
