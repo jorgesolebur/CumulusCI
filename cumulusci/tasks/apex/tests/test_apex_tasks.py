@@ -1270,8 +1270,8 @@ class TestRunApexTests(MockLoggerMixin):
         task._check_code_coverage()
 
         # Check that appropriate success message was logged
-        log_messages = [call[0][0] for call in task.logger.info.call_args_list]
-        assert any("individual coverage requirements" in msg for msg in log_messages)
+        log = self._task_log_handler.messages
+        assert any("individual coverage requirements" in msg for msg in log["info"])
 
     def test_check_code_coverage__both_requirements_success_message(self):
         """Test success message when both global and individual requirements are set"""
@@ -1301,8 +1301,8 @@ class TestRunApexTests(MockLoggerMixin):
         task._check_code_coverage()
 
         # Check that appropriate success message was logged
-        log_messages = [call[0][0] for call in task.logger.info.call_args_list]
-        assert any("global: 50%" in msg and "individual" in msg for msg in log_messages)
+        log = self._task_log_handler.messages
+        assert any("global: 50%" in msg and "individual" in msg for msg in log["info"])
 
     def test_check_code_coverage__nonexistent_class_in_individual_requirements(self):
         """Test that specifying a non-existent class in individual requirements doesn't cause errors"""
