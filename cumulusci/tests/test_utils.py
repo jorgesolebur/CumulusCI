@@ -453,31 +453,95 @@ Options\n------------------------------------------\n\n
     def test_inject_namespace__managed(self):
         logger = mock.Mock()
         name = "___NAMESPACE___test"
-        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%"
+        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%|%%%NAMESPACE_COLON%%%|%%%NAMESPACED_ORG_COLON%%%"
 
         name, content = utils.inject_namespace(
             name, content, namespace="ns", managed=True, logger=logger
         )
         assert name == "ns__test"
-        assert content == "ns__|ns.||ns|c"
+        assert content == "ns__|ns.||ns|c|ns:|"
 
     def test_inject_namespace__unmanaged(self):
         name = "___NAMESPACE___test"
-        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%"
+        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%|%%%NAMESPACE_COLON%%%|%%%NAMESPACED_ORG_COLON%%%"
 
         name, content = utils.inject_namespace(name, content, namespace="ns")
         assert name == "test"
-        assert content == "|||c|c"
+        assert content == "|||c|c||"
 
     def test_inject_namespace__namespaced_org(self):
         name = "___NAMESPACE___test"
-        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%"
+        content = "%%%NAMESPACE%%%|%%%NAMESPACE_DOT%%%|%%%NAMESPACED_ORG%%%|%%%NAMESPACE_OR_C%%%|%%%NAMESPACED_ORG_OR_C%%%|%%%NAMESPACE_COLON%%%|%%%NAMESPACED_ORG_COLON%%%"
 
         name, content = utils.inject_namespace(
             name, content, namespace="ns", managed=True, namespaced_org=True
         )
         assert name == "ns__test"
-        assert content == "ns__|ns.|ns__|ns|ns"
+        assert content == "ns__|ns.|ns__|ns|ns|ns:|ns:"
+
+    def test_inject_namespace__namespace_colon_managed(self):
+        """Test %%%NAMESPACE_COLON%%% token with managed=True"""
+        logger = mock.Mock()
+        name = "test"
+        content = "%%%NAMESPACE_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace="ns", managed=True, logger=logger
+        )
+        assert content == "ns:component"
+        logger.info.assert_called()
+
+    def test_inject_namespace__namespace_colon_unmanaged(self):
+        """Test %%%NAMESPACE_COLON%%% token with managed=False"""
+        name = "test"
+        content = "%%%NAMESPACE_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace="ns", managed=False
+        )
+        assert content == "component"
+
+    def test_inject_namespace__namespace_colon_no_namespace(self):
+        """Test %%%NAMESPACE_COLON%%% token with no namespace"""
+        name = "test"
+        content = "%%%NAMESPACE_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace=None, managed=True
+        )
+        assert content == "component"
+
+    def test_inject_namespace__namespaced_org_colon(self):
+        """Test %%%NAMESPACED_ORG_COLON%%% token with namespaced_org=True"""
+        logger = mock.Mock()
+        name = "test"
+        content = "%%%NAMESPACED_ORG_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace="ns", namespaced_org=True, logger=logger
+        )
+        assert content == "ns:component"
+        logger.info.assert_called()
+
+    def test_inject_namespace__namespaced_org_colon_false(self):
+        """Test %%%NAMESPACED_ORG_COLON%%% token with namespaced_org=False"""
+        name = "test"
+        content = "%%%NAMESPACED_ORG_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace="ns", namespaced_org=False
+        )
+        assert content == "component"
+
+    def test_inject_namespace__namespaced_org_colon_no_namespace(self):
+        """Test %%%NAMESPACED_ORG_COLON%%% token with no namespace"""
+        name = "test"
+        content = "%%%NAMESPACED_ORG_COLON%%%component"
+
+        name, content = utils.inject_namespace(
+            name, content, namespace=None, namespaced_org=True
+        )
+        assert content == "component"
 
     def test_inject_namespace__filename_token_in_package_xml(self):
         name, content = utils.inject_namespace(
