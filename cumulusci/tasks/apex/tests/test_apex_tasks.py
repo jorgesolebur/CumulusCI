@@ -813,7 +813,9 @@ class TestRunApexTests(MockLoggerMixin):
         task._init_options(task_config.config["options"])
 
         assert (
-            task.options["retry_failures"][0].search("UNABLE_TO_LOCK_ROW: test failed")
+            task.parsed_options.retry_failures[0].search(
+                "UNABLE_TO_LOCK_ROW: test failed"
+            )
             is not None
         )
 
@@ -1116,7 +1118,7 @@ class TestRunApexTests(MockLoggerMixin):
         )
         with pytest.raises(TaskOptionsError) as e:
             RunApexTests(self.project_config, task_config, self.org_config)
-        assert "must be a dictionary" in str(e.value)
+        assert "Var is not a name/value pair: not a dict" in str(e.value)
 
     def test_individual_class_coverage__invalid_value(self):
         """Test that invalid values in dictionary raise TaskOptionsError"""
@@ -1132,7 +1134,7 @@ class TestRunApexTests(MockLoggerMixin):
         )
         with pytest.raises(TaskOptionsError) as e:
             RunApexTests(self.project_config, task_config, self.org_config)
-        assert "Invalid value" in str(e.value)
+        assert "value is not a valid integer" in str(e.value)
 
     def test_check_code_coverage__individual_takes_priority(self):
         """Test that individual class requirements override global per-class requirements"""
