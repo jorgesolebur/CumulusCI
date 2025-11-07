@@ -7,6 +7,7 @@ import os
 import re
 from typing import Dict, List, Optional
 
+from cumulusci.core.config import TaskConfig
 from cumulusci.core.exceptions import (
     ApexTestException,
     CumulusCIException,
@@ -22,6 +23,7 @@ from cumulusci.utils.options import (
     MappingOption,
     PercentageOption,
 )
+from cumulusci.vcs.utils.list_modified_files import ListModifiedFiles
 
 APEX_LIMITS = {
     "Soql": {
@@ -241,9 +243,15 @@ class RunApexTests(BaseSalesforceApiTask):
         )
         dynamic_filter: Optional[str] = Field(
             None,
-            description="Defines a dynamic filter to apply to test classes. Supported values: 'package_only' - only runs test classes "
-            "that exist in the default package directory (force-app/ or src/), filtering out classes from the org that match "
-            "test_name_match but are not part of the local project. Additional filter values will be supported in the future.",
+            description="Defines a dynamic filter to apply to test classes from the org that match test_name_match. Supported values: "
+            "'package_only' - only runs test classes that exist in the default package directory (force-app/ or src/),"
+            "'delta_changes' - only runs test classes that are affected by the delta changes in the current branch (force-app/ or src/),"
+            "Default is None, which means no dynamic filter is applied and all test classes from the org that match test_name_match are run.",
+        )
+        base_ref: Optional[str] = Field(
+            None,
+            description="Git reference (branch, tag, or commit) to compare against for delta changes. "
+            "If not set, uses the default branch of the repository. Only used when dynamic_filter is 'delta_changes'.",
         )
 
     parsed_options: Options
@@ -434,9 +442,35 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _filter_package_classes(self, test_classes):
         """Filter test classes to only include those that exist in the package directory."""
-        if self.parsed_options.dynamic_filter != "package_only":
+        if self.parsed_options.dynamic_filter is None:
             return test_classes
 
+        filtered_records = []
+        match self.parsed_options.dynamic_filter:
+            case "package_only":
+                filtered_records = self._filter_test_classes_to_package_only(
+                    test_classes
+                )
+            case "delta_changes":
+                filtered_records = self._filter_test_classes_to_delta_changes(
+                    test_classes
+                )
+            case _:
+                raise TaskOptionsError(
+                    f"Unsupported dynamic filter: {self.parsed_options.dynamic_filter}"
+                )
+
+        # Update the result with filtered records
+        filtered_result = {
+            "totalSize": len(filtered_records),
+            "records": filtered_records,
+            "done": test_classes.get("done", True),
+        }
+
+        return filtered_result
+
+    def _filter_test_classes_to_package_only(self, test_classes):
+        """Filter test classes to only include those that exist in the package directory."""
         filtered_records = []
         excluded_count = 0
 
@@ -454,15 +488,112 @@ class RunApexTests(BaseSalesforceApiTask):
             self.logger.info(
                 f"Excluded {excluded_count} test class(es) not in package directory"
             )
+        return filtered_records
 
-        # Update the result with filtered records
-        filtered_result = {
-            "totalSize": len(filtered_records),
-            "records": filtered_records,
-            "done": test_classes.get("done", True),
-        }
+    def _filter_test_classes_to_delta_changes(self, test_classes):
+        """Filter test classes to only include those that are affected by the delta changes in the current branch."""
+        # Check if the current base folder has git. (project_config.repo)
+        if self.project_config.get_repo() is None:
+            self.logger.info("No git repository found. Returning all test classes.")
+            return test_classes["records"]
 
-        return filtered_result
+        task = ListModifiedFiles(
+            self.project_config,
+            TaskConfig(
+                {
+                    "options": {
+                        "base_ref": self.parsed_options.base_ref,
+                        "file_extensions": ["cls", "flow-meta.xml", "trigger"],
+                        "directories": ["force-app", "src"],
+                    }
+                }
+            ),
+            org_config=None,
+        )
+        task()
+        changed_files = task.return_values.get("files", None)
+
+        if changed_files is None:
+            # ListModifiedFiles task failed or no changes found
+            self.logger.warning(
+                f"Could not determine git changes against {self.parsed_options.base_ref or 'default branch'}."
+            )
+            return []
+
+        if not changed_files:
+            self.logger.info(
+                "No changed files found in package directories (force-app/ or src/)."
+            )
+            return []
+
+        # Extract class names from changed files
+        affected_class_names = task.return_values.get("file_names", None)
+
+        if affected_class_names is None:
+            self.logger.info("No file names found in changed files.")
+            return []
+
+        self.logger.info(
+            f"Found {len(affected_class_names)} affected class(es): {', '.join(sorted(affected_class_names))}"
+        )
+
+        # Filter test classes to only include those affected by the delta changes
+        filtered_records = []
+        excluded_count = 0
+
+        affected_class_names_lower = [name.lower() for name in affected_class_names]
+
+        for record in test_classes["records"]:
+            test_class_name = record["Name"]
+            if self._is_test_class_affected(
+                test_class_name.lower(), affected_class_names_lower
+            ):
+                filtered_records.append(record)
+            else:
+                excluded_count += 1
+                self.logger.debug(
+                    f"Excluding test class '{test_class_name}' - not affected by delta changes"
+                )
+
+        if excluded_count > 0:
+            self.logger.info(
+                f"Excluded {excluded_count} test class(es) not affected by delta changes"
+            )
+
+        if not filtered_records:
+            self.logger.info(
+                "No test classes found that are affected by delta changes."
+            )
+            return []
+
+        self.logger.info(
+            f"Running {len(filtered_records)} test class(es) that are affected by delta changes. Test classes: {', '.join([record['Name'] for record in filtered_records])}"
+        )
+
+        return filtered_records
+
+    def _is_test_class_affected(self, test_class_name, affected_class_names):
+        """Check if a test class is affected by the changed classes."""
+        # Direct match: test class name matches a changed class
+        if test_class_name in affected_class_names:
+            return True
+
+        # Check if test class name corresponds to an affected class
+        # Common patterns:
+        # - Account.cls changed -> AccountTest.cls should run
+        # - MyService.cls changed -> MyServiceTest.cls should run
+        # - AccountHandler.cls changed -> AccountHandlerTest.cls should run
+        for affected_class in affected_class_names:
+            # Check if test class name follows common test naming patterns
+            if (
+                test_class_name == f"{affected_class}test"
+                or test_class_name == f"test{affected_class}"
+                or test_class_name.startswith(f"{affected_class}_")
+                or test_class_name.startswith(f"test{affected_class}_")
+            ):
+                return True
+
+        return False
 
     def _get_test_methods_for_class(self, class_name):
         result = self.tooling.query(

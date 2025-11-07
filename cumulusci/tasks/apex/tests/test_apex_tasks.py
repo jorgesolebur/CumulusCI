@@ -1345,6 +1345,515 @@ class TestRunApexTests(MockLoggerMixin):
         # OtherClass_TEST: 70% >= 60% (global req) - Pass
         # NonExistentClass_TEST and AnotherMissingClass_TEST are simply ignored
 
+    @patch.object(BaseProjectConfig, "get_repo")
+    def test_delta_changes_filter__no_git_repo(self, mock_get_repo):
+        """Test that delta_changes filter returns all classes when no git repo exists"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = None
+
+        mock_classes = {
+            "totalSize": 2,
+            "done": True,
+            "records": [
+                {"Id": "01p000001", "Name": "TestClass1"},
+                {"Id": "01p000002", "Name": "TestClass2"},
+            ],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Should return all classes when no git repo
+        assert len(filtered) == 2
+        assert filtered == mock_classes["records"]
+        log = self._task_log_handler.messages
+        assert any("No git repository found" in msg for msg in log["info"])
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__list_modified_files_returns_none(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter handles None return from ListModifiedFiles"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task - it's instantiated and then called
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {"files": None, "file_names": None}
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 2,
+            "done": True,
+            "records": [
+                {"Id": "01p000001", "Name": "TestClass1"},
+                {"Id": "01p000002", "Name": "TestClass2"},
+            ],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Should return empty list when ListModifiedFiles returns None
+        assert filtered == []
+        log = self._task_log_handler.messages
+        assert any("Could not determine git changes" in msg for msg in log["warning"])
+        # Verify ListModifiedFiles was instantiated
+        mock_list_modified_files.assert_called_once()
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__no_changed_files(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter handles empty changed files list"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {"files": [], "file_names": None}
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 2,
+            "done": True,
+            "records": [
+                {"Id": "01p000001", "Name": "TestClass1"},
+                {"Id": "01p000002", "Name": "TestClass2"},
+            ],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Should return empty list when no files changed
+        assert filtered == []
+        log = self._task_log_handler.messages
+        assert any("No changed files found" in msg for msg in log["info"])
+        # Verify ListModifiedFiles was instantiated
+        mock_list_modified_files.assert_called_once()
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__no_file_names(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter handles missing file_names in return_values"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task - files exist but no file_names
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {
+                    "files": ["force-app/main/default/classes/MyClass.cls"],
+                    "file_names": None,
+                }
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 2,
+            "done": True,
+            "records": [
+                {"Id": "01p000001", "Name": "TestClass1"},
+                {"Id": "01p000002", "Name": "TestClass2"},
+            ],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Should return empty list when no file names found
+        assert filtered == []
+        log = self._task_log_handler.messages
+        assert any("No file names found" in msg for msg in log["info"])
+        # Verify ListModifiedFiles was instantiated
+        mock_list_modified_files.assert_called_once()
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__filters_test_classes(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter correctly filters test classes based on affected classes"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {
+                    "files": ["force-app/main/default/classes/Account.cls"],
+                    "file_names": {"Account"},
+                }
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 4,
+            "done": True,
+            "records": [
+                {"Id": "01p000001", "Name": "Account"},  # Direct match
+                {"Id": "01p000002", "Name": "AccountTest"},  # Affected class + Test
+                {"Id": "01p000003", "Name": "TestAccount"},  # Test + Affected class
+                {"Id": "01p000004", "Name": "ContactTest"},  # Not affected
+            ],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Should return only affected test classes
+        assert len(filtered) == 3
+        filtered_names = [record["Name"] for record in filtered]
+        assert "Account" in filtered_names
+        assert "AccountTest" in filtered_names
+        assert "TestAccount" in filtered_names
+        assert "ContactTest" not in filtered_names
+        # Verify ListModifiedFiles was instantiated
+        mock_list_modified_files.assert_called_once()
+        # Verify logging for excluded classes
+        log = self._task_log_handler.messages
+        assert any(
+            "Excluded" in msg and "not affected by delta changes" in msg
+            for msg in log["info"]
+        )
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__with_custom_base_ref(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter uses custom base_ref when provided"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                    "base_ref": "origin/develop",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {
+                    "files": ["force-app/main/default/classes/MyClass.cls"],
+                    "file_names": {"MyClass"},
+                }
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 1,
+            "done": True,
+            "records": [{"Id": "01p000001", "Name": "MyClassTest"}],
+        }
+
+        filtered = task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Verify ListModifiedFiles was called with correct base_ref
+        mock_list_modified_files.assert_called_once()
+        call_args = mock_list_modified_files.call_args
+        task_config_arg = call_args[0][1]
+        assert task_config_arg.config["options"]["base_ref"] == "origin/develop"
+        assert len(filtered) == 1
+        # Verify logging for affected classes
+        log = self._task_log_handler.messages
+        assert any("Found" in msg and "affected class" in msg for msg in log["info"])
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    def test_delta_changes_filter__default_base_ref_none(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Test that delta_changes filter uses None base_ref when not provided (default branch)"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                    # base_ref not provided, should be None
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+        mock_get_repo.return_value = Mock()
+
+        # Mock ListModifiedFiles task to return None files (to test warning message)
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {"files": None, "file_names": None}
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+
+        mock_classes = {
+            "totalSize": 1,
+            "done": True,
+            "records": [{"Id": "01p000001", "Name": "TestClass1"}],
+        }
+
+        task._filter_test_classes_to_delta_changes(mock_classes)
+
+        # Verify ListModifiedFiles was called with None base_ref
+        mock_list_modified_files.assert_called_once()
+        call_args = mock_list_modified_files.call_args
+        task_config_arg = call_args[0][1]
+        assert task_config_arg.config["options"]["base_ref"] is None
+        # Verify warning message uses "default branch" when base_ref is None
+        log = self._task_log_handler.messages
+        assert any("default branch" in msg for msg in log["warning"])
+
+    def test_is_test_class_affected__direct_match(self):
+        """Test _is_test_class_affected with direct match"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "contact"]
+
+        assert task._is_test_class_affected("account", affected_class_names) is True
+        assert task._is_test_class_affected("contact", affected_class_names) is True
+        assert (
+            task._is_test_class_affected("opportunity", affected_class_names) is False
+        )
+
+    def test_is_test_class_affected__suffix_test_pattern(self):
+        """Test _is_test_class_affected with ClassNameTest pattern"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "myservice"]
+
+        assert task._is_test_class_affected("accounttest", affected_class_names) is True
+        assert (
+            task._is_test_class_affected("myservicetest", affected_class_names) is True
+        )
+        assert (
+            task._is_test_class_affected("contacttest", affected_class_names) is False
+        )
+
+    def test_is_test_class_affected__prefix_test_pattern(self):
+        """Test _is_test_class_affected with TestClassName pattern"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "handler"]
+
+        assert task._is_test_class_affected("testaccount", affected_class_names) is True
+        assert task._is_test_class_affected("testhandler", affected_class_names) is True
+        assert (
+            task._is_test_class_affected("testcontact", affected_class_names) is False
+        )
+
+    def test_is_test_class_affected__underscore_suffix_pattern(self):
+        """Test _is_test_class_affected with ClassName_* pattern"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "service"]
+
+        assert (
+            task._is_test_class_affected("account_test", affected_class_names) is True
+        )
+        assert (
+            task._is_test_class_affected("account_test_method", affected_class_names)
+            is True
+        )
+        assert (
+            task._is_test_class_affected("service_integration", affected_class_names)
+            is True
+        )
+        assert (
+            task._is_test_class_affected("contact_test", affected_class_names) is False
+        )
+
+    def test_is_test_class_affected__test_underscore_prefix_pattern(self):
+        """Test _is_test_class_affected with TestClassName_* pattern"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "handler"]
+
+        assert (
+            task._is_test_class_affected("testaccount_unit", affected_class_names)
+            is True
+        )
+        assert (
+            task._is_test_class_affected(
+                "testhandler_integration", affected_class_names
+            )
+            is True
+        )
+        assert (
+            task._is_test_class_affected("testcontact_unit", affected_class_names)
+            is False
+        )
+
+    def test_is_test_class_affected__case_insensitive(self):
+        """Test _is_test_class_affected works with lowercase inputs (as called in practice)"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        # Method is called with lowercase strings in practice
+        affected_class_names = ["account", "myservice"]
+
+        assert task._is_test_class_affected("accounttest", affected_class_names) is True
+        assert (
+            task._is_test_class_affected("myservicetest", affected_class_names) is True
+        )
+        assert (
+            task._is_test_class_affected("contacttest", affected_class_names) is False
+        )
+
+    def test_is_test_class_affected__multiple_patterns(self):
+        """Test _is_test_class_affected with multiple affected classes and patterns"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account", "contact", "handler"]
+
+        # Test various patterns with multiple affected classes
+        assert task._is_test_class_affected("accounttest", affected_class_names) is True
+        assert task._is_test_class_affected("testcontact", affected_class_names) is True
+        assert (
+            task._is_test_class_affected("handler_integration", affected_class_names)
+            is True
+        )
+        assert (
+            task._is_test_class_affected("testaccount_unit", affected_class_names)
+            is True
+        )
+        assert (
+            task._is_test_class_affected("opportunitytest", affected_class_names)
+            is False
+        )
+
+    def test_filter_package_classes__unsupported_dynamic_filter(self):
+        """Test that unsupported dynamic_filter values raise TaskOptionsError"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "unsupported_filter",
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+
+        mock_classes = {
+            "totalSize": 1,
+            "done": True,
+            "records": [{"Id": "01p000001", "Name": "TestClass1"}],
+        }
+
+        with pytest.raises(TaskOptionsError) as e:
+            task._filter_package_classes(mock_classes)
+        assert "Unsupported dynamic filter: unsupported_filter" in str(e.value)
+
+    @patch.object(BaseProjectConfig, "get_repo")
+    @patch("cumulusci.tasks.apex.testrunner.ListModifiedFiles")
+    @responses.activate
+    def test_run_task__delta_changes_filter_integration(
+        self, mock_list_modified_files, mock_get_repo
+    ):
+        """Integration test for delta_changes filter in full test run"""
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+
+        # Mock ListModifiedFiles task - it's instantiated and then called
+        # Create a simple object with return_values attribute
+        class MockTaskInstance:
+            def __init__(self):
+                self.return_values = {
+                    "files": ["force-app/main/default/classes/Account.cls"],
+                    "file_names": {"Account"},
+                }
+
+            def __call__(self):
+                pass
+
+        mock_list_modified_files.return_value = MockTaskInstance()
+        mock_get_repo.return_value = Mock()
+
+        # Mock ApexClass query to return test classes
+        self._mock_apex_class_query(name="AccountTest")
+        self._mock_run_tests()
+        self._mock_get_failed_test_classes()
+        self._mock_tests_complete()
+        self._mock_get_test_results()
+
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "test_name_match": "%_TEST",
+                    "dynamic_filter": "delta_changes",
+                    "junit_output": "results_junit.xml",
+                    "poll_interval": 1,
+                }
+            }
+        )
+        task = RunApexTests(self.project_config, task_config, self.org_config)
+
+        task()
+
+        # Verify ListModifiedFiles was instantiated
+        mock_list_modified_files.assert_called_once()
+
 
 @patch(
     "cumulusci.core.tasks.BaseSalesforceTask._update_credentials",
