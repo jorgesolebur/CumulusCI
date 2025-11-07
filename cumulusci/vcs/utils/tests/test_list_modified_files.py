@@ -50,7 +50,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
         mock_subprocess.assert_not_called()
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
@@ -67,7 +67,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
         mock_subprocess.assert_called_once_with(
             ["git", "diff", "--name-only", "origin/main"],
             capture_output=True,
@@ -86,7 +86,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
     def test_git_diff_exception(self, mock_subprocess):
@@ -99,7 +99,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
     @patch.object(BaseProjectConfig, "default_package_path", new_callable=PropertyMock)
@@ -117,7 +117,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
     @patch.object(BaseProjectConfig, "default_package_path", new_callable=PropertyMock)
@@ -137,7 +137,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert task.return_values == {"files": [], "file_names": set()}
+        assert task.return_values == {"files": set(), "file_names": set()}
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
     @patch.object(BaseProjectConfig, "default_package_path", new_callable=PropertyMock)

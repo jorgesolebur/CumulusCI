@@ -75,7 +75,7 @@ class ListModifiedFiles(BaseTask):
             )
             return
 
-        self.return_values["files"] = changed_files
+        self.return_values["files"] = sorted(changed_files)
 
         # Extract file names if requested
         file_names = set()

@@ -525,9 +525,9 @@ class RunApexTests(BaseSalesforceApiTask):
         uncommitted_return_values = task.return_values.copy()
 
         # Get the list of changed files.
-        changed_files = branch_return_values.get("files", set()).union(
-            uncommitted_return_values.get("files", set())
-        )
+        branch_files = set(branch_return_values.get("files", []))
+        uncommitted_files = set(uncommitted_return_values.get("files", []))
+        changed_files = branch_files.union(uncommitted_files)
 
         if not changed_files:
             self.logger.info(

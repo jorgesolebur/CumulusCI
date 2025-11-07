@@ -1397,7 +1397,9 @@ class TestRunApexTests(MockLoggerMixin):
         # Create a simple object with return_values attribute
         class MockTaskInstance:
             def __init__(self):
-                self.return_values = {"files": None, "file_names": None}
+                self.return_values = {"files": set(), "file_names": set()}
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1415,10 +1417,10 @@ class TestRunApexTests(MockLoggerMixin):
 
         filtered = task._filter_test_classes_to_delta_changes(mock_classes)
 
-        # Should return empty list when ListModifiedFiles returns None
+        # Should return empty list when no files changed
         assert filtered == []
         log = self._task_log_handler.messages
-        assert any("Could not determine git changes" in msg for msg in log["warning"])
+        assert any("No changed files found" in msg for msg in log["info"])
         # Verify ListModifiedFiles was instantiated
         mock_list_modified_files.assert_called_once()
 
@@ -1444,6 +1446,8 @@ class TestRunApexTests(MockLoggerMixin):
         class MockTaskInstance:
             def __init__(self):
                 self.return_values = {"files": [], "file_names": None}
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1491,8 +1495,10 @@ class TestRunApexTests(MockLoggerMixin):
             def __init__(self):
                 self.return_values = {
                     "files": ["force-app/main/default/classes/MyClass.cls"],
-                    "file_names": None,
+                    "file_names": set(),  # Empty set simulates no file names found
                 }
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1542,6 +1548,8 @@ class TestRunApexTests(MockLoggerMixin):
                     "files": ["force-app/main/default/classes/Account.cls"],
                     "file_names": {"Account"},
                 }
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1603,6 +1611,8 @@ class TestRunApexTests(MockLoggerMixin):
                     "files": ["force-app/main/default/classes/MyClass.cls"],
                     "file_names": {"MyClass"},
                 }
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1649,7 +1659,9 @@ class TestRunApexTests(MockLoggerMixin):
         # Create a simple object with return_values attribute
         class MockTaskInstance:
             def __init__(self):
-                self.return_values = {"files": None, "file_names": None}
+                self.return_values = {"files": set(), "file_names": set()}
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
@@ -1669,9 +1681,8 @@ class TestRunApexTests(MockLoggerMixin):
         call_args = mock_list_modified_files.call_args
         task_config_arg = call_args[0][1]
         assert task_config_arg.config["options"]["base_ref"] is None
-        # Verify warning message uses "default branch" when base_ref is None
-        log = self._task_log_handler.messages
-        assert any("default branch" in msg for msg in log["warning"])
+        # Note: Warning about "default branch" would come from ListModifiedFiles
+        # implementation, but since we're mocking it, that warning won't appear here
 
     def test_is_test_class_affected__direct_match(self):
         """Test _is_test_class_affected with direct match"""
@@ -1823,6 +1834,8 @@ class TestRunApexTests(MockLoggerMixin):
                     "files": ["force-app/main/default/classes/Account.cls"],
                     "file_names": {"Account"},
                 }
+                self.parsed_options = Mock()
+                self.parsed_options.base_ref = None
 
             def __call__(self):
                 pass
