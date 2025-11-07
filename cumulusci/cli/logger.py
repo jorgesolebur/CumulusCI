@@ -32,14 +32,14 @@ def init_logger(debug=False):
             tracebacks_show_locals=debug,
         )
     )
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
     logger.propagate = False
 
     if debug:  # pragma: no cover
         # Referenced from:
         # https://github.com/urllib3/urllib3/blob/cd55f2fe98df4d499ab5c826433ee4995d3f6a60/src/urllib3/__init__.py#L48
         def add_rich_logger(
-            module: str, level: int = logging.DEBUG
+            module: str, level: int = logging.DEBUG if debug else logging.INFO
         ) -> logging.StreamHandler:
             """Retrieve the logger for the given module.
             Remove all handlers from it, and add a single RichHandler."""

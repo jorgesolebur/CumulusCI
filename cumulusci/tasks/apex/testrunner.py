@@ -497,6 +497,9 @@ class RunApexTests(BaseSalesforceApiTask):
             self.logger.info("No git repository found. Returning all test classes.")
             return test_classes["records"]
 
+        self.logger.info("")
+        self.logger.info("Getting the list of committed files in the current branch.")
+        # Get the list of modified files in the current branch.
         task = ListModifiedFiles(
             self.project_config,
             TaskConfig(
@@ -511,14 +514,20 @@ class RunApexTests(BaseSalesforceApiTask):
             org_config=None,
         )
         task()
-        changed_files = task.return_values.get("files", None)
 
-        if changed_files is None:
-            # ListModifiedFiles task failed or no changes found
-            self.logger.warning(
-                f"Could not determine git changes against {self.parsed_options.base_ref or 'default branch'}."
-            )
-            return []
+        branch_return_values = task.return_values.copy()
+
+        # Get the list of modified files which are not yet committed.
+        self.logger.info("")
+        self.logger.info("Getting the list of uncommitted files in the current branch.")
+        task.parsed_options.base_ref = "HEAD"
+        task()
+        uncommitted_return_values = task.return_values.copy()
+
+        # Get the list of changed files.
+        changed_files = branch_return_values.get("files", set()).union(
+            uncommitted_return_values.get("files", set())
+        )
 
         if not changed_files:
             self.logger.info(
@@ -527,9 +536,11 @@ class RunApexTests(BaseSalesforceApiTask):
             return []
 
         # Extract class names from changed files
-        affected_class_names = task.return_values.get("file_names", None)
+        affected_class_names = branch_return_values.get("file_names", set()).union(
+            uncommitted_return_values.get("file_names", set())
+        )
 
-        if affected_class_names is None:
+        if not affected_class_names:
             self.logger.info("No file names found in changed files.")
             return []
 

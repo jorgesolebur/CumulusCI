@@ -2,7 +2,7 @@
 
 import os
 import subprocess
-from typing import List, Optional, Set
+from typing import Optional, Set
 
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils.options import CCIOptions, Field, ListOfStringsOption
@@ -44,7 +44,7 @@ class ListModifiedFiles(BaseTask):
     def _run_task(self):
         """Run the task to list modified files."""
         self.return_values = {
-            "files": [],
+            "files": set(),
             "file_names": set(),
         }
 
@@ -104,10 +104,10 @@ class ListModifiedFiles(BaseTask):
         else:
             self.logger.info(f"  ... and {len(file_names) - 20} more file names")
 
-    def _get_git_changed_files(self) -> Optional[List[str]]:
+    def _get_git_changed_files(self) -> Optional[Set[str]]:
         """Get list of changed files using git diff.
         Returns:
-            List of changed file paths, or None if git command failed
+            Set of changed file paths, or None if git command failed
         """
         try:
             result = subprocess.run(
@@ -123,19 +123,18 @@ class ListModifiedFiles(BaseTask):
                 )
                 return None
 
-            changed_files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
-            return changed_files
+            return set([f.strip() for f in result.stdout.splitlines() if f.strip()])
 
         except FileNotFoundError:
             self.logger.warning(
                 "Git command not found. Cannot determine changed files."
             )
-            return None
+            return set()
         except Exception as e:
             self.logger.warning(f"Error running git diff: {str(e)}")
-            return None
+            return set()
 
-    def _filter_package_changed_files(self, changed_files: List[str]) -> List[str]:
+    def _filter_package_changed_files(self, changed_files: Set[str]) -> Set[str]:
         """Filter changed files to only include those in the package directories."""
         package_dir = os.path.basename(
             os.path.normpath(self.project_config.default_package_path)
@@ -144,19 +143,19 @@ class ListModifiedFiles(BaseTask):
         if package_dir not in self.parsed_options.directories:
             self.parsed_options.directories.append(package_dir)
 
-        filtered_files = []
+        filtered_files = set()
         for file_path in changed_files:
             # Check if file is in any of the package directories
             for pkg_dir in self.parsed_options.directories:
                 if file_path.startswith(pkg_dir + "/") or file_path.startswith(
                     pkg_dir + "\\"
                 ):
-                    filtered_files.append(file_path)
+                    filtered_files.add(file_path)
                     break
 
-        return filtered_files
+        return set(filtered_files)
 
-    def _extract_file_names_from_files(self, changed_files: List[str]) -> Set[str]:
+    def _extract_file_names_from_files(self, changed_files: Set[str]) -> Set[str]:
         """Extract file names from changed file paths based on specified extensions.
 
         Args:
