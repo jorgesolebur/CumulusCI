@@ -95,6 +95,8 @@ class ListOfStringsOption(CCIOptionType):
 
     @classmethod
     def from_str(cls, v) -> List[str]:
+        if v is None or v == "":
+            return []
         return [s.strip() for s in v.split(",")]
 
 
@@ -104,6 +106,26 @@ class MappingOption(CCIOptionType):
     @classmethod
     def from_str(cls, v) -> Dict[str, Any]:
         return parse_list_of_pairs_dict_arg(v)
+
+
+class PercentageOption(CCIOptionType):
+    """Parses a percentage from a string in format X%"""
+
+    @classmethod
+    def validate(cls, v):
+        """Validate and convert a value.
+        If its a string, parse it, else, just validate it.
+        """
+        try:
+            return v if isinstance(v, int) else int(v.rstrip("%"))
+        except ValueError:
+            raise TaskOptionsError(
+                "Value should be a percentage or integer (e.g. 90% or 90)"
+            )
+
+    @classmethod
+    def from_str(cls, v) -> int:
+        return v
 
 
 def parse_list_of_pairs_dict_arg(arg):

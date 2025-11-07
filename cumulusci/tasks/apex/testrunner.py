@@ -3,21 +3,27 @@
 import html
 import io
 import json
+import os
 import re
+from typing import Dict, List, Optional
 
+from cumulusci.core.config import TaskConfig
 from cumulusci.core.exceptions import (
     ApexTestException,
     CumulusCIException,
     TaskOptionsError,
 )
-from cumulusci.core.utils import (
-    decode_to_unicode,
-    determine_managed_mode,
-    process_bool_arg,
-    process_list_arg,
-)
+from cumulusci.core.utils import decode_to_unicode, determine_managed_mode
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils.http.requests_utils import safe_json_from_response
+from cumulusci.utils.options import (
+    CCIOptions,
+    Field,
+    ListOfStringsOption,
+    MappingOption,
+    PercentageOption,
+)
+from cumulusci.vcs.utils.list_modified_files import ListModifiedFiles
 
 APEX_LIMITS = {
     "Soql": {
@@ -83,6 +89,46 @@ WHERE AsyncApexJobId='{}'
 """
 
 
+class MappingIntOption(MappingOption):
+    """Parses a Mapping of Str->Int from a string in format a:b,c:d"""
+
+    @classmethod
+    def from_str(cls, v) -> Dict[str, int]:
+        """Validate and convert a value.
+        If its a string, parse it, else, just validate it.
+        """
+        try:
+            v = {
+                key: PercentageOption.from_str(value)
+                for key, value in super().from_str(v).items()
+            }
+        except ValueError:
+            raise TaskOptionsError(
+                "Value should be a percentage or integer (e.g. 90% or 90)"
+            )
+        return v
+
+
+class ListOfRegexPatternsOption(ListOfStringsOption):
+    @classmethod
+    def validate(cls, v):
+        """Validate and convert a value.
+        If its a string, parse it, else, just validate it.
+        """
+        regex_patterns: List[re.Pattern] = []
+        for regex in v:
+            try:
+                regex_patterns.append(re.compile(regex))
+            except re.error as e:
+                raise TaskOptionsError(
+                    "An invalid regular expression ({}) was provided ({})".format(
+                        regex, e
+                    )
+                )
+        v = regex_patterns
+        return v
+
+
 class RunApexTests(BaseSalesforceApiTask):
     """Task to run Apex tests with the Tooling API and report results.
 
@@ -117,141 +163,143 @@ class RunApexTests(BaseSalesforceApiTask):
 
     api_version = "38.0"
     name = "RunApexTests"
-    task_options = {
-        "test_name_match": {
-            "description": (
+
+    class Options(CCIOptions):
+        test_name_match: Optional[ListOfStringsOption] = Field(
+            None,
+            description=(
                 "Pattern to find Apex test classes to run "
                 '("%" is wildcard).  Defaults to '
                 "project__test__name_match from project config. "
                 "Comma-separated list for multiple patterns."
             ),
-        },
-        "test_name_exclude": {
-            "description": (
+        )
+        test_name_exclude: Optional[ListOfStringsOption] = Field(
+            None,
+            description=(
                 "Query to find Apex test classes to exclude "
                 '("%" is wildcard).  Defaults to '
                 "project__test__name_exclude from project config. "
                 "Comma-separated list for multiple patterns."
-            )
-        },
-        "namespace": {
-            "description": (
+            ),
+        )
+        namespace: Optional[str] = Field(
+            None,
+            description=(
                 "Salesforce project namespace.  Defaults to "
-                + "project__package__namespace"
-            )
-        },
-        "managed": {
-            "description": (
-                "If True, search for tests in the namespace "
-                + "only.  Defaults to False"
-            )
-        },
-        "poll_interval": {
-            "description": ("Seconds to wait between polling for Apex test results.")
-        },
-        "junit_output": {
-            "description": "File name for JUnit output.  Defaults to test_results.xml"
-        },
-        "json_output": {
-            "description": "File name for json output.  Defaults to test_results.json"
-        },
-        "retry_failures": {
-            "description": "A list of regular expression patterns to match against "
+                "project__package__namespace"
+            ),
+        )
+        managed: bool = Field(
+            False,
+            description=(
+                "If True, search for tests in the namespace " "only. Defaults to False"
+            ),
+        )
+        poll_interval: int = Field(
+            1,
+            description="Seconds to wait between polling for Apex test results.",
+        )
+        junit_output: Optional[str] = Field(
+            "test_results.xml",
+            description="File name for JUnit output.  Defaults to test_results.xml",
+        )
+        json_output: Optional[str] = Field(
+            "test_results.json",
+            description="File name for json output.  Defaults to test_results.json",
+        )
+        retry_failures: ListOfRegexPatternsOption = Field(
+            [],
+            description="A list of regular expression patterns to match against "
             "test failures. If failures match, the failing tests are retried in "
-            "serial mode."
-        },
-        "retry_always": {
-            "description": "By default, all failures must match retry_failures to perform "
-            "a retry. Set retry_always to True to retry all failed tests if any failure matches."
-        },
-        "required_org_code_coverage_percent": {
-            "description": "Require at least X percent code coverage across the org following the test run.",
-            "usage": "--required_org_code_coverage_percent PERCENTAGE",
-        },
-        "required_per_class_code_coverage_percent": {
-            "description": "Require at least X percent code coverage for every class in the org.",
-        },
-        "verbose": {
-            "description": "By default, only failures get detailed output. "
-            "Set verbose to True to see all passed test methods."
-        },
-        "test_suite_names": {
-            "description": "Accepts a comma-separated list of test suite names. Only runs test classes that are part of the test suites specified."
-        },
-    }
+            "serial mode.",
+        )
+        retry_always: bool = Field(
+            False,
+            description="By default, all failures must match retry_failures to perform "
+            "a retry. Set retry_always to True to retry all failed tests if any failure matches.",
+        )
+        required_org_code_coverage_percent: PercentageOption = Field(
+            0,
+            description="Require at least X percent code coverage across the org following the test run.",
+        )
+        required_per_class_code_coverage_percent: PercentageOption = Field(
+            0,
+            description="Require at least X percent code coverage for every class in the org.",
+        )
+        required_individual_class_code_coverage_percent: MappingIntOption = Field(
+            {},
+            description="Mapping of class names to their minimum coverage percentage requirements. "
+            "Takes priority over required_per_class_code_coverage_percent for specified classes.",
+        )
+        verbose: bool = Field(
+            False,
+            description="By default, only failures get detailed output. "
+            "Set verbose to True to see all passed test methods.",
+        )
+        test_suite_names: ListOfStringsOption = Field(
+            [],
+            description="List of test suite names. Only runs test classes that are part of the test suites specified.",
+        )
+        dynamic_filter: Optional[str] = Field(
+            None,
+            description="Defines a dynamic filter to apply to test classes from the org that match test_name_match. Supported values: "
+            "'package_only' - only runs test classes that exist in the default package directory (force-app/ or src/),"
+            "'delta_changes' - only runs test classes that are affected by the delta changes in the current branch (force-app/ or src/),"
+            "Default is None, which means no dynamic filter is applied and all test classes from the org that match test_name_match are run.",
+        )
+        base_ref: Optional[str] = Field(
+            None,
+            description="Git reference (branch, tag, or commit) to compare against for delta changes. "
+            "If not set, uses the default branch of the repository. Only used when dynamic_filter is 'delta_changes'.",
+        )
+
+    parsed_options: Options
 
     def _init_options(self, kwargs):
         super(RunApexTests, self)._init_options(kwargs)
 
-        self.options["test_name_match"] = self.options.get(
-            "test_name_match", self.project_config.project__test__name_match
-        )
-        self.options["test_name_exclude"] = self.options.get(
-            "test_name_exclude", self.project_config.project__test__name_exclude
-        )
+        # Set defaults from project config
+        if self.parsed_options.test_name_match is None:
+            self.parsed_options.test_name_match = ListOfStringsOption.from_str(
+                self.project_config.project__test__name_match
+            )
+        if self.parsed_options.test_name_exclude is None:
+            self.parsed_options.test_name_exclude = ListOfStringsOption.from_str(
+                self.project_config.project__test__name_exclude
+            )
+        if self.parsed_options.test_suite_names is None:
+            self.parsed_options.test_suite_names = ListOfStringsOption.from_str(
+                self.project_config.project__test__suite__names
+            )
+        if self.parsed_options.namespace is None:
+            self.parsed_options.namespace = (
+                self.project_config.project__package__namespace
+            )
 
-        self.options["test_suite_names"] = self.options.get(
-            "test_suite_names", self.project_config.project__test__suite__names
-        )
-        if self.options["test_name_match"] is None:
-            self.options["test_name_match"] = ""
-
-        if self.options["test_name_exclude"] is None:
-            self.options["test_name_exclude"] = ""
-
-        self.options["namespace"] = self.options.get(
-            "namespace", self.project_config.project__package__namespace
-        )
-
-        self.options["junit_output"] = self.options.get(
-            "junit_output", "test_results.xml"
-        )
-
-        self.options["json_output"] = self.options.get(
-            "json_output", "test_results.json"
-        )
-
-        self.options["retry_failures"] = process_list_arg(
-            self.options.get("retry_failures", [])
-        )
-        compiled_res = []
-        for regex in self.options["retry_failures"]:
-            try:
-                compiled_res.append(re.compile(regex))
-            except re.error as e:
-                raise TaskOptionsError(
-                    "An invalid regular expression ({}) was provided ({})".format(
-                        regex, e
-                    )
-                )
-        self.options["retry_failures"] = compiled_res
-        self.options["retry_always"] = process_bool_arg(
-            self.options.get("retry_always") or False
-        )
-
-        self.verbose = process_bool_arg(self.options.get("verbose") or False)
-
+        self.verbose = self.parsed_options.verbose
         self.counts = {}
 
-        if "required_org_code_coverage_percent" in self.options:
-            try:
-                self.code_coverage_level = int(
-                    str(self.options["required_org_code_coverage_percent"]).rstrip("%")
-                )
-            except ValueError:
-                raise TaskOptionsError(
-                    f"Invalid code coverage level {self.options['required_org_code_coverage_percent']}"
-                )
-        else:
-            self.code_coverage_level = 0
-
-        self.required_per_class_code_coverage_percent = int(
-            self.options.get("required_per_class_code_coverage_percent", 0)
+        self.code_coverage_level = (
+            self.parsed_options.required_org_code_coverage_percent
         )
+
+        self.required_per_class_code_coverage_percent = (
+            self.parsed_options.required_per_class_code_coverage_percent
+        )
+
+        # Parse individual class coverage requirements
+        # Validator already converted values to int, so just use it directly
+        self.required_individual_class_code_coverage_percent = (
+            self.parsed_options.required_individual_class_code_coverage_percent
+        )
+
         # Raises a TaskOptionsError when the user provides both test_suite_names and test_name_match.
-        if (self.options["test_suite_names"]) and (
-            self.options["test_name_match"] is not None
-            and self.options["test_name_match"] != "%_TEST%"
+        if self.parsed_options.test_suite_names and not (
+            any(
+                pattern in ["%_TEST%", "%TEST%"]
+                for pattern in self.parsed_options.test_name_match
+            )
         ):
             raise TaskOptionsError(
                 "Both test_suite_names and test_name_match cannot be passed simultaneously"
@@ -268,9 +316,9 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _get_namespace_filter(self):
 
-        if self.options.get("managed"):
+        if self.parsed_options.managed:
 
-            namespace = self.options.get("namespace")
+            namespace = self.parsed_options.namespace
 
             if not namespace:
                 raise TaskOptionsError(
@@ -287,15 +335,13 @@ class RunApexTests(BaseSalesforceApiTask):
     def _get_test_class_query(self):
         namespace = self._get_namespace_filter()
         # Split by commas to allow multiple class name matching options
-        test_name_match = self.options["test_name_match"]
         included_tests = []
-        for pattern in test_name_match.split(","):
+        for pattern in self.parsed_options.test_name_match:
             if pattern:
                 included_tests.append("Name LIKE '{}'".format(pattern))
         # Add any excludes to the where clause
-        test_name_exclude = self.options.get("test_name_exclude", "")
         excluded_tests = []
-        for pattern in test_name_exclude.split(","):
+        for pattern in self.parsed_options.test_name_exclude:
             if pattern:
                 excluded_tests.append("(NOT Name LIKE '{}')".format(pattern))
         # Get all test classes for namespace
@@ -311,7 +357,7 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _get_test_classes(self):
         # If test_suite_names is provided, execute only tests that are a part of the list of test suites provided.
-        if self.options["test_suite_names"]:
+        if self.parsed_options.test_suite_names:
             test_classes_from_test_suite_names = (
                 self._get_test_classes_from_test_suite_names()
             )
@@ -350,13 +396,12 @@ class RunApexTests(BaseSalesforceApiTask):
         if len(testSuiteIds_formatted) == 0:
             testSuiteIds_formatted = "''"
 
-        test_name_exclude_arg = self.options["test_name_exclude"]
         condition = ""
 
         # Check if test_name_exclude is provided. Append to query string if the former is specified.
-        if test_name_exclude_arg:
+        if self.parsed_options.test_name_exclude:
             test_name_exclude = self._get_comma_separated_string_of_items(
-                test_name_exclude_arg.split(",")
+                self.parsed_options.test_name_exclude
             )
             condition = f"AND Name NOT IN ({test_name_exclude})"
 
@@ -365,9 +410,8 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _get_test_classes_from_test_suite_names(self):
         # Returns a list of Apex test classes that belong to the test suite(s) specified. Test classes specified in test_name_exclude are excluded.
-        test_suite_names_arg = self.options["test_suite_names"]
         query1 = self._get_test_suite_ids_from_test_suite_names_query(
-            test_suite_names_arg
+            self.parsed_options.test_suite_names
         )
         self.logger.info("Fetching test suite metadata...")
         result = self.tooling.query_all(query1)
@@ -381,6 +425,186 @@ class RunApexTests(BaseSalesforceApiTask):
         result = self.tooling.query_all(query2)
         self.logger.info("Found {} test classes".format(result["totalSize"]))
         return result
+
+    def _class_exists_in_package(self, class_name):
+        """Check if an Apex class exists in the default package directory."""
+        package_path = self.project_config.default_package_path
+
+        # Walk through the package directory to find .cls files
+        for root, dirs, files in os.walk(package_path):
+            for file in files:
+                if file.endswith(".cls"):
+                    # Extract class name from filename (remove .cls extension)
+                    file_class_name = file[:-4]
+                    if file_class_name == class_name:
+                        return True
+        return False
+
+    def _filter_package_classes(self, test_classes):
+        """Filter test classes to only include those that exist in the package directory."""
+        if self.parsed_options.dynamic_filter is None:
+            return test_classes
+
+        filtered_records = []
+        match self.parsed_options.dynamic_filter:
+            case "package_only":
+                filtered_records = self._filter_test_classes_to_package_only(
+                    test_classes
+                )
+            case "delta_changes":
+                filtered_records = self._filter_test_classes_to_delta_changes(
+                    test_classes
+                )
+            case _:
+                raise TaskOptionsError(
+                    f"Unsupported dynamic filter: {self.parsed_options.dynamic_filter}"
+                )
+
+        # Update the result with filtered records
+        filtered_result = {
+            "totalSize": len(filtered_records),
+            "records": filtered_records,
+            "done": test_classes.get("done", True),
+        }
+
+        return filtered_result
+
+    def _filter_test_classes_to_package_only(self, test_classes):
+        """Filter test classes to only include those that exist in the package directory."""
+        filtered_records = []
+        excluded_count = 0
+
+        for record in test_classes["records"]:
+            class_name = record["Name"]
+            if self._class_exists_in_package(class_name):
+                filtered_records.append(record)
+            else:
+                excluded_count += 1
+                self.logger.debug(
+                    f"Excluding test class '{class_name}' - not found in package directory"
+                )
+
+        if excluded_count > 0:
+            self.logger.info(
+                f"Excluded {excluded_count} test class(es) not in package directory"
+            )
+        return filtered_records
+
+    def _filter_test_classes_to_delta_changes(self, test_classes):
+        """Filter test classes to only include those that are affected by the delta changes in the current branch."""
+        # Check if the current base folder has git. (project_config.repo)
+        if self.project_config.get_repo() is None:
+            self.logger.info("No git repository found. Returning all test classes.")
+            return test_classes["records"]
+
+        self.logger.info("")
+        self.logger.info("Getting the list of committed files in the current branch.")
+        # Get the list of modified files in the current branch.
+        task = ListModifiedFiles(
+            self.project_config,
+            TaskConfig(
+                {
+                    "options": {
+                        "base_ref": self.parsed_options.base_ref,
+                        "file_extensions": ["cls", "flow-meta.xml", "trigger"],
+                        "directories": ["force-app", "src"],
+                    }
+                }
+            ),
+            org_config=None,
+        )
+        task()
+
+        branch_return_values = task.return_values.copy()
+
+        # Get the list of modified files which are not yet committed.
+        self.logger.info("")
+        self.logger.info("Getting the list of uncommitted files in the current branch.")
+        task.parsed_options.base_ref = "HEAD"
+        task()
+        uncommitted_return_values = task.return_values.copy()
+
+        # Get the list of changed files.
+        branch_files = set(branch_return_values.get("files", []))
+        uncommitted_files = set(uncommitted_return_values.get("files", []))
+        changed_files = branch_files.union(uncommitted_files)
+
+        if not changed_files:
+            self.logger.info(
+                "No changed files found in package directories (force-app/ or src/)."
+            )
+            return []
+
+        # Extract class names from changed files
+        affected_class_names = branch_return_values.get("file_names", set()).union(
+            uncommitted_return_values.get("file_names", set())
+        )
+
+        if not affected_class_names:
+            self.logger.info("No file names found in changed files.")
+            return []
+
+        self.logger.info(
+            f"Found {len(affected_class_names)} affected class(es): {', '.join(sorted(affected_class_names))}"
+        )
+
+        # Filter test classes to only include those affected by the delta changes
+        filtered_records = []
+        excluded_count = 0
+
+        affected_class_names_lower = [name.lower() for name in affected_class_names]
+
+        for record in test_classes["records"]:
+            test_class_name = record["Name"]
+            if self._is_test_class_affected(
+                test_class_name.lower(), affected_class_names_lower
+            ):
+                filtered_records.append(record)
+            else:
+                excluded_count += 1
+                self.logger.debug(
+                    f"Excluding test class '{test_class_name}' - not affected by delta changes"
+                )
+
+        if excluded_count > 0:
+            self.logger.info(
+                f"Excluded {excluded_count} test class(es) not affected by delta changes"
+            )
+
+        if not filtered_records:
+            self.logger.info(
+                "No test classes found that are affected by delta changes."
+            )
+            return []
+
+        self.logger.info(
+            f"Running {len(filtered_records)} test class(es) that are affected by delta changes. Test classes: {', '.join([record['Name'] for record in filtered_records])}"
+        )
+
+        return filtered_records
+
+    def _is_test_class_affected(self, test_class_name, affected_class_names):
+        """Check if a test class is affected by the changed classes."""
+        # Direct match: test class name matches a changed class
+        if test_class_name in affected_class_names:
+            return True
+
+        # Check if test class name corresponds to an affected class
+        # Common patterns:
+        # - Account.cls changed -> AccountTest.cls should run
+        # - MyService.cls changed -> MyServiceTest.cls should run
+        # - AccountHandler.cls changed -> AccountHandlerTest.cls should run
+        for affected_class in affected_class_names:
+            # Check if test class name follows common test naming patterns
+            if (
+                test_class_name == f"{affected_class}test"
+                or test_class_name == f"test{affected_class}"
+                or test_class_name.startswith(f"{affected_class}_")
+                or test_class_name.startswith(f"test{affected_class}_")
+            ):
+                return True
+
+        return False
 
     def _get_test_methods_for_class(self, class_name):
         result = self.tooling.query(
@@ -404,7 +628,7 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _is_retriable_error_message(self, error_message):
         return any(
-            [reg.search(error_message) for reg in self.options["retry_failures"]]
+            [reg.search(error_message) for reg in self.parsed_options.retry_failures]
         )
 
     def _is_retriable_failure(self, test_result):
@@ -450,7 +674,7 @@ class RunApexTests(BaseSalesforceApiTask):
             )
 
             # In Spring '20, we cannot get symbol tables for managed classes.
-            if self.options.get("managed"):
+            if self.parsed_options.managed:
                 self.logger.error(
                     f"Cannot access symbol table for managed class {class_name}. Failure will not be retried."
                 )
@@ -489,7 +713,7 @@ class RunApexTests(BaseSalesforceApiTask):
                         # Even if this failure is not retriable per se,
                         # persist its details if we might end up retrying
                         # all failures.
-                        if self.options["retry_always"] or can_retry_this_failure:
+                        if self.parsed_options.retry_always or can_retry_this_failure:
                             self.retry_details.setdefault(
                                 test_result["ApexClassId"], []
                             ).append(test_result["MethodName"])
@@ -614,12 +838,18 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _init_task(self):
         super()._init_task()
-        self.options["managed"] = determine_managed_mode(
+
+        self.parsed_options.managed = determine_managed_mode(
             self.options, self.project_config, self.org_config
         )
 
     def _run_task(self):
         result = self._get_test_classes()
+
+        # Apply dynamic filters if enabled
+        if self.parsed_options.dynamic_filter:
+            result = self._filter_package_classes(result)
+
         if result["totalSize"] == 0:
             return
         for test_class in result["records"]:
@@ -645,7 +875,9 @@ class RunApexTests(BaseSalesforceApiTask):
         # Did we get back retriable test results? Check our retry policy,
         # then enqueue new runs individually, until either (a) all retriable
         # tests succeed or (b) a test fails.
-        able_to_retry = (self.counts["Retriable"] and self.options["retry_always"]) or (
+        able_to_retry = (
+            self.counts["Retriable"] and self.parsed_options.retry_always
+        ) or (
             self.counts["Retriable"] and self.counts["Retriable"] == self.counts["Fail"]
         )
         if not able_to_retry:
@@ -664,7 +896,7 @@ class RunApexTests(BaseSalesforceApiTask):
             )
 
         if self.code_coverage_level or self.required_per_class_code_coverage_percent:
-            if self.options.get("namespace") not in self.org_config.installed_packages:
+            if self.parsed_options.namespace not in self.org_config.installed_packages:
                 self._check_code_coverage()
             else:
                 self.logger.info(
@@ -680,13 +912,17 @@ class RunApexTests(BaseSalesforceApiTask):
         class_level_coverage_failures = {}
 
         # Query for Class level code coverage using the aggregate
-        if self.required_per_class_code_coverage_percent:
+        if (
+            self.required_per_class_code_coverage_percent
+            or self.required_individual_class_code_coverage_percent
+        ):
             test_classes = self.tooling.query(
                 "SELECT ApexClassOrTrigger.Name, ApexClassOrTriggerId, NumLinesCovered, NumLinesUncovered FROM ApexCodeCoverageAggregate ORDER BY ApexClassOrTrigger.Name ASC"
             )["records"]
 
             coverage_percentage = 0
             for class_level in test_classes:
+                class_name = class_level["ApexClassOrTrigger"]["Name"]
                 total = (
                     class_level["NumLinesCovered"] + class_level["NumLinesUncovered"]
                 )
@@ -698,26 +934,58 @@ class RunApexTests(BaseSalesforceApiTask):
                         2,
                     )
 
-                if coverage_percentage < self.required_per_class_code_coverage_percent:
-                    class_level_coverage_failures[
-                        class_level["ApexClassOrTrigger"]["Name"]
-                    ] = coverage_percentage
+                # Determine the required coverage for this class using fallback logic
+                required_coverage = None
+                if class_name in self.required_individual_class_code_coverage_percent:
+                    # Individual class requirement takes priority
+                    required_coverage = (
+                        self.required_individual_class_code_coverage_percent[class_name]
+                    )
+                elif self.required_per_class_code_coverage_percent:
+                    # Fall back to global per-class requirement
+                    required_coverage = self.required_per_class_code_coverage_percent
+
+                # Only check if a requirement is defined for this class
+                if (
+                    required_coverage is not None
+                    and coverage_percentage < required_coverage
+                ):
+                    class_level_coverage_failures[class_name] = {
+                        "actual": coverage_percentage,
+                        "required": required_coverage,
+                    }
 
         # Query for OrgWide coverage
         result = self.tooling.query("SELECT PercentCovered FROM ApexOrgWideCoverage")
         coverage = result["records"][0]["PercentCovered"]
 
         errors = []
-        if self.required_per_class_code_coverage_percent:
+        if (
+            self.required_per_class_code_coverage_percent
+            or self.required_individual_class_code_coverage_percent
+        ):
             if class_level_coverage_failures:
-                for class_name in class_level_coverage_failures.keys():
+                for class_name, coverage_info in class_level_coverage_failures.items():
                     errors.append(
-                        f"{class_name}'s code coverage of {class_level_coverage_failures[class_name]}% is below required level of {self.required_per_class_code_coverage_percent}."
+                        f"{class_name}'s code coverage of {coverage_info['actual']}% is below required level of {coverage_info['required']}%."
                     )
             else:
-                self.logger.info(
-                    f"All classes meet code coverage expectations of {self.required_per_class_code_coverage_percent}% ."
-                )
+                # Build a message about what requirements were met
+                if (
+                    self.required_per_class_code_coverage_percent
+                    and self.required_individual_class_code_coverage_percent
+                ):
+                    self.logger.info(
+                        f"All classes meet code coverage expectations (global: {self.required_per_class_code_coverage_percent}%, individual class requirements also satisfied)."
+                    )
+                elif self.required_per_class_code_coverage_percent:
+                    self.logger.info(
+                        f"All classes meet code coverage expectations of {self.required_per_class_code_coverage_percent}%."
+                    )
+                elif self.required_individual_class_code_coverage_percent:
+                    self.logger.info(
+                        "All classes with individual coverage requirements meet their expectations."
+                    )
 
         if coverage < self.code_coverage_level:
             errors.append(
@@ -759,7 +1027,7 @@ class RunApexTests(BaseSalesforceApiTask):
 
     def _wait_for_tests(self):
         self.poll_complete = False
-        self.poll_interval_s = int(self.options.get("poll_interval", 1))
+        self.poll_interval_s = self.parsed_options.poll_interval
         self.poll_count = 0
         self._poll()
 
@@ -802,7 +1070,7 @@ class RunApexTests(BaseSalesforceApiTask):
             self.poll_complete = True
 
     def _write_output(self, test_results):
-        junit_output = self.options["junit_output"]
+        junit_output = self.parsed_options.junit_output
         if junit_output:
             with io.open(junit_output, mode="w", encoding="utf-8") as f:
                 f.write('<testsuite tests="{}">\n'.format(len(test_results)))
@@ -834,7 +1102,7 @@ class RunApexTests(BaseSalesforceApiTask):
                     f.write(str(s))
                 f.write("</testsuite>")
 
-        json_output = self.options["json_output"]
+        json_output = self.parsed_options.json_output
         if json_output:
             with io.open(json_output, mode="w", encoding="utf-8") as f:
                 f.write(str(json.dumps(test_results, indent=4)))

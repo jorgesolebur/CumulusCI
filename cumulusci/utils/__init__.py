@@ -270,6 +270,14 @@ def inject_namespace(
     namespaced_org_file_token = "___NAMESPACED_ORG___"
     namespaced_org = (namespace + "__") if namespaced_org and namespace else ""
 
+    # Handle tokens %%%NAMESPACED_ORG_COLON%%%
+    namespaced_org_colon_token = "%%%NAMESPACED_ORG_COLON%%%"
+    namespaced_org_colon = (namespace + ":") if namespaced_org and namespace else ""
+
+    # Handle tokens %%%NAMESPACE_COLON%%%
+    namespace_colon_token = "%%%NAMESPACE_COLON%%%"
+    namespace_colon = (namespace + ":") if managed and namespace else ""
+
     # Handle token %%%NAMESPACE_OR_C%%% for lightning components
     namespace_or_c_token = "%%%NAMESPACE_OR_C%%%"
     namespace_or_c = namespace if managed and namespace else "c"
@@ -326,6 +334,20 @@ def inject_namespace(
     if logger and content != prev_content:
         logger.info(
             f'  {name}: Replaced {namespaced_org_token} with "{namespaced_org}"'
+        )
+
+    prev_content = content
+    content = content.replace(namespaced_org_colon_token, namespaced_org_colon)
+    if logger and content != prev_content:
+        logger.info(
+            f'  {name}: Replaced {namespaced_org_colon_token} with "{namespaced_org_colon}"'
+        )
+
+    prev_content = content
+    content = content.replace(namespace_colon_token, namespace_colon)
+    if logger and content != prev_content:
+        logger.info(
+            f'  {name}: Replaced {namespace_colon_token} with "{namespace_colon}"'
         )
 
     prev_content = content
