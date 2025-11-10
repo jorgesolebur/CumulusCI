@@ -890,3 +890,166 @@ class TestAssignPermissionSetToPermissionSetGroup:
         assert len(responses.calls) == 3
         composite_request = json.loads(responses.calls[2].request.body)
         assert len(composite_request["records"]) == 2
+
+    @responses.activate
+    def test_run_task_batch_error_with_fail_on_error_true(self):
+        """Test _run_task raises exception when batch fails and fail_on_error=True"""
+        task = create_task(
+            AssignPermissionSetToPermissionSetGroup,
+            {"assignments": {"PSG1": ["PS1"]}, "fail_on_error": True},
+        )
+        task._init_task()
+
+        # Mock PSG query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {
+                        "Id": "0PG000000000001",
+                        "DeveloperName": "PSG1",
+                        "NamespacePrefix": None,
+                    }
+                ],
+            },
+        )
+
+        # Mock PS query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {"Id": "0PS000000000001", "Name": "PS1", "NamespacePrefix": None}
+                ],
+            },
+        )
+
+        # Mock Composite API to raise an exception
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=500,
+            json={"errorCode": "INTERNAL_ERROR", "message": "Internal server error"},
+        )
+
+        with pytest.raises(SalesforceException):
+            task._run_task()
+
+    @responses.activate
+    def test_run_task_batch_error_with_fail_on_error_false(self):
+        """Test _run_task continues when batch fails and fail_on_error=False"""
+        task = create_task(
+            AssignPermissionSetToPermissionSetGroup,
+            {"assignments": {"PSG1": ["PS1"]}, "fail_on_error": False},
+        )
+        task._init_task()
+
+        # Mock PSG query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {
+                        "Id": "0PG000000000001",
+                        "DeveloperName": "PSG1",
+                        "NamespacePrefix": None,
+                    }
+                ],
+            },
+        )
+
+        # Mock PS query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {"Id": "0PS000000000001", "Name": "PS1", "NamespacePrefix": None}
+                ],
+            },
+        )
+
+        # Mock Composite API to raise an exception
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=500,
+            json={"errorCode": "INTERNAL_ERROR", "message": "Internal server error"},
+        )
+
+        # Should not raise, just log the error
+        task._run_task()
+
+        # Verify that the error was logged (we can't easily test logging, but we can verify
+        # that the task completed without raising)
+        assert len(responses.calls) == 3
+
+    @responses.activate
+    def test_run_task_batch_error_with_fail_on_error_default(self):
+        """Test _run_task continues when batch fails and fail_on_error is default (False)"""
+        task = create_task(
+            AssignPermissionSetToPermissionSetGroup,
+            {"assignments": {"PSG1": ["PS1"]}},
+        )
+        task._init_task()
+
+        # Mock PSG query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {
+                        "Id": "0PG000000000001",
+                        "DeveloperName": "PSG1",
+                        "NamespacePrefix": None,
+                    }
+                ],
+            },
+        )
+
+        # Mock PS query
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {"Id": "0PS000000000001", "Name": "PS1", "NamespacePrefix": None}
+                ],
+            },
+        )
+
+        # Mock Composite API to raise an exception
+        responses.add(
+            method="POST",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/composite/sobjects",
+            status=500,
+            json={"errorCode": "INTERNAL_ERROR", "message": "Internal server error"},
+        )
+
+        # Should not raise, just log the error (fail_on_error defaults to False)
+        task._run_task()
+
+        # Verify that the error was logged but task completed
+        assert len(responses.calls) == 3

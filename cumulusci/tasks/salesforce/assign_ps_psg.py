@@ -126,6 +126,10 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             None,
             description="Whether the org is managed. If not provided, the managed mode will be determined based on the org config.",
         )
+        fail_on_error: bool = Field(
+            False,
+            description="Whether the task should fail if any Permission Set Group Component creation fails.",
+        )
 
     parsed_options: Options
 
@@ -172,7 +176,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             psg_id = self.psg_ids.get(self.psg_names_sanitized[psg_name])
             if not psg_id:
                 self.logger.warning(
-                    f"Permission Set Group '{psg_name}' not found. Skipping."
+                    f"Permission Set Group '{psg_name}' not found in the org. Skipping assignment creation."
                 )
                 continue
 
@@ -180,7 +184,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                 ps_id = self.ps_ids.get(self.ps_names_sanitized[ps_name])
                 if not ps_id:
                     self.logger.warning(
-                        f"Permission Set '{ps_name}' not found. Skipping."
+                        f"Permission Set '{ps_name}' not found in the org. Skipping assignment creation."
                     )
                     continue
 
@@ -204,7 +208,8 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                 self._create_permission_set_group_components(batch)
             except Exception as e:
                 self.logger.error(f"Error processing batch {i // 200 + 1}: {str(e)}")
-                raise e
+                if self.parsed_options.fail_on_error:
+                    raise e
 
     def _get_permission_set_group_ids(self, psg_names: List[str]):
         """Query Permission Set Groups by DeveloperName and return mapping of name to ID."""
@@ -241,7 +246,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             missing = set(self.psg_names_sanitized.values()) - set(self.psg_ids.keys())
             if missing:
                 self.logger.warning(
-                    f"Permission Set Groups not found: {', '.join(missing)}"
+                    f"Permission Set Groups not found in the org: {', '.join(missing)}"
                 )
 
             return
@@ -346,7 +351,9 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             # Log missing permission sets
             missing = set(self.ps_names_sanitized.values()) - set(self.ps_ids.keys())
             if missing:
-                self.logger.warning(f"Permission Sets not found: {', '.join(missing)}")
+                self.logger.warning(
+                    f"Permission Sets not found in the org: {', '.join(missing)}"
+                )
 
             return
         except Exception as e:
