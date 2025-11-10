@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.28 (2025-11-10)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* PM-2080 Ability to define exceptions in Apex test Class Coverage Validation + option to run onlypackaged test classes by [@jorgesolebur](https://github.com/jorgesolebur) in [#101](https://github.com/jorgesolebur/CumulusCI/pull/101)
+* Add CCI task to assign PSs to PSG by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#107](https://github.com/jorgesolebur/CumulusCI/pull/107)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.27...v5.0.28
+
+
+<!-- latest-stop -->
+
 ## v5.0.27 (2025-10-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.26...v5.0.27
 
-
-<!-- latest-stop -->
 
 ## v5.0.26 (2025-10-14)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
