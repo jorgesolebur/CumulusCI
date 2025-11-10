@@ -197,6 +197,10 @@ tasks:
             user_permissions:
                 - PermissionsBulkApiHardDelete
                 - PermissionsCreateAuditFields
+    assign_permission_set_to_psg:
+        group: Metadata Transformations
+        description: "Assigns specified Permission Sets to the specified Permission Set Groups using the Composite API."
+        class_path: cumulusci.tasks.salesforce.assign_ps_psg.AssignPermissionSetToPermissionSetGroup
     create_unmanaged_ee_src:
         description: Modifies the src directory for unmanaged deployment to an EE org
         class_path: cumulusci.tasks.metadata.ee_src.CreateUnmanagedEESrc
