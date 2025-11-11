@@ -684,7 +684,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
 
     @responses.activate
     def test_create_permission_set_group_components_with_errors(self):
-        """Test _create_permission_set_group_components with errors"""
+        """Test _create_permission_set_group_components with duplicate errors (should not raise exception)"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
             {"assignments": {"PSG1": ["PS1"]}},
@@ -717,8 +717,9 @@ class TestAssignPermissionSetToPermissionSetGroup:
             ],
         )
 
-        with pytest.raises(SalesforceException, match="Failed to create"):
-            task._create_permission_set_group_components(records)
+        # Duplicate errors are now handled gracefully and should not raise an exception
+        task._create_permission_set_group_components(records)
+        assert len(responses.calls) == 1
 
     @responses.activate
     def test_create_permission_set_group_components_api_error(self):
@@ -785,7 +786,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
 
     @responses.activate
     def test_create_permission_set_group_components_partial_success(self):
-        """Test _create_permission_set_group_components with partial success"""
+        """Test _create_permission_set_group_components with partial success (should not raise exception for DUPLICATE_VALUE errors)"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
             {"assignments": {"PSG1": ["PS1", "PS2"]}},
@@ -824,8 +825,8 @@ class TestAssignPermissionSetToPermissionSetGroup:
             ],
         )
 
-        with pytest.raises(SalesforceException, match="Failed to create"):
-            task._create_permission_set_group_components(records)
+        task._create_permission_set_group_components(records)
+        assert len(responses.calls) == 1
 
     @responses.activate
     def test_run_task_multiple_psgs(self):
