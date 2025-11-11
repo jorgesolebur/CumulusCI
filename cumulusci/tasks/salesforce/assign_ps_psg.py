@@ -90,18 +90,18 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
 
     Task options:
     - assignments: A dictionary where:
-      - key: Permission Set Group API name (DeveloperName)
-      - value: List of Permission Set API names (Name) to assign to the Permission Set Group
+      key: Permission Set Group API name (DeveloperName)
+       - value: List of Permission Set API names (Name) to assign to the Permission Set Group
 
     Example 1: Passed as JSON
-    - "PermissionSetGroup1": ["PermissionSet1", "PermissionSet2"]
-    - "PermissionSetGroup2": ["PermissionSet3", "PermissionSet4"]
+    "PermissionSetGroup1": ["PermissionSet1", "PermissionSet2"]
+    "PermissionSetGroup2": ["PermissionSet3", "PermissionSet4"]
 
     Example 2: Passed as YAML
-    - PermissionSetGroup1:
+    PermissionSetGroup1:
       - PermissionSet1
       - PermissionSet2
-    - PermissionSetGroup2:
+    PermissionSetGroup2:
       - PermissionSet3
       - PermissionSet4
 
@@ -387,8 +387,19 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                         f"Created PermissionSetGroupComponent record: {record_id}"
                     )
                 else:
-                    error_count += 1
+
                     errors = response.get("errors", [])
+                    is_duplicate_error = any(
+                        err.get("statusCode")
+                        for err in errors
+                        if isinstance(err, dict)
+                        and err.get("statusCode", "Unknown status code")
+                        == "DUPLICATE_VALUE"
+                    )
+
+                    if not is_duplicate_error:
+                        error_count += 1
+
                     error_messages = [
                         f"{err.get('message', 'Unknown error')} ({err.get('statusCode', 'Unknown status code')})"
                         for err in errors
@@ -411,9 +422,15 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                         ),
                         None,
                     )
-                    self.logger.error(
-                        f"Failed to create PermissionSetGroupComponent for Permission Set Group '{psg_name}' and Permission Set '{ps_name}': {', '.join(error_messages)}"
-                    )
+
+                    if is_duplicate_error:
+                        self.logger.info(
+                            f"Permission Set '{ps_name}' is already assigned to Permission Set Group '{psg_name}'. Skipping assignment creation."
+                        )
+                    else:
+                        self.logger.error(
+                            f"Failed to create PermissionSetGroupComponent for Permission Set Group '{psg_name}' and Permission Set '{ps_name}': {', '.join(error_messages)}"
+                        )
 
             self.logger.info(
                 f"Permission Set Group Assignments results: {success_count} succeeded, {error_count} failed"

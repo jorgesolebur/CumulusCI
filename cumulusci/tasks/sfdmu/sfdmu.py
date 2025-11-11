@@ -2,9 +2,11 @@
 
 import os
 import shutil
-import subprocess
+
+import sarge
 
 from cumulusci.core.exceptions import TaskOptionsError
+from cumulusci.core.sfdx import sfdx
 from cumulusci.core.tasks import BaseSalesforceTask
 from cumulusci.core.utils import determine_managed_mode
 from cumulusci.tasks.command import Command
@@ -209,10 +211,8 @@ class SfdmuTask(BaseSalesforceTask, Command):
         self._inject_namespace_tokens(execute_path, target_org_config)
 
         # Build and execute SFDmu command
-        command = [
-            "sf",
-            "sfdmu",
-            "run",
+        # Use shell_quote to properly handle paths with spaces on Windows
+        command_parts = [
             "-s",
             source_sf_org,
             "-u",
@@ -226,31 +226,25 @@ class SfdmuTask(BaseSalesforceTask, Command):
             # Split the additional_params string into individual arguments
             # This handles cases like "-no-warnings -m -t error" -> ["-no-warnings", "-m", "-t", "error"]
             additional_args = self.options["additional_params"].split()
-            command.extend(additional_args)
+            # Quote each argument to handle spaces properly
+            command_parts.extend(additional_args)
 
-        self.logger.info(f"Executing: {' '.join(command)}")
+        # Join command parts into a single string for sarge (which uses shell=True)
+        command = "sf sfdmu run " + " ".join(command_parts)
+        self.logger.info(f"Executing: {command}")
 
-        # Execute the command with real-time output
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            bufsize=1,
+        p: sarge.Command = sfdx(
+            "sfdmu run",
+            log_note="Running SFDmu",
+            args=command_parts,
+            check_return=True,
+            username=None,
         )
 
-        # Stream output in real-time
-        if process.stdout:
-            for line in iter(process.stdout.readline, ""):
-                if line:
-                    self.logger.info(line.rstrip())
+        for line in p.stdout_text:
+            self.logger.info(line)
 
-        process.wait()
-
-        # Check return code
-        if process.returncode != 0:
-            raise TaskOptionsError(
-                f"SFDmu command failed with return code {process.returncode}"
-            )
+        for line in p.stderr_text:
+            self.logger.error(line)
 
         self.logger.info("SFDmu task completed successfully")

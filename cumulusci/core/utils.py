@@ -379,7 +379,9 @@ def determine_managed_mode(options, project_config, org_config):
     Note: The changes allows multiple package development under same namespace.
     """
     if "managed" in options:
-        return process_bool_arg(options["managed"])
+        return process_bool_arg(
+            options["managed"] if options["managed"] is not None else False
+        )
 
     # Get package and namespace information
     package_name = getattr(project_config, "project__package__name", None)
