@@ -15,14 +15,17 @@ from cumulusci.utils.options import (
 from .credentialManager import CredentialManager
 
 
+class GenericOptions(CCIOptions):
+    env_path: Path = Field("./.env", description="Path to the .env file")
+    secrets_provider: str = Field(
+        None,
+        description='Secrets provider type i.e local, ado_variables, aws_secrets. Default value is None, which will use the secrets type from the environment variable CUMULUSCI_SECRETS_TYPE if it is set, otherwise it will use the "local" provider.',
+    )
+    provider_options: MappingOption = Field({}, description="Provider options")
+
+
 class SecretsToEnv(BaseTask):
-    class Options(CCIOptions):
-        env_path: Path = Field("./.env", description="Path to the .env file")
-        secrets_provider: str = Field(
-            None,
-            description='Secrets provider type i.e local, ado_variables, aws_secrets. Default value is None, which will use the secrets type from the environment variable CUMULUSCI_SECRETS_TYPE if it is set, otherwise it will use the "local" provider.',
-        )
-        provider_options: MappingOption = Field({}, description="Provider options")
+    class Options(GenericOptions):
         secrets: Union[ListOfStringsOption, MappingOption] = Field(
             [],
             description="List of secret keys to retrieve be it with a list of keys or a mapping of secret name to key. Defaults to empty list.",
