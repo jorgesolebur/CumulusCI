@@ -232,6 +232,10 @@ tasks:
         options:
             path: src
         group: Salesforce Metadata
+    deploy_unpackaged_metadata:
+        description: Deploys the unpackaged metadata from the project config to the target org. This is application of 2nd generation package metadata.
+        class_path: cumulusci.tasks.salesforce.DeployUnpackagedMetadata
+        group: Salesforce Metadata
     deploy_marketing_cloud_package:
         class_path: cumulusci.tasks.marketing_cloud.deploy.MarketingCloudDeployTask
         description: Deploys a package zip file to a Marketing Cloud Tenant via the Marketing Cloud Package Manager API.
@@ -772,6 +776,10 @@ tasks:
     directory_recreator:
         description: Remove and recreate a directory
         class_path: cumulusci.tasks.utility.directoryRecreator.DirectoryRecreator
+        group: Utilities
+    consolidate_unpackaged_metadata:
+        description: Consolidate unpackaged metadata from multiple sources into a single directory
+        class_path: cumulusci.tasks.utility.copyContents.ConsolidateUnpackagedMetadata
         group: Utilities
     download_extract:
         description: Downloads files and folders from a VCS repository.
@@ -1606,6 +1614,9 @@ project:
         namespace:
         install_class:
         uninstall_class:
+        apex_test_access:
+        package_metadata_access:
+        unpackaged_metadata_path:
         api_version: "63.0"
     git:
         default_branch: master

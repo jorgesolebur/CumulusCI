@@ -84,6 +84,11 @@ class Package(CCIDictModel):
     uninstall_class: str = None
     api_version: str = None
     metadata_package_id: str = None
+    apex_test_access: Optional[dict[str, Union[str, list[str]]]] = None
+    package_metadata_access: Optional[dict[str, Union[str, list[str]]]] = None
+    unpackaged_metadata_path: Optional[
+        Union[str, List[str], Dict[str, Union[str, List[str]]]]
+    ] = None
 
 
 class Test(CCIDictModel):

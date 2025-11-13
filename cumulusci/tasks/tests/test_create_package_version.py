@@ -845,3 +845,718 @@ class TestCreatePackageVersion:
         assert task._prepare_cci_dependencies(
             {"ids": [{"subscriberPackageVersionId": "04t000000000000"}]}
         ) == [{"version_id": "04t000000000000"}]
+
+
+class TestPackageConfigNewFeatures:
+    """Tests for new PackageConfig validation features."""
+
+    def test_validate_apex_test_access(self):
+        with pytest.raises(ValidationError, match="Only managed packages"):
+            PackageConfig(
+                package_type=PackageTypeEnum.unlocked,
+                apex_test_access={"permission_set_names": ["TestPermSet"]},
+            )  # type: ignore
+
+    def test_validate_package_metadata_access(self):
+        with pytest.raises(ValidationError, match="Only managed packages"):
+            PackageConfig(
+                package_type=PackageTypeEnum.unlocked,
+                package_metadata_access={"permission_set_names": ["TestPermSet"]},
+            )  # type: ignore
+
+
+class TestCreatePackageVersionNewFeatures:
+    """Tests for new CreatePackageVersion functionality."""
+
+    devhub_base_url = (
+        f"https://devhub.my.salesforce.com/services/data/v{CURRENT_SF_API_VERSION}"
+    )
+
+    @responses.activate
+    def test_version_number_option(self, get_task, devhub_config):
+        """Test that version_number option is used instead of version_base/version_type"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+                "version_number": "2.5.3.10",
+            }
+        )
+
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+        responses.add(
+            "POST",
+            f"{self.devhub_base_url}/tooling/sobjects/Package2/",
+            json={"id": "0Ho6g000000fy4ZCAQ"},
+        )
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        package_id = task._get_or_create_package(task.package_config)
+        builder = BasePackageZipBuilder()
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as _, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                # Verify version_number was used instead of version_base/version_type
+                assert descriptor["versionNumber"] == "2.5.3.10"
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                package_id, task.package_config, builder, skip_validation=True
+            )
+            # Verify version_number was parsed correctly
+            assert task.options["version_number"] is not None
+            assert task.options["version_number"].format() == "2.5.3.10"
+
+    @responses.activate
+    def test_dependencies_option(self, get_task, devhub_config):
+        """Test that explicit dependencies option is used"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+                "dependencies": "04t000000000001,04t000000000002",
+            }
+        )
+
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+        responses.add(
+            "POST",
+            f"{self.devhub_base_url}/tooling/sobjects/Package2/",
+            json={"id": "0Ho6g000000fy4ZCAQ"},
+        )
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        package_id = task._get_or_create_package(task.package_config)
+        builder = BasePackageZipBuilder()
+
+        with mock.patch.object(
+            task, "_get_dependencies"
+        ) as mock_get_deps, mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                # Verify dependencies were set correctly
+                assert "dependencies" in descriptor
+                assert descriptor["dependencies"] == [
+                    {"subscriberPackageVersionId": "04t000000000001"},
+                    {"subscriberPackageVersionId": "04t000000000002"},
+                ]
+                # _get_dependencies should not be called when dependencies option is set
+                mock_get_deps.assert_not_called()
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                package_id,
+                task.package_config,
+                builder,
+                skip_validation=False,
+            )
+            # Verify dependencies were parsed correctly
+            assert task.options["dependencies"] == [
+                {"subscriberPackageVersionId": "04t000000000001"},
+                {"subscriberPackageVersionId": "04t000000000002"},
+            ]
+
+    @responses.activate
+    def test_apex_test_access_string_format(self, get_task, devhub_config):
+        """Test apex_test_access with string format for permission sets"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.apex_test_access = {
+            "permission_set_names": "PermSet1, PermSet2",
+            "permission_set_license_names": "License1, License2",
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "permissionSetNames" in descriptor
+                assert descriptor["permissionSetNames"] == ["PermSet1", "PermSet2"]
+                assert "permissionSetLicenseDeveloperNames" in descriptor
+                assert descriptor["permissionSetLicenseDeveloperNames"] == [
+                    "License1",
+                    "License2",
+                ]
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+    @responses.activate
+    def test_apex_test_access_list_format(self, get_task, devhub_config):
+        """Test apex_test_access with list format for permission sets"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.apex_test_access = {
+            "permission_set_names": ["PermSet1", "PermSet2"],
+            "permission_set_license_names": ["License1", "License2"],
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "permissionSetNames" in descriptor
+                assert descriptor["permissionSetNames"] == ["PermSet1", "PermSet2"]
+                assert "permissionSetLicenseDeveloperNames" in descriptor
+                assert descriptor["permissionSetLicenseDeveloperNames"] == [
+                    "License1",
+                    "License2",
+                ]
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+    @responses.activate
+    def test_package_metadata_access_string_format(self, get_task, devhub_config):
+        """Test package_metadata_access with string format"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.package_metadata_access = {
+            "permission_set_names": "MetaPermSet1, MetaPermSet2",
+            "permission_set_license_names": "MetaLicense1, MetaLicense2",
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "packageMetadataPermissionSetNames" in descriptor
+                assert descriptor["packageMetadataPermissionSetNames"] == [
+                    "MetaPermSet1",
+                    "MetaPermSet2",
+                ]
+                assert "packageMetadataPermissionSetLicenseNames" in descriptor
+                assert descriptor["packageMetadataPermissionSetLicenseNames"] == [
+                    "MetaLicense1",
+                    "MetaLicense2",
+                ]
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+    @responses.activate
+    def test_package_metadata_access_list_format(self, get_task, devhub_config):
+        """Test package_metadata_access with list format"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.package_metadata_access = {
+            "permission_set_names": ["MetaPermSet1", "MetaPermSet2"],
+            "permission_set_license_names": ["MetaLicense1", "MetaLicense2"],
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "packageMetadataPermissionSetNames" in descriptor
+                assert descriptor["packageMetadataPermissionSetNames"] == [
+                    "MetaPermSet1",
+                    "MetaPermSet2",
+                ]
+                assert "packageMetadataPermissionSetLicenseNames" in descriptor
+                assert descriptor["packageMetadataPermissionSetLicenseNames"] == [
+                    "MetaLicense1",
+                    "MetaLicense2",
+                ]
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+    @responses.activate
+    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
+    @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
+    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
+    def test_get_unpackaged_metadata_path_string(
+        self,
+        mock_clean_temp,
+        mock_zip_builder,
+        mock_convert_sfdx,
+        mock_consolidate,
+        task,
+    ):
+        """Test _get_unpackaged_metadata_path with string path"""
+        import tempfile
+
+        temp_path = tempfile.mkdtemp()
+        mock_consolidate.return_value = temp_path
+        mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+
+        mock_builder_instance = mock.Mock()
+        mock_builder_instance.as_bytes.return_value = b"testzipbytes"
+        mock_zip_builder.return_value = mock_builder_instance
+
+        version_bytes = io.BytesIO()
+        version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
+
+        result = task._get_unpackaged_metadata_path("unpackaged/pre", version_info)
+
+        assert result == version_info
+        mock_consolidate.assert_called_once_with(
+            "unpackaged/pre", task.project_config.repo_root
+        )
+        mock_convert_sfdx.assert_called_once()
+        mock_zip_builder.assert_called_once()
+        mock_builder_instance.as_bytes.assert_called_once()
+        mock_clean_temp.assert_called_once_with(temp_path)
+        assert "unpackaged-metadata-package.zip" in [
+            name for name in version_info.namelist()
+        ]
+
+        version_info.close()
+
+    @responses.activate
+    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
+    @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
+    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
+    def test_get_unpackaged_metadata_path_list(
+        self,
+        mock_clean_temp,
+        mock_zip_builder,
+        mock_convert_sfdx,
+        mock_consolidate,
+        task,
+    ):
+        """Test _get_unpackaged_metadata_path with list of paths"""
+        import tempfile
+
+        temp_path = tempfile.mkdtemp()
+        mock_consolidate.return_value = temp_path
+        mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+
+        mock_builder_instance = mock.Mock()
+        mock_builder_instance.as_bytes.return_value = b"testzipbytes"
+        mock_zip_builder.return_value = mock_builder_instance
+
+        version_bytes = io.BytesIO()
+        version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
+
+        metadata_paths = ["unpackaged/pre", "unpackaged/post"]
+        result = task._get_unpackaged_metadata_path(metadata_paths, version_info)
+
+        assert result == version_info
+        mock_consolidate.assert_called_once_with(
+            metadata_paths, task.project_config.repo_root
+        )
+        version_info.close()
+
+    @responses.activate
+    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
+    @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
+    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
+    def test_get_unpackaged_metadata_path_dict(
+        self,
+        mock_clean_temp,
+        mock_zip_builder,
+        mock_convert_sfdx,
+        mock_consolidate,
+        task,
+    ):
+        """Test _get_unpackaged_metadata_path with dict format"""
+        import tempfile
+
+        temp_path = tempfile.mkdtemp()
+        mock_consolidate.return_value = temp_path
+        mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+
+        mock_builder_instance = mock.Mock()
+        mock_builder_instance.as_bytes.return_value = b"testzipbytes"
+        mock_zip_builder.return_value = mock_builder_instance
+
+        version_bytes = io.BytesIO()
+        version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
+
+        metadata_paths = {"unpackaged/pre": "*.*", "unpackaged/post": "test.xml"}
+        result = task._get_unpackaged_metadata_path(metadata_paths, version_info)
+
+        assert result == version_info
+        mock_consolidate.assert_called_once_with(
+            metadata_paths, task.project_config.repo_root
+        )
+        version_info.close()
+
+    @responses.activate
+    def test_create_version_request_with_unpackaged_metadata(
+        self, get_task, devhub_config
+    ):
+        """Test _create_version_request includes unpackaged metadata when configured"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.unpackaged_metadata_path = "unpackaged/pre"
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_unpackaged_metadata_path"
+        ) as mock_unpackaged, mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            version_bytes = io.BytesIO()
+            version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
+            mock_unpackaged.return_value = version_info
+
+            mock_tooling_obj = mock.Mock()
+            mock_tooling_obj.create.return_value = {"id": "08c000000000002AAA"}
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+            mock_unpackaged.assert_called_once_with("unpackaged/pre", mock.ANY)
+            version_info.close()
+
+    @responses.activate
+    def test_apex_test_access_partial_config(self, get_task, devhub_config):
+        """Test apex_test_access with only permission_set_names"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.apex_test_access = {
+            "permission_set_names": ["PermSet1"],
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "permissionSetNames" in descriptor
+                assert "permissionSetLicenseDeveloperNames" not in descriptor
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )
+
+    @responses.activate
+    def test_package_metadata_access_partial_config(self, get_task, devhub_config):
+        """Test package_metadata_access with only permission_set_license_names"""
+        task = get_task(
+            {
+                "package_type": "Managed",
+                "package_name": "Test Package",
+            }
+        )
+        task.package_config.package_metadata_access = {
+            "permission_set_license_names": ["MetaLicense1"],
+        }
+
+        builder = BasePackageZipBuilder()
+
+        # Mock the query for existing Package2VersionCreateRequest
+        responses.add(
+            "GET",
+            f"{self.devhub_base_url}/tooling/query/",
+            json={"size": 0, "records": []},
+        )
+
+        with mock.patch.object(
+            task, "_get_base_version_number"
+        ) as mock_version, mock.patch.object(
+            builder, "as_hash", return_value="testhash"
+        ), mock.patch.object(
+            builder, "as_bytes", return_value=b"testbytes"
+        ), mock.patch.object(
+            task, "_get_tooling_object"
+        ) as mock_tooling:
+            mock_version.return_value.increment.return_value.format.return_value = (
+                "1.0.0.1"
+            )
+            mock_tooling_obj = mock.Mock()
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                descriptor_json = version_info_zip.read("package2-descriptor.json")
+                descriptor = json.loads(descriptor_json.decode("utf-8"))
+                assert "packageMetadataPermissionSetLicenseNames" in descriptor
+                assert "packageMetadataPermissionSetNames" not in descriptor
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
+            mock_tooling.return_value = mock_tooling_obj
+
+            task._create_version_request(
+                "0Ho6g000000fy4ZCAQ",
+                task.package_config,
+                builder,
+                skip_validation=True,
+            )

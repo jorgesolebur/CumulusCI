@@ -18,6 +18,7 @@ ORIGINS = {
     "CreateCommunity": "cumulusci.tasks.salesforce.CreateCommunity",
     "CreatePackage": "cumulusci.tasks.salesforce.CreatePackage",
     "Deploy": "cumulusci.tasks.salesforce.Deploy",
+    "DeployUnpackagedMetadata": "cumulusci.tasks.salesforce.Deploy",
     "DeployBundles": "cumulusci.tasks.salesforce.DeployBundles",
     "EnsureRecordTypes": "cumulusci.tasks.salesforce.EnsureRecordTypes",
     "GetInstalledPackages": "cumulusci.tasks.preflight.packages",
