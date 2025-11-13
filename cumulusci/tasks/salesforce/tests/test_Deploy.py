@@ -6,10 +6,11 @@ from unittest import mock
 
 import pytest
 
+from cumulusci.core.config import BaseProjectConfig, UniversalConfig
 from cumulusci.core.exceptions import TaskOptionsError
 from cumulusci.core.flowrunner import StepSpec
 from cumulusci.core.source_transforms.transforms import CleanMetaXMLTransform
-from cumulusci.tasks.salesforce import Deploy
+from cumulusci.tasks.salesforce import Deploy, DeployUnpackagedMetadata
 from cumulusci.utils import temporary_dir, touch
 
 from .util import create_task
@@ -468,3 +469,213 @@ class TestDeploy:
         )
 
         assert all(s["kind"] == "metadata" for s in task.freeze(step))
+
+
+class TestDeployUnpackagedMetadata:
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    def test_task_options_excludes_path(self, mock_org_config):
+        """Test that path is removed from task_options."""
+        assert "path" not in DeployUnpackagedMetadata.task_options
+        # Verify other options are still present
+        assert "check_only" in DeployUnpackagedMetadata.task_options
+        assert "namespace_inject" in DeployUnpackagedMetadata.task_options
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    def test_init_options_sets_path_from_consolidate_metadata(
+        self, mock_consolidate, mock_org_config
+    ):
+        """Test that _init_options sets path using consolidate_metadata."""
+        with temporary_dir() as path:
+            mock_consolidate.return_value = path
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True},
+                project_config=project_config,
+            )
+
+            mock_consolidate.assert_called_once_with("unpackaged/pre", path)
+            assert task.options["path"] == path
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    def test_init_options_calls_consolidate_metadata_with_correct_params(
+        self, mock_consolidate, mock_org_config
+    ):
+        """Test that consolidate_metadata is called with correct parameters."""
+        with temporary_dir() as path:
+            consolidated_path = os.path.join(path, "consolidated")
+            os.makedirs(consolidated_path)
+            mock_consolidate.return_value = consolidated_path
+
+            repo_root = "/repo/root"
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": repo_root},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True},
+                project_config=project_config,
+            )
+
+            mock_consolidate.assert_called_once_with("unpackaged/pre", repo_root)
+            assert task.options["path"] == consolidated_path
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.clean_temp_directory")
+    def test_run_task_calls_parent_and_cleans_up(
+        self, mock_clean_temp, mock_consolidate, mock_org_config
+    ):
+        """Test that _run_task calls parent's _run_task and cleans up."""
+        with temporary_dir() as path:
+            touch("package.xml")
+            consolidated_path = os.path.join(path, "consolidated")
+            os.makedirs(consolidated_path)
+            mock_consolidate.return_value = consolidated_path
+
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True},
+                project_config=project_config,
+            )
+
+            # Mock parent's _run_task to avoid actual deployment
+            task._get_api = mock.Mock(return_value=mock.Mock())
+            task._run_task()
+
+            # Verify cleanup was called
+            mock_clean_temp.assert_called_once_with(consolidated_path)
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.clean_temp_directory")
+    def test_run_task_cleans_up_on_exception(
+        self, mock_clean_temp, mock_consolidate, mock_org_config
+    ):
+        """Test that cleanup happens even when parent's _run_task raises exception."""
+        with temporary_dir() as path:
+            consolidated_path = os.path.join(path, "consolidated")
+            os.makedirs(consolidated_path)
+            mock_consolidate.return_value = consolidated_path
+
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True},
+                project_config=project_config,
+            )
+
+            # Mock parent's _run_task to raise an exception
+            task._get_api = mock.Mock(side_effect=Exception("Test exception"))
+
+            with pytest.raises(Exception, match="Test exception"):
+                task._run_task()
+
+            # Verify cleanup was still called despite exception
+            mock_clean_temp.assert_called_once_with(consolidated_path)
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    def test_init_options_inherits_parent_options(
+        self, mock_consolidate, mock_org_config
+    ):
+        """Test that _init_options properly calls parent's _init_options."""
+        with temporary_dir() as path:
+            consolidated_path = os.path.join(path, "consolidated")
+            os.makedirs(consolidated_path)
+            mock_consolidate.return_value = consolidated_path
+
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {
+                    "unmanaged": True,
+                    "check_only": True,
+                    "test_level": "RunLocalTests",
+                },
+                project_config=project_config,
+            )
+
+            # Verify parent options were processed
+            assert task.check_only is True
+            assert task.test_level == "RunLocalTests"
+            # Verify path was set from consolidate_metadata
+            assert task.options["path"] == consolidated_path
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @pytest.mark.parametrize("rest_deploy", [True, False])
+    def test_inherits_rest_deploy_option(
+        self, mock_consolidate, mock_org_config, rest_deploy
+    ):
+        """Test that rest_deploy option is properly inherited from parent."""
+        with temporary_dir() as path:
+            consolidated_path = os.path.join(path, "consolidated")
+            os.makedirs(consolidated_path)
+            mock_consolidate.return_value = consolidated_path
+
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True, "rest_deploy": rest_deploy},
+                project_config=project_config,
+            )
+
+            assert task.rest_deploy == rest_deploy

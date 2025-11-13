@@ -3,7 +3,7 @@ import io
 import json
 import pathlib
 import zipfile
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, validator
 from simple_salesforce.exceptions import SalesforceMalformedRequest
@@ -38,6 +38,10 @@ from cumulusci.salesforce_api.package_zip import (
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
 from cumulusci.tasks.salesforce.BaseSalesforceApiTask import BaseSalesforceApiTask
 from cumulusci.tasks.salesforce.org_settings import build_settings_package
+from cumulusci.tasks.utility.copyContents import (
+    clean_temp_directory,
+    consolidate_metadata,
+)
 from cumulusci.utils.salesforce.soql import (
     format_subscriber_package_version_where_clause,
 )
@@ -68,6 +72,11 @@ class PackageConfig(BaseModel):
     version_name: str
     version_base: Optional[str] = None
     version_type: VersionTypeEnum = VersionTypeEnum.minor
+    apex_test_access: Optional[dict[str, list[str]]] = None
+    package_metadata_access: Optional[dict[str, list[str]]] = None
+    unpackaged_metadata_path: Optional[
+        Union[str, List[str], Dict[str, Union[str, List[str]]]]
+    ] = None
 
     @validator("org_dependent")
     def org_dependent_must_be_unlocked(cls, v, values):
@@ -85,6 +94,20 @@ class PackageConfig(BaseModel):
     def uninstall_script_must_be_managed(cls, v, values):
         if v and values["package_type"] != PackageTypeEnum.managed:
             raise ValueError("Only managed packages can have an uninstall script.")
+        return v
+
+    @validator("apex_test_access")
+    def apex_test_access_must_be_managed(cls, v, values):
+        if v and values["package_type"] != PackageTypeEnum.managed:
+            raise ValueError(
+                "Only managed packages can have Apex Test Access. Assign permission sets and permission set licenses to the user in context when your Apex tests run at package version creation."
+            )
+        return v
+
+    @validator("package_metadata_access")
+    def package_metadata_access_must_be_managed(cls, v, values):
+        if v and values["package_type"] != PackageTypeEnum.managed:
+            raise ValueError("Only managed packages can have Package Metadata Access.")
         return v
 
 
@@ -201,6 +224,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             version_name=self.options.get("version_name") or "Release",
             version_base=self.options.get("version_base"),
             version_type=self.options.get("version_type") or VersionTypeEnum("build"),
+            apex_test_access=self.project_config.project__package__apex_test_access,
+            package_metadata_access=self.project_config.project__package__package_metadata_access,
+            unpackaged_metadata_path=self.project_config.project__package__unpackaged_metadata_path,
         )
         self.options["skip_validation"] = process_bool_arg(
             self.options.get("skip_validation") or False
@@ -249,13 +275,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         self.return_values["package_id"] = self.package_id
 
         # submit request to create package version
-        options = {
-            "package_type": self.package_config.package_type.value,
-            "namespace_inject": self.package_config.namespace,
-            "namespaced_org": self.package_config.namespace is not None,
-        }
-        if "static_resource_path" in self.options:
-            options["static_resource_path"] = self.options["static_resource_path"]
+        options = self._get_package_zip_builder_options()
 
         package_zip_builder = None
         with convert_sfdx_source(
@@ -317,6 +337,20 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         )
         self.logger.info(f"  Version Number: {self.return_values['version_number']}")
         self.logger.info(f"  Dependencies: {self.return_values['dependencies']}")
+
+    def _get_package_zip_builder_options(self):
+        if not self.package_config:
+            return {}
+
+        options = {
+            "package_type": self.package_config.package_type.value,
+            "namespace_inject": self.package_config.namespace,
+            "namespaced_org": self.package_config.namespace is not None,
+        }
+        if "static_resource_path" in self.options:
+            options["static_resource_path"] = self.options["static_resource_path"]
+
+        return options
 
     def _get_or_create_package(self, package_config: PackageConfig):
         """Find or create the Package2
@@ -432,6 +466,57 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 ] = package_config.post_install_script
             if package_config.uninstall_script:
                 package_descriptor["uninstallScript"] = package_config.uninstall_script
+
+            if package_config.apex_test_access:
+                if "permission_set_names" in package_config.apex_test_access:
+                    perm_sets = package_config.apex_test_access["permission_set_names"]
+                    if isinstance(perm_sets, str):
+                        perm_sets = perm_sets.split(",")
+
+                    package_descriptor["permissionSetNames"] = [
+                        s.strip() for s in perm_sets
+                    ]
+                if "permission_set_license_names" in package_config.apex_test_access:
+                    psl = package_config.apex_test_access[
+                        "permission_set_license_names"
+                    ]
+                    if isinstance(psl, str):
+                        psl = psl.split(",")
+                    package_descriptor["permissionSetLicenseDeveloperNames"] = [
+                        s.strip() for s in psl
+                    ]
+
+            if package_config.package_metadata_access:
+                if "permission_set_names" in package_config.package_metadata_access:
+                    perm_sets = package_config.package_metadata_access[
+                        "permission_set_names"
+                    ]
+                    if isinstance(perm_sets, str):
+                        perm_sets = perm_sets.split(",")
+
+                    if isinstance(perm_sets, list):
+                        package_descriptor["packageMetadataPermissionSetNames"] = [
+                            s.strip() for s in perm_sets
+                        ]
+
+                if (
+                    "permission_set_license_names"
+                    in package_config.package_metadata_access
+                ):
+                    psl = package_config.package_metadata_access[
+                        "permission_set_license_names"
+                    ]
+                    if isinstance(psl, str):
+                        psl = psl.split(",")
+                    if isinstance(psl, list):
+                        package_descriptor[
+                            "packageMetadataPermissionSetLicenseNames"
+                        ] = [s.strip() for s in psl]
+
+            if package_config.unpackaged_metadata_path:
+                self._get_unpackaged_metadata_path(
+                    package_config.unpackaged_metadata_path, version_info
+                )
 
             # Add org shape
             with open(self.org_config.config_file, "r") as f:
@@ -817,3 +902,32 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             ]
 
         return []
+
+    def _get_unpackaged_metadata_path(
+        self,
+        metadata_path: Union[str, List[str], Dict[str, Union[str, List[str]]]],
+        version_info: zipfile.ZipFile,
+    ) -> zipfile.ZipFile:
+
+        final_metadata_path = consolidate_metadata(
+            metadata_path, self.project_config.repo_root
+        )
+
+        # Use the consolidated temp directory with convert_sfdx_source
+        with convert_sfdx_source(
+            final_metadata_path, "unpackaged-metadata-package", self.logger
+        ) as src_path:
+            unpackaged_metadata_zip_builder = MetadataPackageZipBuilder(
+                path=src_path,
+                name="unpackaged-metadata-package",
+                context=self.context,
+                options=self._get_package_zip_builder_options(),
+            )
+            version_info.writestr(
+                "unpackaged-metadata-package.zip",
+                unpackaged_metadata_zip_builder.as_bytes(),
+            )
+
+        clean_temp_directory(final_metadata_path)
+
+        return version_info

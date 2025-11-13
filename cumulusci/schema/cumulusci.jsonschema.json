@@ -246,6 +246,70 @@
                 "metadata_package_id": {
                     "title": "Metadata Package Id",
                     "type": "string"
+                },
+                "apex_test_access": {
+                    "title": "Apex Test Access",
+                    "type": "object",
+                    "additionalProperties": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "package_metadata_access": {
+                    "title": "Package Metadata Access",
+                    "type": "object",
+                    "additionalProperties": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        ]
+                    }
+                },
+                "unpackaged_metadata_path": {
+                    "title": "Unpackaged Metadata Path",
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
                 }
             },
             "additionalProperties": false

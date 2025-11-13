@@ -24,6 +24,10 @@ from cumulusci.tasks.metadata.package import process_common_components
 from cumulusci.tasks.salesforce.BaseSalesforceMetadataApiTask import (
     BaseSalesforceMetadataApiTask,
 )
+from cumulusci.tasks.utility.copyContents import (
+    clean_temp_directory,
+    consolidate_metadata,
+)
 from cumulusci.utils.xml import metadata_tree
 
 
@@ -242,3 +246,26 @@ class Deploy(BaseSalesforceMetadataApiTask):
             if step["kind"] == "other":
                 step["kind"] = "metadata"
         return steps
+
+
+class DeployUnpackagedMetadata(Deploy):
+
+    unpackaged_metadata_options = Deploy.task_options.copy()
+    unpackaged_metadata_options.pop("path")
+    task_options = {**unpackaged_metadata_options}
+
+    def _init_options(self, kwargs):
+        super(DeployUnpackagedMetadata, self)._init_options(kwargs)
+        final_metadata_path = consolidate_metadata(
+            self.project_config.project__package__unpackaged_metadata_path,
+            self.project_config.repo_root,
+        )
+        self.options["path"] = final_metadata_path
+
+    def _run_task(self):
+        try:
+            super(DeployUnpackagedMetadata, self)._run_task()
+        except Exception as e:
+            raise e
+        finally:
+            clean_temp_directory(self.options["path"])
