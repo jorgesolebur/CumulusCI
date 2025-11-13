@@ -255,6 +255,9 @@ class DeployUnpackagedMetadata(Deploy):
     task_options = {**unpackaged_metadata_options}
 
     def _init_options(self, kwargs):
+        if self.project_config.project__package__unpackaged_metadata_path is None:
+            return
+
         super(DeployUnpackagedMetadata, self)._init_options(kwargs)
         final_metadata_path = consolidate_metadata(
             self.project_config.project__package__unpackaged_metadata_path,
@@ -263,6 +266,12 @@ class DeployUnpackagedMetadata(Deploy):
         self.options["path"] = final_metadata_path
 
     def _run_task(self):
+        if self.project_config.project__package__unpackaged_metadata_path is None:
+            self.logger.info(
+                "No unpackaged metadata path configured. Skipping metadata deployment task."
+            )
+            return
+
         try:
             super(DeployUnpackagedMetadata, self)._run_task()
         except Exception as e:

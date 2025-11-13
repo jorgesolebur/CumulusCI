@@ -679,3 +679,32 @@ class TestDeployUnpackagedMetadata:
             )
 
             assert task.rest_deploy == rest_deploy
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    def test_no_unpackaged_metadata_path(self, mock_consolidate, mock_org_config):
+        """Test that when unpackaged_metadata_path is None, consolidate_metadata is not called and path is not set."""
+        with temporary_dir() as path:
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = None
+
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {},
+                project_config=project_config,
+            )
+
+            # Verify consolidate_metadata was not called
+            mock_consolidate.assert_not_called()
+            # When unpackaged_metadata_path is None, _init_options returns early
+            # so parent's _init_options is not called and options may not be initialized
+            # or path is not set if options exists
+            if hasattr(task, "options"):
+                assert "path" not in task.options

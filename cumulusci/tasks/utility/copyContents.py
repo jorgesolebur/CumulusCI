@@ -125,7 +125,8 @@ def resolve_file_pattern(pattern: str, source_dir: str) -> List[str]:
         else:
             raise ValueError(f"File pattern does not match any files: {pattern}")
 
-    return matched_files
+    # Normalize paths to use OS-native separators (fixes Windows path separator issues)
+    return [os.path.normpath(path) for path in matched_files]
 
 
 def copy_matched_files(matched_files: List[str], source_dir: str, dest_dir: str):
