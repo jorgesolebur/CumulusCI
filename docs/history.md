@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.30 (2025-11-13)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* 2GP Unpackaged Metadata support for Managed Package Creation by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#111](https://github.com/jorgesolebur/CumulusCI/pull/111)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.29...v5.0.30
+
+
+<!-- latest-stop -->
+
 ## v5.0.29 (2025-11-11)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.28...v5.0.29
 
-
-<!-- latest-stop -->
 
 ## v5.0.28 (2025-11-10)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
