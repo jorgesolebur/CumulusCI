@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.31 (2025-11-16)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Assign option keys only if available in tasks. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#113](https://github.com/jorgesolebur/CumulusCI/pull/113)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.30...v5.0.31
+
+
+<!-- latest-stop -->
+
 ## v5.0.30 (2025-11-13)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.29...v5.0.30
 
-
-<!-- latest-stop -->
 
 ## v5.0.29 (2025-11-11)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
