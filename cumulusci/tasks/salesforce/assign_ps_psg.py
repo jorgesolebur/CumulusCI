@@ -2,7 +2,7 @@ import json
 from inspect import signature
 from typing import Dict, List
 
-from pydantic import create_model
+from pydantic.v1 import create_model
 
 from cumulusci.core.exceptions import SalesforceException, TaskOptionsError
 from cumulusci.core.utils import determine_managed_mode
@@ -118,13 +118,13 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                 "Permission Set API names. Supports JSON, YAML, or command line format."
             ),
         )
-        namespace: str = Field(
+        namespace_inject: str = Field(
             None,
             description="Namespace to use for Permission Set names. If not provided, the namespace from the project config will be used.",
         )
         managed: bool = Field(
             None,
-            description="Whether the org is managed. If not provided, the managed mode will be determined based on the org config.",
+            description="Whether the deployment is managed. If not provided, the managed mode will be determined based on the org config.",
         )
         fail_on_error: bool = Field(
             False,
@@ -136,19 +136,22 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
     def _init_options(self, kwargs):
         super()._init_options(kwargs)
 
-        if self.parsed_options.namespace is None:
-            self.parsed_options.namespace = (
+        if self.parsed_options.namespace_inject is None:
+            self.parsed_options.namespace_inject = (
                 self.project_config.project__package__namespace
             )
+
         if self.parsed_options.managed is None:
             self.parsed_options.managed = determine_managed_mode(
                 self.parsed_options, self.project_config, self.org_config
             )
+
         self.namespaced_org = bool(
-            self.parsed_options.namespace
-        ) and self.parsed_options.namespace == getattr(
+            self.parsed_options.namespace_inject
+        ) and self.parsed_options.namespace_inject == getattr(
             self.org_config, "namespace", None
         )
+
         self.psg_names_sanitized = {}
         self.ps_names_sanitized = {}
 
@@ -263,9 +266,10 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             _, name_processed = inject_namespace(
                 "",
                 name,
-                namespace=self.parsed_options.namespace,
+                namespace=self.parsed_options.namespace_inject,
                 managed=self.parsed_options.managed,
                 namespaced_org=self.namespaced_org,
+                logger=self.logger,
             )
             names_processed[name] = name_processed
         return names_processed
@@ -277,7 +281,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
         )  # Maps (original_name, namespace_prefix) tuple back to original name
         for name in names:
             # Check if name contains namespace prefix (format: namespace__Name)
-            if "__" in name and self.parsed_options.namespace:
+            if "__" in name and self.parsed_options.namespace_inject:
                 parts = name.split("__", 1)
                 if len(parts) == 2:
                     ns_prefix, ps_name = parts

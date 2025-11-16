@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 
 from cumulusci.core.exceptions import SalesforceDXException
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection

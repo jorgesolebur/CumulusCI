@@ -2,7 +2,7 @@ from io import StringIO
 from unittest.mock import Mock
 
 import pytest
-from pydantic import Field
+from pydantic.v1 import Field
 
 from cumulusci.utils.yaml.model_parser import CCIDictModel, CCIModel, ValidationError
 

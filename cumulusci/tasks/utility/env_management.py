@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, validator
+from pydantic.v1 import BaseModel, validator
 
 from cumulusci.core.config import BaseProjectConfig, OrgConfig, TaskConfig
 from cumulusci.core.tasks import BaseTask

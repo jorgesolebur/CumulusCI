@@ -654,6 +654,10 @@ def test_annoy_post_process():
     not PANDAS_AVAILABLE or not OPTIONAL_DEPENDENCIES_AVAILABLE,
     reason="requires optional dependencies for annoy",
 )
+@pytest.mark.skipif(
+    sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
+    reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
+)
 def test_annoy_post_process__insert_records():
     # Test data
     load_records = [["Alice", "Engineer"], ["Bob", "Doctor"]]
@@ -695,6 +699,14 @@ def test_annoy_post_process__insert_records():
         assert insert_record in [["Alice", "Engineer"], ["Bob", "Doctor"]]
 
 
+@pytest.mark.skipif(
+    not PANDAS_AVAILABLE or not OPTIONAL_DEPENDENCIES_AVAILABLE,
+    reason="requires optional dependencies for annoy",
+)
+@pytest.mark.skipif(
+    sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
+    reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
+)
 def test_annoy_post_process__no_query_records():
     # Test data
     load_records = [["Alice", "Engineer"], ["Bob", "Doctor"]]
@@ -726,6 +738,10 @@ def test_annoy_post_process__no_query_records():
 @pytest.mark.skipif(
     not PANDAS_AVAILABLE or not OPTIONAL_DEPENDENCIES_AVAILABLE,
     reason="requires optional dependencies for annoy",
+)
+@pytest.mark.skipif(
+    sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
+    reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
 )
 def test_annoy_post_process__insert_records_with_polymorphic_fields():
     # Test data
@@ -783,6 +799,10 @@ def test_annoy_post_process__insert_records_with_polymorphic_fields():
 @pytest.mark.skipif(
     not PANDAS_AVAILABLE or not OPTIONAL_DEPENDENCIES_AVAILABLE,
     reason="requires optional dependencies for annoy",
+)
+@pytest.mark.skipif(
+    sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
+    reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
 )
 def test_single_record_match_annoy_post_process():
     # Mock data where only the first query record matches the first load record
