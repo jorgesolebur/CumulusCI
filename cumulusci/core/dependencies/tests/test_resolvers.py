@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from github3.exceptions import NotFoundError
-from pydantic import root_validator
+from pydantic.v1 import root_validator
 
 from cumulusci.core.config import UniversalConfig
 from cumulusci.core.config.project_config import BaseProjectConfig

@@ -3,8 +3,7 @@ from abc import ABC
 from functools import lru_cache
 from typing import Optional, Type
 
-from pydantic import root_validator
-from pydantic.networks import AnyUrl
+from pydantic.v1 import AnyUrl, root_validator
 
 import cumulusci.core.dependencies.base as base_dependency
 from cumulusci.core.exceptions import DependencyResolutionError, GithubApiNotFoundError

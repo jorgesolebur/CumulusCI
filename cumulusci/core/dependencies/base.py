@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional, Type
 from zipfile import ZipFile
 
-from pydantic import AnyUrl, PrivateAttr, root_validator, validator
+from pydantic.v1 import AnyUrl, PrivateAttr, root_validator, validator
 
 from cumulusci.core.config import OrgConfig
 from cumulusci.core.config.project_config import BaseProjectConfig

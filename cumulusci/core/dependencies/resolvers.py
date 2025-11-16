@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import Callable, Iterable, List, Optional, Tuple, Type
 
-from pydantic import AnyUrl
+from pydantic.v1 import AnyUrl
 
 from cumulusci.core.config.project_config import BaseProjectConfig
 from cumulusci.core.dependencies.base import (

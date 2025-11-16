@@ -2,7 +2,7 @@ import json
 from inspect import signature
 from typing import Dict, List
 
-from pydantic import create_model
+from pydantic.v1 import create_model
 
 from cumulusci.core.exceptions import SalesforceException, TaskOptionsError
 from cumulusci.core.utils import determine_managed_mode
