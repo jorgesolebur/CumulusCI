@@ -781,11 +781,12 @@ def get_tasks_with_options(project_config, frozen_options: frozenset):
     coordinator_opts = {}
     options = dict(frozen_options)
     for task_config in project_config.list_tasks():
-        if any(
-            key in options.keys()
-            for key in project_config.get_task(task_config["name"])
-            .get_class()
-            .task_options.keys()
-        ):
-            coordinator_opts[task_config["name"]] = options
+        task_keys = (
+            project_config.get_task(task_config["name"]).get_class().task_options.keys()
+        )
+        if any(key in options.keys() for key in task_keys):
+            # only assign options that are actually used by the task. This is to avoid passing options that are not used by the task.
+            coordinator_opts[task_config["name"]] = {
+                key: options[key] for key in options.keys() if key in task_keys
+            }
     return coordinator_opts

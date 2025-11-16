@@ -17,10 +17,7 @@ def run_click_command(cmd, *args, **kw):
 
 def run_cli_command(*args, runtime=None, input=None, **kw):
     """Run a click command with arg parsing and injected CCI runtime object."""
-    if tuple(map(int, click.__version__.split("."))) >= (8, 1, 0):
-        runner = CliRunner()
-    else:
-        runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         args,

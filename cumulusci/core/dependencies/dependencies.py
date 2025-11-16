@@ -3,7 +3,7 @@ import logging
 import os
 from typing import List, Optional, Type
 
-from pydantic import AnyUrl, ValidationError
+from pydantic.v1 import AnyUrl, ValidationError
 
 import cumulusci.core.dependencies.base as base_dependency
 from cumulusci.core.config import OrgConfig

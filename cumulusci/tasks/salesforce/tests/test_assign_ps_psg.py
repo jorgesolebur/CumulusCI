@@ -96,10 +96,10 @@ class TestAssignPermissionSetToPermissionSetGroup:
             AssignPermissionSetToPermissionSetGroup,
             {
                 "assignments": {"PSG1": ["PS1"]},
-                "namespace": "test_namespace",
+                "namespace_inject": "test_namespace",
             },
         )
-        assert task.parsed_options.namespace == "test_namespace"
+        assert task.parsed_options.namespace_inject == "test_namespace"
 
     def test_init_options_without_namespace(self):
         """Test _init_options without namespace (uses project config)"""
@@ -109,7 +109,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         )
         task.project_config.project__package__namespace = "project_namespace"
         task._init_options({})
-        assert task.parsed_options.namespace == "project_namespace"
+        assert task.parsed_options.namespace_inject == "project_namespace"
 
     def test_init_options_with_managed(self):
         """Test _init_options with managed flag"""
@@ -141,7 +141,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
             AssignPermissionSetToPermissionSetGroup,
             {
                 "assignments": {"PSG1": ["PS1"]},
-                "namespace": "test_namespace",
+                "namespace_inject": "test_namespace",
             },
         )
         task.org_config.namespace = "test_namespace"
@@ -154,7 +154,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
             AssignPermissionSetToPermissionSetGroup,
             {
                 "assignments": {"PSG1": ["PS1"]},
-                "namespace": "test_namespace",
+                "namespace_inject": "test_namespace",
             },
         )
         task.org_config.namespace = "different_namespace"
@@ -430,7 +430,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _get_permission_set_group_ids with namespace"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"NS__PSG1": ["PS1"]}, "namespace": "NS"},
+            {"assignments": {"NS__PSG1": ["PS1"]}, "namespace_inject": "NS"},
         )
         task._init_options({})
         task._init_task()
@@ -547,7 +547,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _get_permission_set_ids with namespace"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace": "NS"},
+            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace_inject": "NS"},
         )
         task._init_options({})
         task._init_task()
@@ -596,7 +596,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         ):
             task = create_task(
                 AssignPermissionSetToPermissionSetGroup,
-                {"assignments": {"PSG1": ["PS1"]}, "namespace": "NS"},
+                {"assignments": {"PSG1": ["PS1"]}, "namespace_inject": "NS"},
             )
             task._init_options({})
             result = task._process_namespaces(["PS1"])
@@ -618,7 +618,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _build_name_conditions with namespace"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace": "NS"},
+            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace_inject": "NS"},
         )
         task._init_options({})
         conditions, mapping = task._build_name_conditions(["NS__PS1"])

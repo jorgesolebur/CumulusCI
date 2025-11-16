@@ -19,7 +19,7 @@ from cumulusci.utils.version_strings import LooseVersion
 
 API_VERSION_RE = re.compile(r"^\d\d+\.0$")
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from cumulusci.core.config import FlowConfig, TaskConfig
 from cumulusci.core.config.base_task_flow_config import BaseTaskFlowConfig
