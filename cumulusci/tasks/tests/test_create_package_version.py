@@ -1293,7 +1293,7 @@ class TestCreatePackageVersionNewFeatures:
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path
+        mock_consolidate.return_value = temp_path, 1
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
 
         mock_builder_instance = mock.Mock()
@@ -1307,7 +1307,7 @@ class TestCreatePackageVersionNewFeatures:
 
         assert result == version_info
         mock_consolidate.assert_called_once_with(
-            "unpackaged/pre", task.project_config.repo_root
+            "unpackaged/pre", task.project_config.repo_root, logger=task.logger
         )
         mock_convert_sfdx.assert_called_once()
         mock_zip_builder.assert_called_once()
@@ -1336,7 +1336,7 @@ class TestCreatePackageVersionNewFeatures:
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path
+        mock_consolidate.return_value = temp_path, 1
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
 
         mock_builder_instance = mock.Mock()
@@ -1351,7 +1351,7 @@ class TestCreatePackageVersionNewFeatures:
 
         assert result == version_info
         mock_consolidate.assert_called_once_with(
-            metadata_paths, task.project_config.repo_root
+            metadata_paths, task.project_config.repo_root, logger=task.logger
         )
         version_info.close()
 
@@ -1372,7 +1372,7 @@ class TestCreatePackageVersionNewFeatures:
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path
+        mock_consolidate.return_value = temp_path, 1
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
 
         mock_builder_instance = mock.Mock()
@@ -1387,7 +1387,7 @@ class TestCreatePackageVersionNewFeatures:
 
         assert result == version_info
         mock_consolidate.assert_called_once_with(
-            metadata_paths, task.project_config.repo_root
+            metadata_paths, task.project_config.repo_root, logger=task.logger
         )
         version_info.close()
 

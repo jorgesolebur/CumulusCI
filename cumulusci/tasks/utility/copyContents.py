@@ -11,10 +11,13 @@ import os
 import shutil
 import tempfile
 from logging import Logger
-from typing import Dict, List, Union
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils.options import CCIOptions, Field
+
+IGNORE_FILES = [".gitkeep", ".DS_Store"]
 
 
 def merge_directory_contents(src_dir: str, dest_dir: str, overwrite: bool = False):
@@ -123,7 +126,7 @@ def resolve_file_pattern(pattern: str, source_dir: str) -> List[str]:
         if os.path.exists(pattern_path):
             matched_files = [pattern_path]
         else:
-            raise ValueError(f"File pattern does not match any files: {pattern}")
+            matched_files = []
 
     # Normalize paths to use OS-native separators (fixes Windows path separator issues)
     return [os.path.normpath(path) for path in matched_files]
@@ -176,7 +179,8 @@ def validate_directory(path: str, path_name: str = "path"):
 def consolidate_metadata(
     metadata_path: Union[str, List[str], Dict[str, Union[str, List[str]]]],
     base_path: str = None,
-) -> str:
+    logger: Optional[Logger] = None,
+) -> Tuple[str, int]:
     """
     Consolidate metadata from various sources into a temporary directory.
 
@@ -262,12 +266,22 @@ def consolidate_metadata(
                     else:
                         # Treat as glob pattern or specific file path
                         matched_files = resolve_file_pattern(file_patterns, source_dir)
+                        if logger and not matched_files:
+                            logger.warning(
+                                f"File pattern does not match any files: {file_patterns}"
+                            )
+                            continue
                         copy_matched_files(matched_files, source_dir, temp_dir)
 
                 elif isinstance(file_patterns, list):
                     # List of file paths/patterns
                     for pattern in file_patterns:
                         matched_files = resolve_file_pattern(pattern, source_dir)
+                        if logger and not matched_files:
+                            logger.warning(
+                                f"File pattern does not match any files: {pattern}"
+                            )
+                            continue
                         copy_matched_files(matched_files, source_dir, temp_dir)
                 else:
                     raise ValueError(
@@ -276,7 +290,20 @@ def consolidate_metadata(
         else:
             raise ValueError(f"Invalid unpackaged metadata path: {metadata_path}")
 
-        return temp_dir
+        # Count the files in the final_metadata_path and log the count, ignore .gitkeep files
+        file_count = len(
+            [
+                p
+                for p in Path(temp_dir).rglob("*")
+                if p.name not in IGNORE_FILES and p.is_file()
+            ]
+        )
+        if logger:
+            logger.info(
+                f"Found {file_count} files in the consolidated metadata path, ignoring .gitkeep files: {temp_dir}"
+            )
+
+        return temp_dir, file_count
 
     except Exception:
         # Clean up temp directory on error
@@ -364,9 +391,9 @@ class ConsolidateUnpackagedMetadata(BaseTask):
         self.logger.info(f"Using base path: {base_path}")
 
         # Consolidate metadata
-        consolidated_path = consolidate_metadata(metadata_path, base_path)
-
-        self.logger.info(f"Metadata consolidated to: {consolidated_path}")
+        consolidated_path, _ = consolidate_metadata(
+            metadata_path, base_path, logger=self.logger
+        )
         print_directory_tree(consolidated_path, logger=self.logger)
 
         if not self.parsed_options.keep_temp:
