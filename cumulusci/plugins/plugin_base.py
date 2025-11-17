@@ -11,7 +11,7 @@ from cumulusci.utils.yaml.cumulusci_yml import Plugin, cci_safe_load
 class PluginBase(ABC):
     plugin: Plugin
     plugin_config_file: str = "cumulusci_plugin.yml"
-    path: str = None
+    path: str
     plugin_project_config: Optional[dict] = None
 
     def __init__(self, **kwargs) -> None:
@@ -32,12 +32,14 @@ class PluginBase(ABC):
     @property
     def name(self) -> str:
         """Returns the name of the plugin."""
-        return self.plugin.name if self.plugin else "Unnamed Plugin"
+        return (
+            self.plugin.name if self.plugin and self.plugin.name else "Unnamed Plugin"
+        )
 
     @property
     def version(self) -> str:
         """Returns the version of the plugin."""
-        return self.plugin.version if self.plugin else "0.0.0"
+        return self.plugin.version if self.plugin and self.plugin.version else "0.0.0"
 
     def initialize(self) -> None:
         """Initialize the plugin. This method is called when the plugin is loaded."""

@@ -1,12 +1,12 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 from cumulusci.core.config import BaseTaskFlowConfig
 from cumulusci.core.config.project_config import (
     BaseProjectConfig,
     ProjectConfigPropertiesMixin,
 )
-from cumulusci.core.utils import merge_config
 from cumulusci.utils.yaml.cumulusci_yml import cci_safe_load
 
 __location__ = os.path.dirname(os.path.realpath(__file__))
@@ -18,10 +18,9 @@ class UniversalConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
     project_local_dir: str
     cli: dict
 
-    config = None
+    config: Optional[dict] = None
     config_filename = "cumulusci.yml"
     project_config_class = BaseProjectConfig
-    universal_config_obj = None
 
     def __init__(self, config=None):
         self._init_logger()
@@ -80,7 +79,7 @@ class UniversalConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
             config = {}
         UniversalConfig.config_global = config
 
-        UniversalConfig.config = merge_config(
+        UniversalConfig.config = self.merge_base_config(
             {
                 "universal_config": UniversalConfig.config_universal,
                 "global_config": UniversalConfig.config_global,

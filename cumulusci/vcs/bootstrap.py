@@ -226,20 +226,21 @@ def get_repo_from_config(config: BaseProjectConfig, options: dict = {}) -> Abstr
 
 def get_latest_tag(repo: AbstractRepo, beta: bool = False) -> str:
     """Query Github Releases to find the latest production or beta tag"""
-    prefix = repo.project_config.project__git__prefix_release
+    prefix = repo.project_config.project__git__prefix_beta if beta else repo.project_config.project__git__prefix_release  # type: ignore
 
     try:
         if not beta:
             release: Optional[AbstractRelease] = repo.latest_release()
+
+            if release is None:
+                raise
 
             if not release.tag_name.startswith(prefix):
                 return _get_latest_tag_for_prefix(repo, prefix)
 
             return release.tag_name
         else:
-            return _get_latest_tag_for_prefix(
-                repo, repo.project_config.project__git__prefix_beta
-            )
+            return _get_latest_tag_for_prefix(repo, prefix)
     except Exception:
         raise VcsException(
             f"No release found for {repo.repo_url} with tag prefix {prefix}"
