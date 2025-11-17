@@ -358,10 +358,9 @@ class TestResolveFilePattern:
     def test_resolve_pattern_no_match_raises_error(self):
         """Test that resolving non-existent pattern raises ValueError."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(
-                ValueError, match="File pattern does not match any files"
-            ):
-                resolve_file_pattern("nonexistent.txt", tmpdir)
+            result = resolve_file_pattern("nonexistent.txt", tmpdir)
+            assert len(result) == 0
+            assert result == []
 
     def test_resolve_pattern_with_subdirectory(self):
         """Test resolving pattern in subdirectory."""
@@ -514,10 +513,11 @@ class TestConsolidateMetadata:
             with open(os.path.join(source_dir, "file.txt"), "w") as f:
                 f.write("content")
 
-            result = consolidate_metadata("source", tmpdir)
+            result, file_count = consolidate_metadata("source", tmpdir)
 
             assert os.path.exists(result)
             assert os.path.exists(os.path.join(result, "file.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
     def test_consolidate_list_paths(self):
@@ -533,10 +533,11 @@ class TestConsolidateMetadata:
             with open(os.path.join(dir2, "file2.txt"), "w") as f:
                 f.write("content2")
 
-            result = consolidate_metadata(["dir1", "dir2"], tmpdir)
+            result, file_count = consolidate_metadata(["dir1", "dir2"], tmpdir)
 
             assert os.path.exists(os.path.join(result, "file1.txt"))
             assert os.path.exists(os.path.join(result, "file2.txt"))
+            assert file_count == 2
             clean_temp_directory(result)
 
     def test_consolidate_dict_with_wildcard(self):
@@ -549,9 +550,10 @@ class TestConsolidateMetadata:
             with open(os.path.join(src_subdir, "file.txt"), "w") as f:
                 f.write("content")
 
-            result = consolidate_metadata({"source": "*.*"}, tmpdir)
+            result, file_count = consolidate_metadata({"source": "*.*"}, tmpdir)
 
             assert os.path.exists(os.path.join(result, "src", "file.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
     def test_consolidate_dict_with_single_pattern(self):
@@ -564,9 +566,10 @@ class TestConsolidateMetadata:
             with open(test_file, "w") as f:
                 f.write("content")
 
-            result = consolidate_metadata({"source": "test.txt"}, tmpdir)
+            result, file_count = consolidate_metadata({"source": "test.txt"}, tmpdir)
 
             assert os.path.exists(os.path.join(result, "test.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
     def test_consolidate_dict_with_list_patterns(self):
@@ -582,12 +585,13 @@ class TestConsolidateMetadata:
             with open(file2, "w") as f:
                 f.write("content2")
 
-            result = consolidate_metadata(
+            result, file_count = consolidate_metadata(
                 {"source": ["file1.txt", "file2.txt"]}, tmpdir
             )
 
             assert os.path.exists(os.path.join(result, "file1.txt"))
             assert os.path.exists(os.path.join(result, "file2.txt"))
+            assert file_count == 2
             clean_temp_directory(result)
 
     def test_consolidate_with_absolute_path(self):
@@ -600,9 +604,10 @@ class TestConsolidateMetadata:
                 f.write("content")
 
             abs_path = os.path.abspath(source_dir)
-            result = consolidate_metadata(abs_path)
+            result, file_count = consolidate_metadata(abs_path, tmpdir)
 
             assert os.path.exists(os.path.join(result, "file.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
     def test_consolidate_invalid_type_raises_error(self):
@@ -648,9 +653,10 @@ class TestConsolidateMetadata:
             with open(os.path.join(src_subdir, "file.txt"), "w") as f:
                 f.write("content")
 
-            result = consolidate_metadata({"source": "*"}, tmpdir)
+            result, file_count = consolidate_metadata({"source": "*"}, tmpdir)
 
             assert os.path.exists(os.path.join(result, "src", "file.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
 
@@ -887,7 +893,7 @@ class TestConsolidateUnpackagedMetadataTask:
             # Check that info was called with consolidation messages
             call_args = [call[0][0] for call in mock_info.call_args_list]
             assert any("Consolidating unpackaged metadata" in msg for msg in call_args)
-            assert any("Metadata consolidated to" in msg for msg in call_args)
+            assert any("Found" in msg for msg in call_args)
 
 
 class TestWindowsLinuxCompatibility:
@@ -906,11 +912,12 @@ class TestWindowsLinuxCompatibility:
 
             # Test with relative pattern from source directory
             pattern = "file.txt"
-            result = consolidate_metadata(
+            result, file_count = consolidate_metadata(
                 {os.path.join(tmpdir, "source", "subdir"): pattern}, tmpdir
             )
 
             assert os.path.exists(result)
+            assert file_count == 1
             assert os.path.exists(os.path.join(result, "file.txt"))
             clean_temp_directory(result)
 
@@ -924,9 +931,10 @@ class TestWindowsLinuxCompatibility:
                 f.write("content")
 
             abs_path = os.path.abspath(source_dir)
-            result = consolidate_metadata(abs_path)
+            result, file_count = consolidate_metadata(abs_path, tmpdir)
 
             assert os.path.exists(os.path.join(result, "file.txt"))
+            assert file_count == 1
             clean_temp_directory(result)
 
     def test_relative_paths_work_on_both_platforms(self):
@@ -941,9 +949,12 @@ class TestWindowsLinuxCompatibility:
                 with open(os.path.join(source_dir, "file.txt"), "w") as f:
                     f.write("content")
 
-                result = consolidate_metadata(source_dir)
+                result, file_count = consolidate_metadata(
+                    source_dir, tmpdir, logger=None
+                )
 
                 assert os.path.exists(os.path.join(result, "file.txt"))
+                assert file_count == 1
                 clean_temp_directory(result)
             finally:
                 os.chdir(original_cwd)
@@ -1311,10 +1322,10 @@ class TestConsolidateMetadataEdgeCases:
             source_dir = os.path.join(tmpdir, "source")
             os.makedirs(source_dir)
 
-            result = consolidate_metadata({"source": []}, tmpdir)
+            result, file_count = consolidate_metadata({"source": []}, tmpdir)
             # Should create temp dir but no files
             assert os.path.exists(result)
-            assert len(os.listdir(result)) == 0
+            assert file_count == 0
             clean_temp_directory(result)
 
     def test_consolidate_dict_with_multiple_wildcards(self):
@@ -1330,10 +1341,13 @@ class TestConsolidateMetadataEdgeCases:
             with open(os.path.join(dir2, "src", "file2.txt"), "w") as f:
                 f.write("content2")
 
-            result = consolidate_metadata({"dir1": "*", "dir2": "*"}, tmpdir)
+            result, file_count = consolidate_metadata(
+                {"dir1": "*", "dir2": "*"}, tmpdir
+            )
 
             assert os.path.exists(os.path.join(result, "src", "file1.txt"))
             assert os.path.exists(os.path.join(result, "src", "file2.txt"))
+            assert file_count == 2
             clean_temp_directory(result)
 
     def test_consolidate_list_with_empty_strings(self):
@@ -1347,12 +1361,13 @@ class TestConsolidateMetadataEdgeCases:
 
             # Empty string resolves to base_path, which is valid
             # So it will copy base_path contents, then source contents
-            result = consolidate_metadata(["", "source"], tmpdir)
+            result, file_count = consolidate_metadata(["", "source"], tmpdir)
 
             # Should succeed and consolidate both
             assert os.path.exists(result)
             # Source file should be present
             assert os.path.exists(os.path.join(result, "file.txt"))
+            assert file_count == 2
             clean_temp_directory(result)
 
     def test_consolidate_verifies_cleanup_on_error(self):
@@ -1388,10 +1403,11 @@ class TestConsolidateMetadataEdgeCases:
             source_dir = os.path.join(tmpdir, "source")
             os.makedirs(source_dir)
 
-            with pytest.raises(
-                ValueError, match="File pattern does not match any files"
-            ):
-                consolidate_metadata({"source": "nonexistent.txt"}, tmpdir)
+            result, file_count = consolidate_metadata(
+                {"source": "nonexistent.txt"}, tmpdir
+            )
+            assert file_count == 0
+            assert result is not None
 
     def test_consolidate_with_base_path_none(self):
         """Test consolidate with base_path explicitly None."""
@@ -1405,8 +1421,9 @@ class TestConsolidateMetadataEdgeCases:
                 with open(os.path.join(source_dir, "file.txt"), "w") as f:
                     f.write("content")
 
-                result = consolidate_metadata(source_dir, base_path=None)
+                result, file_count = consolidate_metadata(source_dir, base_path=None)
                 assert os.path.exists(os.path.join(result, "file.txt"))
+                assert file_count == 1
                 clean_temp_directory(result)
             finally:
                 os.chdir(original_cwd)
@@ -1623,8 +1640,9 @@ class TestWindowsLinuxCompatibilityExtended:
                 os.chdir(tmpdir)
                 # Use absolute path or resolve the relative path properly
                 abs_nested = os.path.abspath(nested_dir)
-                result = consolidate_metadata(abs_nested, tmpdir)
+                result, file_count = consolidate_metadata(abs_nested, tmpdir)
                 assert os.path.exists(os.path.join(result, "file.txt"))
+                assert file_count == 1
                 clean_temp_directory(result)
             finally:
                 os.chdir(original_cwd)

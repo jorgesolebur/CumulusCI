@@ -909,9 +909,12 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         version_info: zipfile.ZipFile,
     ) -> zipfile.ZipFile:
 
-        final_metadata_path = consolidate_metadata(
-            metadata_path, self.project_config.repo_root
+        final_metadata_path, file_count = consolidate_metadata(
+            metadata_path, self.project_config.repo_root, logger=self.logger
         )
+
+        if file_count == 0:
+            return version_info
 
         # Use the consolidated temp directory with convert_sfdx_source
         with convert_sfdx_source(
