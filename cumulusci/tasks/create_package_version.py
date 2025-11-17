@@ -190,6 +190,12 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             "If not provided, the dependencies will be resolved using the resolution_strategy."
             "The format should be a pcakge version Ids i.e '04t...,04t...'"
         },
+        "async_validation": {
+            "description": "If True, validate the package version asynchronously. Defaults to False. You also can't specify both skip validation and async validation at the same time."
+        },
+        "is_dev_use_pkg_zip_requested": {
+            "description": "If True, request a dev use package zip. Defaults to False. If true, a downloadable package zip file containing package metadata is generated when a new package version is created."
+        },
     }
 
     def _init_options(self, kwargs):
@@ -230,6 +236,12 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         )
         self.options["skip_validation"] = process_bool_arg(
             self.options.get("skip_validation") or False
+        )
+        self.options["async_validation"] = process_bool_arg(
+            self.options.get("async_validation") or False
+        )
+        self.options["is_dev_use_pkg_zip_requested"] = process_bool_arg(
+            self.options.get("is_dev_use_pkg_zip_requested") or False
         )
         self.options["force_upload"] = process_bool_arg(
             self.options.get("force_upload") or False
@@ -575,11 +587,24 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         )
         request = {
             "Package2Id": package_id,
-            "SkipValidation": skip_validation,
             "Tag": f"hash:{package_hash}",
             "VersionInfo": version_info,
-            "CalculateCodeCoverage": not skip_validation,
+            "IsDevUsePkgZipRequested": self.options.get("is_dev_use_pkg_zip_requested"),
         }
+
+        if self.options.get("async_validation") is not True:
+            request.update(
+                {
+                    "SkipValidation": skip_validation,
+                    "CalculateCodeCoverage": not skip_validation,
+                }
+            )
+        else:
+            request.update(
+                {
+                    "AsyncValidation": True,
+                }
+            )
 
         install_key = self.options.get("install_key")
         if install_key:
