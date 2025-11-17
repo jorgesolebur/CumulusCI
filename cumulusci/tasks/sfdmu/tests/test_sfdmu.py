@@ -200,7 +200,8 @@ class TestSfdmuTask:
                 f.write('{"test": "data"}')
 
             task = create_task(
-                SfdmuTask, {"source": "csvfile", "target": "csvfile", "path": execute_dir}
+                SfdmuTask,
+                {"source": "csvfile", "target": "csvfile", "path": execute_dir},
             )
 
             # Should not raise any errors and files should remain unchanged
@@ -211,7 +212,9 @@ class TestSfdmuTask:
                 assert f.read() == '{"field": "%%%NAMESPACE%%%Test"}'
 
     @mock.patch("cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode")
-    def test_inject_namespace_tokens_csvfile_target_with_source_org(self, mock_determine_managed):
+    def test_inject_namespace_tokens_csvfile_target_with_source_org(
+        self, mock_determine_managed
+    ):
         """Test that namespace injection uses source org when target is csvfile."""
         mock_determine_managed.return_value = True
 
@@ -219,7 +222,9 @@ class TestSfdmuTask:
             # Create test files with namespace tokens
             test_json = os.path.join(execute_dir, "export.json")
             with open(test_json, "w") as f:
-                f.write('{"query": "SELECT Id FROM %%%MANAGED_OR_NAMESPACED_ORG%%%CustomObject__c"}')
+                f.write(
+                    '{"query": "SELECT Id FROM %%%MANAGED_OR_NAMESPACED_ORG%%%CustomObject__c"}'
+                )
 
             task = create_task(
                 SfdmuTask, {"source": "dev", "target": "csvfile", "path": execute_dir}
