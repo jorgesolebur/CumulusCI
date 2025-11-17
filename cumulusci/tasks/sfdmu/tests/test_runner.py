@@ -62,7 +62,7 @@ def test_create_execute_directory():
 
 
 def test_inject_namespace_tokens_csvfile_target():
-    """Test that namespace injection is skipped when target is csvfile."""
+    """Test that namespace injection is skipped when both source and target are csvfile."""
     with tempfile.TemporaryDirectory() as execute_dir:
         # Create test files
         test_json = os.path.join(execute_dir, "test.json")
@@ -75,11 +75,11 @@ def test_inject_namespace_tokens_csvfile_target():
             f.write('{"test": "data"}')
 
         task = create_task(
-            SfdmuTask, {"source": "dev", "target": "csvfile", "path": execute_dir}
+            SfdmuTask, {"source": "csvfile", "target": "csvfile", "path": execute_dir}
         )
 
         # Should not raise any errors and files should remain unchanged
-        task._inject_namespace_tokens(execute_dir, None)
+        task._inject_namespace_tokens(execute_dir, None, None)
 
         # Check that file content was not changed
         with open(test_json, "r") as f:
@@ -126,7 +126,7 @@ def test_inject_namespace_tokens_managed_mode():
         with mock.patch(
             "cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode", return_value=True
         ):
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
         # Check that namespace tokens were replaced in content
         with open(test_json, "r") as f:
@@ -175,7 +175,7 @@ def test_inject_namespace_tokens_unmanaged_mode():
         with mock.patch(
             "cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode", return_value=False
         ):
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
         # Check that namespace tokens were replaced with empty strings
         with open(test_json, "r") as f:
