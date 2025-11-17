@@ -2,6 +2,21 @@
 
 <!-- latest-start -->
 
+## v5.0.32 (2025-11-17)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix circular loading and loading of plugins in universal config. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#116](https://github.com/jorgesolebur/CumulusCI/pull/116)
+* Fixing issue with sfdmu when target = csv file by [@jorgesolebur](https://github.com/jorgesolebur) in [#115](https://github.com/jorgesolebur/CumulusCI/pull/115)
+* Enhance the consolidate script to run only if there are files copied. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#118](https://github.com/jorgesolebur/CumulusCI/pull/118)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.31...v5.0.32
+
+
+<!-- latest-stop -->
+
 ## v5.0.31 (2025-11-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.30...v5.0.31
 
-
-<!-- latest-stop -->
 
 ## v5.0.30 (2025-11-13)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
