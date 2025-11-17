@@ -186,8 +186,8 @@ class TestSfdmuTask:
             # Check that new file was copied
             assert os.path.exists(os.path.join(execute_path, "export.json"))
 
-    def test_inject_namespace_tokens_csvfile_target(self):
-        """Test that namespace injection is skipped when target is csvfile."""
+    def test_inject_namespace_tokens_csvfile_both(self):
+        """Test that namespace injection is skipped when both source and target are csvfile."""
         with tempfile.TemporaryDirectory() as execute_dir:
             # Create test files
             test_json = os.path.join(execute_dir, "test.json")
@@ -200,15 +200,50 @@ class TestSfdmuTask:
                 f.write('{"test": "data"}')
 
             task = create_task(
-                SfdmuTask, {"source": "dev", "target": "csvfile", "path": execute_dir}
+                SfdmuTask,
+                {"source": "csvfile", "target": "csvfile", "path": execute_dir},
             )
 
             # Should not raise any errors and files should remain unchanged
-            task._inject_namespace_tokens(execute_dir, None)
+            task._inject_namespace_tokens(execute_dir, None, None)
 
             # Check that file content was not changed
             with open(test_json, "r") as f:
                 assert f.read() == '{"field": "%%%NAMESPACE%%%Test"}'
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode")
+    def test_inject_namespace_tokens_csvfile_target_with_source_org(
+        self, mock_determine_managed
+    ):
+        """Test that namespace injection uses source org when target is csvfile."""
+        mock_determine_managed.return_value = True
+
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test files with namespace tokens
+            test_json = os.path.join(execute_dir, "export.json")
+            with open(test_json, "w") as f:
+                f.write(
+                    '{"query": "SELECT Id FROM %%%MANAGED_OR_NAMESPACED_ORG%%%CustomObject__c"}'
+                )
+
+            task = create_task(
+                SfdmuTask, {"source": "dev", "target": "csvfile", "path": execute_dir}
+            )
+
+            # Mock the project config namespace
+            task.project_config.project__package__namespace = "testns"
+
+            mock_source_org = mock.Mock()
+            mock_source_org.namespace = "testns"
+
+            # When target is csvfile (None), should use source org for injection
+            task._inject_namespace_tokens(execute_dir, mock_source_org, None)
+
+            # Check that namespace tokens were replaced using source org
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "testns__CustomObject__c" in content
+                assert "%%%MANAGED_OR_NAMESPACED_ORG%%%" not in content
 
     @mock.patch("cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode")
     def test_inject_namespace_tokens_managed_mode(self, mock_determine_managed):
@@ -247,7 +282,7 @@ class TestSfdmuTask:
             mock_org_config = mock.Mock()
             mock_org_config.namespace = "testns"
 
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
             # Check that namespace tokens were replaced in content
             with open(test_json, "r") as f:
@@ -292,7 +327,7 @@ class TestSfdmuTask:
             mock_org_config = mock.Mock()
             mock_org_config.namespace = "testns"
 
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
             # Check that namespace tokens were replaced with empty strings
             with open(test_json, "r") as f:
@@ -330,7 +365,7 @@ class TestSfdmuTask:
                 "testns"  # Same as project namespace = namespaced org
             )
 
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
             # Check that namespaced org token was replaced
             with open(test_json, "r") as f:
@@ -366,7 +401,7 @@ class TestSfdmuTask:
                 "differentns"  # Different from project namespace
             )
 
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
             # Check that namespaced org token was replaced with empty string
             with open(test_json, "r") as f:
@@ -398,7 +433,7 @@ class TestSfdmuTask:
             mock_org_config = mock.Mock()
             mock_org_config.namespace = None
 
-            task._inject_namespace_tokens(execute_dir, mock_org_config)
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
 
             # Check that namespace tokens were not processed (due to circular import issue)
             with open(test_json, "r") as f:

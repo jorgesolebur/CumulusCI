@@ -99,18 +99,30 @@ class SfdmuTask(BaseSalesforceTask, Command):
         if self.org_config is not None:
             super()._update_credentials()
 
-    def _inject_namespace_tokens(self, execute_path, target_org_config):
+    def _inject_namespace_tokens(
+        self, execute_path, source_org_config, target_org_config
+    ):
         """Inject namespace tokens into files in execute directory using the same mechanism as Deploy task."""
-        if target_org_config is None:  # csvfile case
+        # Determine which org config to use for namespace injection
+        # When exporting (source=org, target=csvfile), use source org
+        # When importing (source=csvfile, target=org), use target org
+        # When transferring (source=org, target=org), use target org
+        org_config_for_injection = (
+            target_org_config if target_org_config is not None else source_org_config
+        )
+
+        if (
+            org_config_for_injection is None
+        ):  # both source and target are csvfile (unlikely but handle it)
             return
 
         # Get namespace information
         namespace = self.project_config.project__package__namespace
         managed = determine_managed_mode(
-            self.options, self.project_config, target_org_config
+            self.options, self.project_config, org_config_for_injection
         )
         namespaced_org = bool(namespace) and namespace == getattr(
-            target_org_config, "namespace", None
+            org_config_for_injection, "namespace", None
         )
 
         # Create a temporary zipfile with all files from execute directory
@@ -153,7 +165,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
 
                 # Create task context
                 context = TaskContext(
-                    target_org_config, self.project_config, self.logger
+                    org_config_for_injection, self.project_config, self.logger
                 )
 
                 # Apply namespace injection
@@ -208,7 +220,9 @@ class SfdmuTask(BaseSalesforceTask, Command):
         self.logger.info(f"Created execute directory at {execute_path}")
 
         # Apply namespace injection
-        self._inject_namespace_tokens(execute_path, target_org_config)
+        self._inject_namespace_tokens(
+            execute_path, source_org_config, target_org_config
+        )
 
         # Build and execute SFDmu command
         # Use shell_quote to properly handle paths with spaces on Windows
