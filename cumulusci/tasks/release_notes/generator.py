@@ -110,28 +110,33 @@ def markdown_link_to_pr(change_note):
     return f"{change_note.title} [[PR{change_note.number}]({change_note.html_url})]"
 
 
-# For backwards-compatibility
-import cumulusci.vcs.github.release_notes.generator as githubGenerator
+# For backwards-compatibility - use lazy imports to avoid circular dependency
 from cumulusci.utils.deprecation import warn_moved
 
 
-class GithubReleaseNotesGenerator(githubGenerator.GithubReleaseNotesGenerator):
+class GithubReleaseNotesGenerator:
     """Deprecated: use cumulusci.vcs.github.release_notes.generator.GithubReleaseNotesGenerator instead"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __new__(cls, *args, **kwargs):
+        # Lazy import to avoid circular dependency at module load time
+        import cumulusci.vcs.github.release_notes.generator as githubGenerator
+
         warn_moved(
             "cumulusci.vcs.github.release_notes.generator.GithubReleaseNotesGenerator",
             __name__,
         )
+        return githubGenerator.GithubReleaseNotesGenerator(*args, **kwargs)
 
 
-class ParentPullRequestNotesGenerator(githubGenerator.ParentPullRequestNotesGenerator):
+class ParentPullRequestNotesGenerator:
     """Deprecated: use cumulusci.vcs.github.release_notes.generator.ParentPullRequestNotesGenerator instead"""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __new__(cls, *args, **kwargs):
+        # Lazy import to avoid circular dependency at module load time
+        import cumulusci.vcs.github.release_notes.generator as githubGenerator
+
         warn_moved(
             "cumulusci.vcs.github.release_notes.generator.ParentPullRequestNotesGenerator",
             __name__,
         )
+        return githubGenerator.ParentPullRequestNotesGenerator(*args, **kwargs)

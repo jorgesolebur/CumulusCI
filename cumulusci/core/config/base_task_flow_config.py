@@ -1,5 +1,5 @@
 from difflib import get_close_matches
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from cumulusci.core.config import BaseConfig, FlowConfig, TaskConfig
 from cumulusci.core.exceptions import (
@@ -7,6 +7,8 @@ from cumulusci.core.exceptions import (
     FlowNotFoundError,
     TaskNotFoundError,
 )
+from cumulusci.core.utils import merge_config
+from cumulusci.plugins.plugin_loader import load_plugins
 
 
 def list_infos(infos: dict) -> List[Dict[str, str]]:
@@ -30,6 +32,7 @@ class BaseTaskFlowConfig(BaseConfig):
 
     tasks: dict
     flows: dict
+    config_plugins: dict = {}
 
     def list_tasks(self) -> List[Dict[str, str]]:
         """Returns a list of task info dictionaries with keys 'name' and 'description'"""
@@ -80,3 +83,25 @@ class BaseTaskFlowConfig(BaseConfig):
             return f'. Did you mean "{match_list[0]}"?'
         else:
             return ""
+
+    def _load_plugins_config(self):
+        """Loads the plugin configurations"""
+        plugins = load_plugins()
+        self.config_plugins = {}
+        for plugin in plugins:
+            if plugin.plugin_project_config:
+                self.config_plugins.update(plugin.plugin_project_config)
+            plugin.teardown()  # clean up the plugin
+
+    def merge_base_config(self, base_config: dict) -> dict:
+        """Merges the base config with the plugin configurations"""
+        self._load_plugins_config()
+        return cast(
+            dict,
+            merge_config(
+                {
+                    **base_config,
+                    "plugins_config": self.config_plugins,
+                }
+            ),
+        )

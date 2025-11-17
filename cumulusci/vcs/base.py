@@ -1,14 +1,16 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Optional, Type
+from typing import TYPE_CHECKING, List, Optional, Set, Type
 
-from cumulusci.core.config import BaseProjectConfig, ServiceConfig
-from cumulusci.core.dependencies.base import DynamicDependency
 from cumulusci.core.keychain import BaseProjectKeychain
-from cumulusci.tasks.release_notes.generator import BaseReleaseNotesGenerator
 from cumulusci.utils.classutils import get_all_subclasses
 from cumulusci.vcs.models import AbstractRelease, AbstractRepo
 from cumulusci.vcs.utils import AbstractCommitDir
+
+if TYPE_CHECKING:
+    from cumulusci.core.config import BaseProjectConfig, ServiceConfig
+    from cumulusci.core.dependencies.base import DynamicDependency
+    from cumulusci.tasks.release_notes.generator import BaseReleaseNotesGenerator
 
 
 class VCSService(ABC):
@@ -18,14 +20,14 @@ class VCSService(ABC):
     """
 
     logger: logging.Logger
-    config: BaseProjectConfig
-    service_config: ServiceConfig
+    config: "BaseProjectConfig"
+    service_config: "ServiceConfig"
     name: str
     keychain: Optional[BaseProjectKeychain]
     _service_registry: List["VCSService"] = []
 
     def __init__(
-        self, config: BaseProjectConfig, name: Optional[str] = None, **kwargs
+        self, config: "BaseProjectConfig", name: Optional[str] = None, **kwargs
     ) -> None:
         """Initializes the VCS service with the given configuration, service name, and keychain.
 
@@ -35,8 +37,11 @@ class VCSService(ABC):
             **kwargs: Additional keyword arguments.
         """
         self.config = config
-        self.service_config = config.keychain.get_service(self.service_type, name)
-        self.name = self.service_config.name or name
+        if config.keychain:
+            self.service_config = config.keychain.get_service(self.service_type, name)
+            self.name = self.service_config.name
+        else:
+            self.name = name or ""
         self.keychain = config.keychain
         self.logger = kwargs.get("logger") or logging.getLogger(__name__)
 
@@ -51,11 +56,11 @@ class VCSService(ABC):
             raise NotImplementedError(
                 "Subclasses should define the service_type property"
             )
-        return self.__class__.service_type
+        return str(self.__class__.service_type)
 
     @property
     @abstractmethod
-    def dynamic_dependency_class(self) -> Type[DynamicDependency]:
+    def dynamic_dependency_class(self) -> Type["DynamicDependency"]:
         """Returns the dynamic dependency class for the VCS service.
         This property should be overridden by subclasses to provide
         the specific dynamic dependency class. For example, it could
@@ -78,7 +83,10 @@ class VCSService(ABC):
     @classmethod
     @abstractmethod
     def get_service_for_url(
-        cls, project_config: BaseProjectConfig, url: str, service_alias: str = None
+        cls,
+        project_config: "BaseProjectConfig",
+        url: str,
+        service_alias: Optional[str] = None,
     ) -> Optional["VCSService"]:
         """Returns the service configuration for the given URL.
         This method should be overridden by subclasses to provide
@@ -87,7 +95,7 @@ class VCSService(ABC):
         raise NotImplementedError("Subclasses should provide their own implementation")
 
     @classmethod
-    def registered_services(cls) -> List[Type["VCSService"]]:
+    def registered_services(cls) -> Set[Type["VCSService"]]:
         """This method returns all subclasses of VCSService that have been registered.
         It can be used to dynamically discover available VCS services."""
         return get_all_subclasses(cls)
@@ -127,7 +135,7 @@ class VCSService(ABC):
         raise NotImplementedError("Subclasses should provide their own implementation")
 
     @abstractmethod
-    def release_notes_generator(self, options: dict) -> BaseReleaseNotesGenerator:
+    def release_notes_generator(self, options: dict) -> "BaseReleaseNotesGenerator":
         """Returns the release notes generator for the VCS service."""
         raise NotImplementedError(
             "Subclasses should define the release_notes_generator property"
@@ -136,7 +144,7 @@ class VCSService(ABC):
     @abstractmethod
     def parent_pr_notes_generator(
         self, repo: AbstractRepo
-    ) -> BaseReleaseNotesGenerator:
+    ) -> "BaseReleaseNotesGenerator":
         """Returns the parent PR notes generator for the VCS service."""
         raise NotImplementedError(
             "Subclasses should define the parent_pr_notes_generator property"

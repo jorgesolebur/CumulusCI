@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
 from cumulusci.core.config.base_config import BaseConfig
 from cumulusci.core.debug import get_debug_mode
 from cumulusci.core.versions import PackageVersionNumber
-from cumulusci.plugins.plugin_loader import load_plugins
 from cumulusci.utils.version_strings import LooseVersion
 
 API_VERSION_RE = re.compile(r"^\d\d+\.0$")
@@ -33,7 +32,6 @@ from cumulusci.core.exceptions import (
     VcsException,
 )
 from cumulusci.core.source import LocalFolderSource, NullSource
-from cumulusci.core.utils import merge_config
 from cumulusci.utils.fileutils import FSResource, open_fs_resource
 from cumulusci.utils.git import current_branch, generic_parse_repo_url, git_path
 from cumulusci.utils.yaml.cumulusci_yml import (
@@ -84,7 +82,6 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
     config_project: dict
     config_project_local: dict
     config_additional_yaml: dict
-    config_plugins_yaml: dict
     additional_yaml: Optional[str]
     source: Union[NullSource, VCSSource, LocalFolderSource]
     _cache_dir: Optional[Path]
@@ -114,7 +111,6 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
         self.config_project = {}
         self.config_project_local = {}
         self.config_additional_yaml = {}
-        self.config_plugins_yaml = {}
 
         # optionally pass in a kwarg named 'additional_yaml' that will
         # be added to the YAML merge stack.
@@ -184,27 +180,13 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
             if additional_yaml_config:
                 self.config_additional_yaml.update(additional_yaml_config)
 
-        # Loading plugins as classes are loaded and available.
-        plugins = load_plugins()
-
-        # Load the plugin yaml config file if it exists
-        for plugin in plugins:
-            if plugin.plugin_project_config:
-                self.config_plugins_yaml.update(plugin.plugin_project_config)
-                self.logger.info(
-                    f"Loaded plugin: {plugin.name} ({plugin.api_name}) v{plugin.version}"
-                )
-
-            plugin.teardown()  # clean up the plugin
-
-        self.config = merge_config(
+        self.config = self.merge_base_config(
             {
                 "universal_config": self.config_universal,
                 "global_config": self.config_global,
                 "project_config": self.config_project,
                 "project_local_config": self.config_project_local,
                 "additional_yaml": self.config_additional_yaml,
-                "plugins_config": self.config_plugins_yaml,
             }
         )
 

@@ -54,7 +54,9 @@ class TestUniversalConfig:
         with open(filename, "w") as f:
             f.write(content)
 
-    def test_load_universal_config_no_local(self, mock_class):
+    @mock.patch("cumulusci.core.config.base_task_flow_config.load_plugins")
+    def test_load_universal_config_no_local(self, mock_load_plugins, mock_class):
+        mock_load_plugins.return_value = []
         mock_class.return_value = self.tempdir_home
         # clear cache
         UniversalConfig.config = None
@@ -63,7 +65,9 @@ class TestUniversalConfig:
             expected_config = yaml.safe_load(f_expected_config)
         assert config.config == expected_config
 
-    def test_load_universal_config_empty_local(self, mock_class):
+    @mock.patch("cumulusci.core.config.base_task_flow_config.load_plugins")
+    def test_load_universal_config_empty_local(self, mock_load_plugins, mock_class):
+        mock_load_plugins.return_value = []
         self._create_universal_config_local("")
         # clear cache
         UniversalConfig.config = None
@@ -73,7 +77,9 @@ class TestUniversalConfig:
             expected_config = yaml.safe_load(f_expected_config)
         assert config.config == expected_config
 
-    def test_load_universal_config_with_local(self, mock_class):
+    @mock.patch("cumulusci.core.config.base_task_flow_config.load_plugins")
+    def test_load_universal_config_with_local(self, mock_load_plugins, mock_class):
+        mock_load_plugins.return_value = []
         local_yaml = "tasks:\n    newtesttask:\n        description: test description"
         self._create_universal_config_local(local_yaml)
         mock_class.return_value = self.tempdir_home
