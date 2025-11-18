@@ -147,6 +147,71 @@ class TestBaseTaskCallable:
         task = BaseTask(self.project_config, self.task_config, self.org_config)
         assert task.options["test_option"] == "before baz after"
 
+    def test_init_options__org_config_substitution(self):
+        self.task_config.config["options"] = {"test_option": "$org_config.username"}
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["test_option"] == USERNAME
+
+    def test_init_options__org_config_substitution_org_id(self):
+        self.task_config.config["options"] = {"test_option": "$org_config.org_id"}
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["test_option"] == ORG_ID
+
+    def test_init_options__org_config_substitution_nested(self):
+        self.task_config.config["options"] = {
+            "test_option": "$org_config.username",
+            "nested": [
+                {"user": "$org_config.username"},
+                {"org": "$org_config.org_id"},
+            ],
+        }
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["test_option"] == USERNAME
+        assert task.options["nested"][0]["user"] == USERNAME
+        assert task.options["nested"][1]["org"] == ORG_ID
+
+    def test_init_options__org_config_substitution__substring(self):
+        self.task_config.config["options"] = {
+            "test_option": "User: $org_config.username, Org: $org_config.org_id"
+        }
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["test_option"] == f"User: {USERNAME}, Org: {ORG_ID}"
+
+    def test_init_options__org_config_substitution__no_org(self):
+        """Test that $org_config substitution is skipped when org_config is None"""
+        self.task_config.config["options"] = {"test_option": "$org_config.username"}
+        task = BaseTask(self.project_config, self.task_config, org_config=None)
+        # Should remain unchanged when org_config is None
+        assert task.options["test_option"] == "$org_config.username"
+
+    def test_init_options__mixed_substitution(self):
+        """Test that both $project_config and $org_config work together"""
+        self.project_config.config["foo"] = {"bar": "baz"}
+        self.task_config.config["options"] = {
+            "test_option": "Project: $project_config.foo__bar, User: $org_config.username"
+        }
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["test_option"] == f"Project: baz, User: {USERNAME}"
+
+    def test_init_options__mixed_substitution_nested(self):
+        """Test mixed substitution in nested structures"""
+        self.project_config.config["project"] = {"name": "TestProject"}
+        self.task_config.config["options"] = {
+            "config": {
+                "project_name": "$project_config.project__name",
+                "username": "$org_config.username",
+                "items": [
+                    "$project_config.project__name",
+                    "$org_config.org_id",
+                ],
+            }
+        }
+        task = BaseTask(self.project_config, self.task_config, self.org_config)
+        assert task.options["config"]["project_name"] == "TestProject"
+        assert task.options["config"]["username"] == USERNAME
+        assert task.options["config"]["items"][0] == "TestProject"
+        assert task.options["config"]["items"][1] == ORG_ID
+
     def test_validates_missing_options(self):
         class Task(BaseTask):
             task_options = {"test_option": {"required": True}}
