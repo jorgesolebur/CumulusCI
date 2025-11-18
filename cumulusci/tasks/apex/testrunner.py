@@ -601,6 +601,7 @@ class RunApexTests(BaseSalesforceApiTask):
                 or test_class_name == f"test{affected_class}"
                 or test_class_name.startswith(f"{affected_class}_")
                 or test_class_name.startswith(f"test{affected_class}_")
+                or test_class_name == f"{affected_class.replace('_', '')}test"
             ):
                 return True
 
