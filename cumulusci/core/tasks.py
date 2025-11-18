@@ -33,6 +33,7 @@ from cumulusci.utils.options import CCIOptions, ReadOnlyOptions
 CURRENT_TASK = threading.local()
 
 PROJECT_CONFIG_RE = re.compile(r"\$project_config.(\w+)")
+ORG_CONFIG_RE = re.compile(r"\$org_config.(\w+)")
 CAPTURE_TASK_OUTPUT = os.environ.get("CAPTURE_TASK_OUTPUT")
 
 
@@ -135,12 +136,22 @@ class BaseTask:
             self.options.update(kwargs)
 
         # Handle dynamic lookup of project_config values via $project_config.attr
+        # and org_config values via $org_config.attr
         def process_options(option):
             if isinstance(option, str):
-                return PROJECT_CONFIG_RE.sub(
+                # Replace $project_config.attr patterns
+                option = PROJECT_CONFIG_RE.sub(
                     lambda match: str(self.project_config.lookup(match.group(1), None)),
                     option,
                 )
+                # Replace $org_config.attr patterns if org_config is available
+                if self.org_config is not None:
+                    org_config = self.org_config  # Capture for type narrowing
+                    option = ORG_CONFIG_RE.sub(
+                        lambda match: str(org_config.lookup(match.group(1), None)),
+                        option,
+                    )
+                return option
             elif isinstance(option, dict):
                 processed_dict = {}
                 for key, value in option.items():
