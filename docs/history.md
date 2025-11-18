@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.33 (2025-11-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add options AsyncValidation and IsDevUsePkgZipRequested by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#121](https://github.com/jorgesolebur/CumulusCI/pull/121)
+* Fix consolidated file upload during validation. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#123](https://github.com/jorgesolebur/CumulusCI/pull/123)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.32...v5.0.33
+
+
+<!-- latest-stop -->
+
 ## v5.0.32 (2025-11-17)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -14,8 +28,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.31...v5.0.32
 
-
-<!-- latest-stop -->
 
 ## v5.0.31 (2025-11-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
