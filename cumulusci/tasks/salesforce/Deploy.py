@@ -259,16 +259,27 @@ class DeployUnpackagedMetadata(Deploy):
             return
 
         super(DeployUnpackagedMetadata, self)._init_options(kwargs)
-        final_metadata_path = consolidate_metadata(
+        final_metadata_path, file_count = consolidate_metadata(
             self.project_config.project__package__unpackaged_metadata_path,
             self.project_config.repo_root,
         )
+        if file_count == 0:
+            self.logger.warning(
+                "No files found in the unpackaged metadata path. Skipping metadata deployment task."
+            )
+            return
         self.options["path"] = final_metadata_path
 
     def _run_task(self):
         if self.project_config.project__package__unpackaged_metadata_path is None:
             self.logger.info(
                 "No unpackaged metadata path configured. Skipping metadata deployment task."
+            )
+            return
+
+        if self.options.get("path") is None:
+            self.logger.warning(
+                "Unpackaged metadata path is not set. Skipping metadata deployment task."
             )
             return
 
