@@ -1794,6 +1794,26 @@ class TestRunApexTests(MockLoggerMixin):
             is False
         )
 
+    def test_is_test_class_affected__underscore_removal_pattern(self):
+        """Test _is_test_class_affected with underscore removal (e.g., Account_Handler -> AccountHandlerTest)"""
+        task = RunApexTests(self.project_config, self.task_config, self.org_config)
+        affected_class_names = ["account_handler", "my_service_class"]
+
+        # Test that AccountHandlerTest matches account_handler
+        assert (
+            task._is_test_class_affected("accounthandlertest", affected_class_names)
+            is True
+        )
+        # Test that MyServiceClassTest matches my_service_class
+        assert (
+            task._is_test_class_affected("myserviceclasstest", affected_class_names)
+            is True
+        )
+        # Test no match
+        assert (
+            task._is_test_class_affected("contacttest", affected_class_names) is False
+        )
+
     def test_filter_package_classes__unsupported_dynamic_filter(self):
         """Test that unsupported dynamic_filter values raise TaskOptionsError"""
         task_config = TaskConfig(
