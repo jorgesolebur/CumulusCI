@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.34 (2025-11-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/flowTestClassDeltaCoverage by [@jorgesolebur](https://github.com/jorgesolebur) in [#125](https://github.com/jorgesolebur/CumulusCI/pull/125)
+* Enhance options to dynamically lookup org_config values. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#126](https://github.com/jorgesolebur/CumulusCI/pull/126)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.33...v5.0.34
+
+
+<!-- latest-stop -->
+
 ## v5.0.33 (2025-11-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.32...v5.0.33
 
-
-<!-- latest-stop -->
 
 ## v5.0.32 (2025-11-17)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
