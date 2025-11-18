@@ -429,11 +429,11 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
 
                     if is_duplicate_error:
                         self.logger.info(
-                            f"Permission Set '{ps_name}' is already assigned to Permission Set Group '{psg_name}'. Skipping assignment creation."
+                            f"Permission Set '{ps_name}' is already assigned to Permission Set Group '{self.psg_names_sanitized.get(psg_name, psg_name)}'. Skipping assignment creation."
                         )
                     else:
                         self.logger.error(
-                            f"Failed to create PermissionSetGroupComponent for Permission Set Group '{psg_name}' and Permission Set '{ps_name}': {', '.join(error_messages)}"
+                            f"Failed to create PermissionSetGroupComponent for Permission Set Group '{self.psg_names_sanitized.get(psg_name, psg_name)}' and Permission Set '{self.ps_names_sanitized.get(ps_name, ps_name)}': {', '.join(error_messages)}"
                         )
 
             self.logger.info(

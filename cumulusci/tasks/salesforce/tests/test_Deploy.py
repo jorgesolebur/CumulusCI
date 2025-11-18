@@ -491,7 +491,7 @@ class TestDeployUnpackagedMetadata:
     ):
         """Test that _init_options sets path using consolidate_metadata."""
         with temporary_dir() as path:
-            mock_consolidate.return_value = path
+            mock_consolidate.return_value = (path, 1)
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
                 universal_config,
@@ -520,7 +520,7 @@ class TestDeployUnpackagedMetadata:
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = consolidated_path
+            mock_consolidate.return_value = (consolidated_path, 5)
 
             repo_root = "/repo/root"
             universal_config = UniversalConfig()
@@ -553,7 +553,7 @@ class TestDeployUnpackagedMetadata:
             touch("package.xml")
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = consolidated_path
+            mock_consolidate.return_value = (consolidated_path, 3)
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -588,7 +588,7 @@ class TestDeployUnpackagedMetadata:
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = consolidated_path
+            mock_consolidate.return_value = (consolidated_path, 2)
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -624,7 +624,7 @@ class TestDeployUnpackagedMetadata:
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = consolidated_path
+            mock_consolidate.return_value = (consolidated_path, 4)
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -662,7 +662,7 @@ class TestDeployUnpackagedMetadata:
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = consolidated_path
+            mock_consolidate.return_value = (consolidated_path, 6)
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -708,3 +708,78 @@ class TestDeployUnpackagedMetadata:
             # or path is not set if options exists
             if hasattr(task, "options"):
                 assert "path" not in task.options
+
+    @mock.patch(
+        "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
+    )
+    def test_consolidate_metadata_integration(self, mock_org_config):
+        """Integration test that actually calls consolidate_metadata without mocking."""
+        with temporary_dir() as path:
+            # Create a realistic metadata structure
+            metadata_dir = os.path.join(path, "unpackaged", "pre")
+            os.makedirs(metadata_dir)
+
+            # Create package.xml
+            package_xml_path = os.path.join(metadata_dir, "package.xml")
+            with open(package_xml_path, "w") as f:
+                f.write(
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>ApexClass</name>
+    </types>
+    <version>60.0</version>
+</Package>"""
+                )
+
+            # Create some metadata files
+            classes_dir = os.path.join(metadata_dir, "classes")
+            os.makedirs(classes_dir)
+
+            # Create an Apex class
+            with open(os.path.join(classes_dir, "TestClass.cls"), "w") as f:
+                f.write("public class TestClass { }")
+
+            # Create an Apex class metadata file
+            with open(os.path.join(classes_dir, "TestClass.cls-meta.xml"), "w") as f:
+                f.write(
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>60.0</apiVersion>
+    <status>Active</status>
+</ApexClass>"""
+                )
+
+            universal_config = UniversalConfig()
+            project_config = BaseProjectConfig(
+                universal_config,
+                config={"noyaml": True, "project": {"package": {}}},
+                repo_info={"root": path},
+            )
+            project_config.project__package__unpackaged_metadata_path = "unpackaged/pre"
+
+            # Create task without mocking consolidate_metadata
+            task = create_task(
+                DeployUnpackagedMetadata,
+                {"unmanaged": True},
+                project_config=project_config,
+            )
+
+            # Verify that path was set to a temporary directory (not the original)
+            assert task.options["path"] != metadata_dir
+            # The path should exist
+            assert os.path.exists(task.options["path"])
+            # The consolidated path should contain our files
+            consolidated_package_xml = os.path.join(task.options["path"], "package.xml")
+            assert os.path.exists(consolidated_package_xml)
+            # Verify the consolidated directory contains the classes directory
+            consolidated_classes_dir = os.path.join(task.options["path"], "classes")
+            assert os.path.exists(consolidated_classes_dir)
+            # Verify our test class exists in consolidated directory
+            assert os.path.exists(
+                os.path.join(consolidated_classes_dir, "TestClass.cls")
+            )
+            assert os.path.exists(
+                os.path.join(consolidated_classes_dir, "TestClass.cls-meta.xml")
+            )

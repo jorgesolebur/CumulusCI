@@ -693,6 +693,8 @@ class TestAssignPermissionSetToPermissionSetGroup:
         task._init_task()
         task.psg_ids = {"PSG1": "0PG000000000001"}
         task.ps_ids = {"PS1": "0PS000000000001"}
+        task.psg_names_sanitized = {"PSG1": "PSG1"}
+        task.ps_names_sanitized = {"PS1": "PS1"}
 
         records = [
             {
@@ -795,6 +797,8 @@ class TestAssignPermissionSetToPermissionSetGroup:
         task._init_task()
         task.psg_ids = {"PSG1": "0PG000000000001"}
         task.ps_ids = {"PS1": "0PS000000000001", "PS2": "0PS000000000002"}
+        task.psg_names_sanitized = {"PSG1": "PSG1"}
+        task.ps_names_sanitized = {"PS1": "PS1", "PS2": "PS2"}
 
         records = [
             {
