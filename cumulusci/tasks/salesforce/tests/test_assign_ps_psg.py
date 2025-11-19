@@ -8,6 +8,7 @@ from cumulusci.core.exceptions import SalesforceException, TaskOptionsError
 from cumulusci.tasks.salesforce.assign_ps_psg import (
     AssignPermissionSetToPermissionSetGroup,
     PermissionSetGroupAssignmentsOption,
+    build_name_conditions,
 )
 from cumulusci.tests.util import CURRENT_SF_API_VERSION
 
@@ -240,7 +241,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _run_task with missing Permission Set Group"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"MissingPSG": ["PS1"]}},
+            {"assignments": {"MissingPSG": ["PS1"]}, "fail_on_error": False},
         )
         task._init_task()
 
@@ -277,7 +278,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _run_task with missing Permission Set"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["MissingPS"]}},
+            {"assignments": {"PSG1": ["MissingPS"]}, "fail_on_error": False},
         )
         task._init_task()
 
@@ -475,7 +476,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         with pytest.raises(
             SalesforceException, match="Error querying Permission Set Groups"
         ):
-            task._get_permission_set_group_ids(["PSG1"])
+            task()
 
     def test_get_permission_set_ids_empty_list(self):
         """Test _get_permission_set_ids with empty list"""
@@ -581,12 +582,28 @@ class TestAssignPermissionSetToPermissionSetGroup:
         responses.add(
             method="GET",
             url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
+            status=200,
+            json={
+                "totalSize": 1,
+                "done": True,
+                "records": [
+                    {
+                        "Id": "0PG000000000001",
+                        "DeveloperName": "PSG1",
+                    }
+                ],
+            },
+        )
+
+        responses.add(
+            method="GET",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/",
             status=400,
             json=[{"errorCode": "INVALID_FIELD", "message": "Invalid field"}],
         )
 
         with pytest.raises(SalesforceException, match="Error querying Permission Sets"):
-            task._get_permission_set_ids(["PS1"])
+            task()
 
     def test_process_namespaces(self):
         """Test _process_namespaces"""
@@ -604,48 +621,26 @@ class TestAssignPermissionSetToPermissionSetGroup:
 
     def test_build_name_conditions_no_namespace(self):
         """Test _build_name_conditions without namespace"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["PS1"])
+        conditions, mapping = build_name_conditions(["PS1"])
         assert len(conditions) == 1
         assert "Name = 'PS1'" in conditions[0]
         assert ("PS1", None) in mapping
 
     def test_build_name_conditions_with_namespace(self):
         """Test _build_name_conditions with namespace"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace_inject": "NS"},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["NS__PS1"])
+        conditions, mapping = build_name_conditions(["NS__PS1"])
         assert len(conditions) == 1
         assert "NamespacePrefix = 'NS' AND Name = 'PS1'" in conditions[0]
         assert ("PS1", "NS") in mapping
 
     def test_build_name_conditions_with_escaped_quotes(self):
         """Test _build_name_conditions with names containing quotes"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS'1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["PS'1"])
+        conditions, mapping = build_name_conditions(["PS'1"])
         assert "Name = 'PS''1'" in conditions[0]  # Single quote should be escaped
 
     def test_build_name_conditions_custom_field_name(self):
         """Test _build_name_conditions with custom field name"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(
-            ["PS1"], field_name="DeveloperName"
-        )
+        conditions, mapping = build_name_conditions(["PS1"], field_name="DeveloperName")
         assert "DeveloperName = 'PS1'" in conditions[0]
 
     @responses.activate
@@ -1009,7 +1004,7 @@ class TestAssignPermissionSetToPermissionSetGroup:
         """Test _run_task continues when batch fails and fail_on_error is default (False)"""
         task = create_task(
             AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS1"]}},
+            {"assignments": {"PSG1": ["PS1"]}, "fail_on_error": False},
         )
         task._init_task()
 

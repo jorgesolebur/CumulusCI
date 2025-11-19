@@ -127,8 +127,8 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             description="Whether the deployment is managed. If not provided, the managed mode will be determined based on the org config.",
         )
         fail_on_error: bool = Field(
-            False,
-            description="Whether the task should fail if any Permission Set Group Component creation fails.",
+            True,
+            description="Whether the task should fail if any Permission Set Group Component creation fails. If set to False, the task will continue even if some assignments fail.",
         )
 
     parsed_options: Options
@@ -164,14 +164,41 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             return
 
         # Step 1: Query Permission Set Groups to get their IDs
-        self._get_permission_set_group_ids(list(assignments.keys()))
+        try:
+            self._get_permission_set_group_ids(list(assignments.keys()))
+        except Exception as e:
+            raise SalesforceException(
+                f"Error querying Permission Set Groups: {str(e)}"
+            ) from e
+
+        # Log missing groups
+        missing = set(self.psg_names_sanitized.values()) - set(self.psg_ids.keys())
+        if missing:
+            msg = f"Permission Set Groups not found in the org: {', '.join(missing)}"
+            if self.parsed_options.fail_on_error:
+                raise SalesforceException(msg)
+            self.logger.warning(msg)
 
         # Step 2: Query Permission Sets to get their IDs
         all_ps_names = []
         for ps_list in assignments.values():
             all_ps_names.extend(ps_list)
 
-        self._get_permission_set_ids(all_ps_names)
+        try:
+            self._get_permission_set_ids(all_ps_names)
+        except Exception as e:
+            msg = f"Error querying Permission Sets: {str(e)}"
+            if self.parsed_options.fail_on_error:
+                raise SalesforceException(msg)
+            self.logger.error(msg)
+
+        # Log missing permission sets
+        missing = set(self.ps_names_sanitized.values()) - set(self.ps_ids.keys())
+        if missing:
+            msg = f"Permission Sets not found in the org: {', '.join(missing)}"
+            if self.parsed_options.fail_on_error:
+                raise SalesforceException(msg)
+            self.logger.warning(msg)
 
         # Step 3: Build composite request to create PermissionSetGroupComponent records
         records = []
@@ -223,7 +250,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
 
         self.psg_names_sanitized = self._process_namespaces(psg_names)
 
-        name_conditions, name_mapping = self._build_name_conditions(
+        name_conditions, name_mapping = build_name_conditions(
             list(self.psg_names_sanitized.values()), field_name="DeveloperName"
         )
 
@@ -232,31 +259,17 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             f"WHERE ({' OR '.join(name_conditions)})"
         )
 
-        try:
-            result = self.sf.query(query)
-            for record in result.get("records", []):
-                record_name = record["DeveloperName"]
-                namespace_prefix = record.get("NamespacePrefix")
-                key = (record_name, namespace_prefix)
-                if key in name_mapping:
-                    original_name = name_mapping[key]
-                    self.psg_ids[original_name] = record["Id"]
-                elif (record_name, None) in name_mapping:
-                    original_name = name_mapping[(record_name, None)]
-                    self.psg_ids[original_name] = record["Id"]
-
-            # Log missing groups
-            missing = set(self.psg_names_sanitized.values()) - set(self.psg_ids.keys())
-            if missing:
-                self.logger.warning(
-                    f"Permission Set Groups not found in the org: {', '.join(missing)}"
-                )
-
-            return
-        except Exception as e:
-            raise SalesforceException(
-                f"Error querying Permission Set Groups: {str(e)}"
-            ) from e
+        result = self.sf.query(query)
+        for record in result.get("records", []):
+            record_name = record["DeveloperName"]
+            namespace_prefix = record.get("NamespacePrefix")
+            key = (record_name, namespace_prefix)
+            if key in name_mapping:
+                original_name = name_mapping[key]
+                self.psg_ids[original_name] = record["Id"]
+            elif (record_name, None) in name_mapping:
+                original_name = name_mapping[(record_name, None)]
+                self.psg_ids[original_name] = record["Id"]
 
     def _process_namespaces(self, names: List[str]):
         """Process namespace tokens in names."""
@@ -273,37 +286,6 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             )
             names_processed[name] = name_processed
         return names_processed
-
-    def _build_name_conditions(self, names: List[str], field_name: str = "Name"):
-        name_conditions = []
-        name_mapping = (
-            {}
-        )  # Maps (original_name, namespace_prefix) tuple back to original name
-        for name in names:
-            # Check if name contains namespace prefix (format: namespace__Name)
-            if "__" in name and self.parsed_options.namespace_inject:
-                parts = name.split("__", 1)
-                if len(parts) == 2:
-                    ns_prefix, ps_name = parts
-                    # Query with namespace prefix
-                    escaped_ns = "'" + ns_prefix.replace("'", "''") + "'"
-                    escaped_name = "'" + ps_name.replace("'", "''") + "'"
-                    name_conditions.append(
-                        f"(NamespacePrefix = {escaped_ns} AND {field_name} = {escaped_name})"
-                    )
-                    name_mapping[(ps_name, ns_prefix)] = name
-                else:
-                    # Fallback: query by name only
-                    escaped_name = "'" + name.replace("'", "''") + "'"
-                    name_conditions.append(f"{field_name} = {escaped_name}")
-                    name_mapping[(name, None)] = name
-            else:
-                # No namespace prefix in name
-                escaped_name = "'" + name.replace("'", "''") + "'"
-                name_conditions.append(f"{field_name} = {escaped_name}")
-                name_mapping[(name, None)] = name
-
-        return name_conditions, name_mapping
 
     def _get_permission_set_ids(self, ps_names: List[str]):
         """Query Permission Sets by Name and return mapping of name to ID.
@@ -324,7 +306,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
         self.ps_names_sanitized = self._process_namespaces(unique_ps_names)
 
         # Replace namespace tokens in names and build query conditions
-        name_conditions, name_mapping = self._build_name_conditions(
+        name_conditions, name_mapping = build_name_conditions(
             list(self.ps_names_sanitized.values())
         )
 
@@ -333,37 +315,22 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             f"SELECT Id, Name, NamespacePrefix FROM PermissionSet "
             f"WHERE IsOwnedByProfile = false AND ({' OR '.join(name_conditions)})"
         )
+        result = self.sf.query(query)
 
-        try:
-            result = self.sf.query(query)
+        # Build mapping considering namespace prefix
+        for record in result.get("records", []):
+            record_name = record["Name"]
+            namespace_prefix = record.get("NamespacePrefix")
 
-            # Build mapping considering namespace prefix
-            for record in result.get("records", []):
-                record_name = record["Name"]
-                namespace_prefix = record.get("NamespacePrefix")
-
-                # Try to match by (name, namespace_prefix) tuple
-                key = (record_name, namespace_prefix)
-                if key in name_mapping:
-                    original_name = name_mapping[key]
-                    self.ps_ids[original_name] = record["Id"]
-                # Fallback: match by name only if namespace_prefix is None
-                elif (record_name, None) in name_mapping:
-                    original_name = name_mapping[(record_name, None)]
-                    self.ps_ids[original_name] = record["Id"]
-
-            # Log missing permission sets
-            missing = set(self.ps_names_sanitized.values()) - set(self.ps_ids.keys())
-            if missing:
-                self.logger.warning(
-                    f"Permission Sets not found in the org: {', '.join(missing)}"
-                )
-
-            return
-        except Exception as e:
-            raise SalesforceException(
-                f"Error querying Permission Sets: {str(e)}"
-            ) from e
+            # Try to match by (name, namespace_prefix) tuple
+            key = (record_name, namespace_prefix)
+            if key in name_mapping:
+                original_name = name_mapping[key]
+                self.ps_ids[original_name] = record["Id"]
+            # Fallback: match by name only if namespace_prefix is None
+            elif (record_name, None) in name_mapping:
+                original_name = name_mapping[(record_name, None)]
+                self.ps_ids[original_name] = record["Id"]
 
     def _create_permission_set_group_components(self, records: List[Dict]):
         """Create PermissionSetGroupComponent records using Composite API."""
@@ -401,9 +368,6 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                         == "DUPLICATE_VALUE"
                     )
 
-                    if not is_duplicate_error:
-                        error_count += 1
-
                     error_messages = [
                         f"{err.get('message', 'Unknown error')} ({err.get('statusCode', 'Unknown status code')})"
                         for err in errors
@@ -432,6 +396,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
                             f"Permission Set '{ps_name}' is already assigned to Permission Set Group '{self.psg_names_sanitized.get(psg_name, psg_name)}'. Skipping assignment creation."
                         )
                     else:
+                        error_count += 1
                         self.logger.error(
                             f"Failed to create PermissionSetGroupComponent for Permission Set Group '{self.psg_names_sanitized.get(psg_name, psg_name)}' and Permission Set '{self.ps_names_sanitized.get(ps_name, ps_name)}': {', '.join(error_messages)}"
                         )
@@ -449,3 +414,35 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             raise SalesforceException(
                 f"Error creating PermissionSetGroupComponent records: {str(e)}"
             ) from e
+
+
+def build_name_conditions(names: List[str], field_name: str = "Name"):
+    name_conditions = []
+    name_mapping = (
+        {}
+    )  # Maps (original_name, namespace_prefix) tuple back to original name
+    for name in names:
+        # Check if name contains namespace prefix (format: namespace__Name)
+        if "__" in name:
+            parts = name.split("__", 1)
+            if len(parts) == 2:
+                ns_prefix, ps_name = parts
+                # Query with namespace prefix
+                escaped_ns = "'" + ns_prefix.replace("'", "''") + "'"
+                escaped_name = "'" + ps_name.replace("'", "''") + "'"
+                name_conditions.append(
+                    f"(NamespacePrefix = {escaped_ns} AND {field_name} = {escaped_name})"
+                )
+                name_mapping[(ps_name, ns_prefix)] = name
+            else:
+                # Fallback: query by name only
+                escaped_name = "'" + name.replace("'", "''") + "'"
+                name_conditions.append(f"{field_name} = {escaped_name}")
+                name_mapping[(name, None)] = name
+        else:
+            # No namespace prefix in name
+            escaped_name = "'" + name.replace("'", "''") + "'"
+            name_conditions.append(f"{field_name} = {escaped_name}")
+            name_mapping[(name, None)] = name
+
+    return name_conditions, name_mapping
