@@ -198,6 +198,77 @@ class SfdmuTask(BaseSalesforceTask, Command):
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
 
+    def _process_csv_exports(self, execute_path, base_path):
+        """Process CSV files when target is csvfile.
+
+        This method performs the following operations:
+        1. Replace namespace prefix with %%%MANAGED_OR_NAMESPACED_ORG%%% in CSV file contents
+        2. Rename CSV files replacing namespace prefix with ___MANAGED_OR_NAMESPACED_ORG___
+        3. Copy all CSV files from execute folder to base path, replacing existing files
+        """
+        namespace = self.project_config.project__package__namespace
+        if not namespace:
+            self.logger.info("No namespace configured, skipping CSV post-processing")
+            return
+
+        namespace_prefix = namespace + "__"
+        content_token = "%%%MANAGED_OR_NAMESPACED_ORG%%%"
+        filename_token = "___MANAGED_OR_NAMESPACED_ORG___"
+
+        # Get all CSV files in execute directory
+        csv_files = [f for f in os.listdir(execute_path) if f.endswith(".csv")]
+
+        if not csv_files:
+            self.logger.info("No CSV files found in execute directory")
+            return
+
+        self.logger.info(f"Processing {len(csv_files)} CSV file(s) for export")
+
+        # Process each CSV file
+        processed_files = []
+        for filename in csv_files:
+            file_path = os.path.join(execute_path, filename)
+
+            # Step 1: Replace namespace prefix in file contents
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            if namespace_prefix in content:
+                content = content.replace(namespace_prefix, content_token)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                self.logger.debug(f"Replaced namespace prefix in content of {filename}")
+
+            # Step 2: Rename file if it contains namespace prefix
+            new_filename = filename.replace(namespace_prefix, filename_token)
+            if new_filename != filename:
+                new_file_path = os.path.join(execute_path, new_filename)
+                os.rename(file_path, new_file_path)
+                self.logger.debug(f"Renamed file: {filename} -> {new_filename}")
+                file_path = new_file_path
+                filename = new_filename
+
+            processed_files.append((file_path, filename))
+
+        # Step 3: Delete all CSV files in base_path and copy processed files
+        self.logger.debug(f"Copying processed CSV files to {base_path}")
+
+        # Remove existing CSV files in base_path
+        for item in os.listdir(base_path):
+            if item.endswith(".csv"):
+                item_path = os.path.join(base_path, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                    self.logger.debug(f"Removed existing file: {item}")
+
+        # Copy processed files to base_path
+        for file_path, filename in processed_files:
+            target_path = os.path.join(base_path, filename)
+            shutil.copy2(file_path, target_path)
+            self.logger.debug(f"Copied {filename} to {base_path}")
+
+        self.logger.info("CSV post-processing completed successfully")
+
     def _run_task(self):
         """Execute the SFDmu task."""
         # Validate source and target orgs
@@ -262,3 +333,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
             self.logger.error(line)
 
         self.logger.info("SFDmu task completed successfully")
+
+        # Post-process CSV files if target is csvfile
+        if self.options["target"] == "csvfile":
+            self._process_csv_exports(execute_path, self.options["path"])
