@@ -2,8 +2,13 @@ import json
 
 from cumulusci.cli.ui import CliTable
 from cumulusci.core.exceptions import CumulusCIException
-from cumulusci.core.utils import determine_managed_mode, process_list_arg
+from cumulusci.core.utils import (
+    determine_managed_mode,
+    process_bool_arg,
+    process_list_arg,
+)
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
+from cumulusci.tasks.salesforce.assign_ps_psg import build_name_conditions
 from cumulusci.utils import inject_namespace
 
 
@@ -28,6 +33,12 @@ The managed mode and namespaced org detection is automatic based on the org cont
         "user_alias": {
             "description": "Target user aliases, separated by commas. Defaults to the current running user."
         },
+        "namespace_inject": {
+            "description": "Namespace to use for Permission Set names. If not provided, the namespace from the project config will be used.",
+        },
+        "managed": {
+            "description": "Whether the deployment is managed. If not provided, the managed mode will be determined based on the org config.",
+        },
     }
 
     permission_name = "PermissionSet"
@@ -44,53 +55,40 @@ The managed mode and namespaced org detection is automatic based on the org cont
         self.options["user_alias"] = process_list_arg(
             self.options.get("user_alias") or []
         )
+        self._init_namespace_injection()
 
     def _init_namespace_injection(self):
-        """Initialize namespace injection options for processing permission set names.
-
-        This automatically determines managed mode and namespaced org context based on:
-        - Whether the package is installed in the org (managed mode)
-        - Whether we're in a packaging org (namespaced org)
-        """
-        namespace = self.project_config.project__package__namespace
-
-        # Automatically determine managed mode based on org context
-        managed = determine_managed_mode(
+        self.options["namespace_inject"] = (
+            self.options.get("namespace_inject")
+            or self.project_config.project__package__namespace
+        )
+        self.options["managed"] = self.options.get("managed") or determine_managed_mode(
             self.options, self.project_config, self.org_config
         )
-
-        # Automatically determine if we're in a namespaced org (e.g., packaging org)
-        namespaced_org = bool(namespace) and namespace == getattr(
-            self.org_config, "namespace", None
+        self.options["namespaced_org"] = process_bool_arg(
+            True
+            if self.options["namespace_inject"] is not None
+            and self.options["namespace_inject"]
+            == getattr(self.org_config, "namespace", None)
+            else False
         )
-
-        # Store in options for use by inject_namespace
-        self.options["namespace_inject"] = namespace
-        self.options["managed"] = managed
-        self.options["namespaced_org"] = namespaced_org
+        self.options["api_names"] = [
+            self._inject_namespace(api_name) for api_name in self.options["api_names"]
+        ]
 
     def _inject_namespace(self, text):
         """Inject the namespace into the given text if running in managed mode."""
-        if self.org_config is None:
-            return text
-        return inject_namespace(
+        _, name_processed = inject_namespace(
             "",
             text,
             namespace=self.options.get("namespace_inject"),
-            managed=self.options.get("managed") or False,
+            managed=self.options.get("managed"),
             namespaced_org=self.options.get("namespaced_org"),
-        )[1]
+            logger=self.logger,
+        )
+        return name_processed
 
     def _run_task(self):
-        # Initialize namespace injection only if tokens are present or options are set
-        if self.org_config and self._needs_namespace_injection():
-            self._init_namespace_injection()
-            # Process namespace tokens in api_names
-            self.options["api_names"] = [
-                self._inject_namespace(api_name)
-                for api_name in self.options["api_names"]
-            ]
-
         users = self._query_existing_assignments()
         users_assigned_perms = {
             user["Id"]: self._get_assigned_perms(user) for user in users
@@ -104,20 +102,6 @@ The managed mode and namespaced org detection is automatic based on the org cont
             )
 
         self._insert_assignments(records_to_insert)
-
-    def _needs_namespace_injection(self):
-        """Check if namespace injection is needed based on presence of tokens in api_names."""
-        namespace_tokens = [
-            "%%%NAMESPACE%%%",
-            "%%%NAMESPACED_ORG%%%",
-            "%%%NAMESPACE_OR_C%%%",
-            "%%%NAMESPACED_ORG_OR_C%%%",
-            "%%%NAMESPACE_DOT%%%",
-        ]
-        return any(
-            any(token in api_name for token in namespace_tokens)
-            for api_name in self.options["api_names"]
-        )
 
     def _query_existing_assignments(self):
         if not self.options["user_alias"]:
@@ -152,12 +136,17 @@ The managed mode and namespaced org detection is automatic based on the org cont
         return assigned_perms
 
     def _get_perm_ids(self):
-        api_names = "', '".join(self.options["api_names"])
+        name_conditions, _ = build_name_conditions(
+            self.options["api_names"], field_name=self.permission_name_field
+        )
         perms = self.sf.query(
-            f"SELECT Id,{self.permission_name_field} FROM {self.permission_name} WHERE {self.permission_name_field} IN ('{api_names}')"
+            f"SELECT Id, NamespacePrefix, {self.permission_name_field} FROM {self.permission_name} WHERE ({' OR '.join(name_conditions)})"
         )
         perms_by_ids = {
-            p["Id"]: p[self.permission_name_field] for p in perms["records"]
+            p["Id"]: f"{p['NamespacePrefix']}__{p[self.permission_name_field]}"
+            if p["NamespacePrefix"]
+            else p[self.permission_name_field]
+            for p in perms["records"]
         }
 
         missing_perms = [

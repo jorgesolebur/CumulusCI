@@ -250,7 +250,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
 
         self.psg_names_sanitized = self._process_namespaces(psg_names)
 
-        name_conditions, name_mapping = self._build_name_conditions(
+        name_conditions, name_mapping = build_name_conditions(
             list(self.psg_names_sanitized.values()), field_name="DeveloperName"
         )
 
@@ -287,37 +287,6 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             names_processed[name] = name_processed
         return names_processed
 
-    def _build_name_conditions(self, names: List[str], field_name: str = "Name"):
-        name_conditions = []
-        name_mapping = (
-            {}
-        )  # Maps (original_name, namespace_prefix) tuple back to original name
-        for name in names:
-            # Check if name contains namespace prefix (format: namespace__Name)
-            if "__" in name and self.parsed_options.namespace_inject:
-                parts = name.split("__", 1)
-                if len(parts) == 2:
-                    ns_prefix, ps_name = parts
-                    # Query with namespace prefix
-                    escaped_ns = "'" + ns_prefix.replace("'", "''") + "'"
-                    escaped_name = "'" + ps_name.replace("'", "''") + "'"
-                    name_conditions.append(
-                        f"(NamespacePrefix = {escaped_ns} AND {field_name} = {escaped_name})"
-                    )
-                    name_mapping[(ps_name, ns_prefix)] = name
-                else:
-                    # Fallback: query by name only
-                    escaped_name = "'" + name.replace("'", "''") + "'"
-                    name_conditions.append(f"{field_name} = {escaped_name}")
-                    name_mapping[(name, None)] = name
-            else:
-                # No namespace prefix in name
-                escaped_name = "'" + name.replace("'", "''") + "'"
-                name_conditions.append(f"{field_name} = {escaped_name}")
-                name_mapping[(name, None)] = name
-
-        return name_conditions, name_mapping
-
     def _get_permission_set_ids(self, ps_names: List[str]):
         """Query Permission Sets by Name and return mapping of name to ID.
 
@@ -337,7 +306,7 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
         self.ps_names_sanitized = self._process_namespaces(unique_ps_names)
 
         # Replace namespace tokens in names and build query conditions
-        name_conditions, name_mapping = self._build_name_conditions(
+        name_conditions, name_mapping = build_name_conditions(
             list(self.ps_names_sanitized.values())
         )
 
@@ -445,3 +414,35 @@ class AssignPermissionSetToPermissionSetGroup(BaseSalesforceApiTask):
             raise SalesforceException(
                 f"Error creating PermissionSetGroupComponent records: {str(e)}"
             ) from e
+
+
+def build_name_conditions(names: List[str], field_name: str = "Name"):
+    name_conditions = []
+    name_mapping = (
+        {}
+    )  # Maps (original_name, namespace_prefix) tuple back to original name
+    for name in names:
+        # Check if name contains namespace prefix (format: namespace__Name)
+        if "__" in name:
+            parts = name.split("__", 1)
+            if len(parts) == 2:
+                ns_prefix, ps_name = parts
+                # Query with namespace prefix
+                escaped_ns = "'" + ns_prefix.replace("'", "''") + "'"
+                escaped_name = "'" + ps_name.replace("'", "''") + "'"
+                name_conditions.append(
+                    f"(NamespacePrefix = {escaped_ns} AND {field_name} = {escaped_name})"
+                )
+                name_mapping[(ps_name, ns_prefix)] = name
+            else:
+                # Fallback: query by name only
+                escaped_name = "'" + name.replace("'", "''") + "'"
+                name_conditions.append(f"{field_name} = {escaped_name}")
+                name_mapping[(name, None)] = name
+        else:
+            # No namespace prefix in name
+            escaped_name = "'" + name.replace("'", "''") + "'"
+            name_conditions.append(f"{field_name} = {escaped_name}")
+            name_mapping[(name, None)] = name
+
+    return name_conditions, name_mapping

@@ -8,6 +8,7 @@ from cumulusci.core.exceptions import SalesforceException, TaskOptionsError
 from cumulusci.tasks.salesforce.assign_ps_psg import (
     AssignPermissionSetToPermissionSetGroup,
     PermissionSetGroupAssignmentsOption,
+    build_name_conditions,
 )
 from cumulusci.tests.util import CURRENT_SF_API_VERSION
 
@@ -620,48 +621,26 @@ class TestAssignPermissionSetToPermissionSetGroup:
 
     def test_build_name_conditions_no_namespace(self):
         """Test _build_name_conditions without namespace"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["PS1"])
+        conditions, mapping = build_name_conditions(["PS1"])
         assert len(conditions) == 1
         assert "Name = 'PS1'" in conditions[0]
         assert ("PS1", None) in mapping
 
     def test_build_name_conditions_with_namespace(self):
         """Test _build_name_conditions with namespace"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["NS__PS1"]}, "namespace_inject": "NS"},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["NS__PS1"])
+        conditions, mapping = build_name_conditions(["NS__PS1"])
         assert len(conditions) == 1
         assert "NamespacePrefix = 'NS' AND Name = 'PS1'" in conditions[0]
         assert ("PS1", "NS") in mapping
 
     def test_build_name_conditions_with_escaped_quotes(self):
         """Test _build_name_conditions with names containing quotes"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS'1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(["PS'1"])
+        conditions, mapping = build_name_conditions(["PS'1"])
         assert "Name = 'PS''1'" in conditions[0]  # Single quote should be escaped
 
     def test_build_name_conditions_custom_field_name(self):
         """Test _build_name_conditions with custom field name"""
-        task = create_task(
-            AssignPermissionSetToPermissionSetGroup,
-            {"assignments": {"PSG1": ["PS1"]}},
-        )
-        task._init_options({})
-        conditions, mapping = task._build_name_conditions(
-            ["PS1"], field_name="DeveloperName"
-        )
+        conditions, mapping = build_name_conditions(["PS1"], field_name="DeveloperName")
         assert "DeveloperName = 'PS1'" in conditions[0]
 
     @responses.activate

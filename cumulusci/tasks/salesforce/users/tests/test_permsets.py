@@ -1,10 +1,11 @@
 import json
-from unittest.mock import patch
+from unittest import mock
 
 import pytest
 import responses
 from responses.matchers import json_params_matcher
 
+from cumulusci.core.config.org_config import OrgConfig
 from cumulusci.core.exceptions import CumulusCIException
 from cumulusci.tasks.salesforce.tests.util import create_task
 from cumulusci.tasks.salesforce.users.permsets import (
@@ -12,7 +13,11 @@ from cumulusci.tasks.salesforce.users.permsets import (
     AssignPermissionSetLicenses,
     AssignPermissionSets,
 )
-from cumulusci.tests.util import CURRENT_SF_API_VERSION
+from cumulusci.tests.util import (
+    CURRENT_SF_API_VERSION,
+    DummyKeychain,
+    create_project_config,
+)
 
 
 class TestCreatePermissionSet:
@@ -46,7 +51,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%2C+%27PermSet2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet1%27+OR+Name+%3D+%27PermSet2%27%29",
             status=200,
             json={
                 "done": True,
@@ -55,10 +60,12 @@ class TestCreatePermissionSet:
                     {
                         "Id": "0PS000000000000",
                         "Name": "PermSet1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PS000000000001",
                         "Name": "PermSet2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -127,7 +134,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%2C+%27PermSet2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet1%27+OR+Name+%3D+%27PermSet2%27%29",
             status=200,
             json={
                 "done": True,
@@ -136,10 +143,12 @@ class TestCreatePermissionSet:
                     {
                         "Id": "0PS000000000000",
                         "Name": "PermSet1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PS000000000001",
                         "Name": "PermSet2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -228,7 +237,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet0%27%2C+%27PermSet1%27%2C+%27PermSet2%27%2C+%27PermSet3%27%2C+%27PermSet4%27%2C+%27PermSet5%27%2C+%27PermSet6%27%2C+%27PermSet7%27%2C+%27PermSet8%27%2C+%27PermSet9%27%2C+%27PermSet10%27%2C+%27PermSet11%27%2C+%27PermSet12%27%2C+%27PermSet13%27%2C+%27PermSet14%27%2C+%27PermSet15%27%2C+%27PermSet16%27%2C+%27PermSet17%27%2C+%27PermSet18%27%2C+%27PermSet19%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet0%27+OR+Name+%3D+%27PermSet1%27+OR+Name+%3D+%27PermSet2%27+OR+Name+%3D+%27PermSet3%27+OR+Name+%3D+%27PermSet4%27+OR+Name+%3D+%27PermSet5%27+OR+Name+%3D+%27PermSet6%27+OR+Name+%3D+%27PermSet7%27+OR+Name+%3D+%27PermSet8%27+OR+Name+%3D+%27PermSet9%27+OR+Name+%3D+%27PermSet10%27+OR+Name+%3D+%27PermSet11%27+OR+Name+%3D+%27PermSet12%27+OR+Name+%3D+%27PermSet13%27+OR+Name+%3D+%27PermSet14%27+OR+Name+%3D+%27PermSet15%27+OR+Name+%3D+%27PermSet16%27+OR+Name+%3D+%27PermSet17%27+OR+Name+%3D+%27PermSet18%27+OR+Name+%3D+%27PermSet19%27%29",
             status=200,
             json={
                 "done": True,
@@ -237,6 +246,7 @@ class TestCreatePermissionSet:
                     {
                         "Id": f"0PS000000000000{str(i)}",
                         "Name": f"PermSet{str(i)}",
+                        "NamespacePrefix": None,
                     }
                     for i in range(20)
                 ],
@@ -288,7 +298,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%2C+%27PermSet2%27%2C+%27PermSet3%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet1%27+OR+Name+%3D+%27PermSet2%27+OR+Name+%3D+%27PermSet3%27%29",
             status=200,
             json={
                 "done": True,
@@ -297,10 +307,12 @@ class TestCreatePermissionSet:
                     {
                         "Id": "0PS000000000000",
                         "Name": "PermSet1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PS000000000001",
                         "Name": "PermSet2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -310,7 +322,7 @@ class TestCreatePermissionSet:
             task()
 
     @responses.activate
-    @patch("cumulusci.tasks.salesforce.users.permsets.CliTable", autospec=True)
+    @mock.patch("cumulusci.tasks.salesforce.users.permsets.CliTable", autospec=True)
     def test_create_permset_partial_success_raises(self, table):
         task = create_task(
             AssignPermissionSets,
@@ -349,7 +361,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%2C+%27PermSet2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet1%27+OR+Name+%3D+%27PermSet2%27%29",
             status=200,
             json={
                 "done": True,
@@ -358,10 +370,12 @@ class TestCreatePermissionSet:
                     {
                         "Id": "0PS000000000000",
                         "Name": "PermSet1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PS000000000001",
                         "Name": "PermSet2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -423,6 +437,8 @@ class TestCreatePermissionSet:
             AssignPermissionSets,
             {
                 "api_names": "%%%NAMESPACE%%%PermSet1,PermSet2",
+                "namespace_inject": "testns",
+                "managed": True,
             },
         )
         # Simulate managed context by setting the namespace in project config
@@ -448,7 +464,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27testns__PermSet1%27%2C+%27PermSet2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28%28NamespacePrefix+%3D+%27testns%27+AND+Name+%3D+%27PermSet1%27%29+OR+Name+%3D+%27PermSet2%27%29",
             status=200,
             json={
                 "done": True,
@@ -456,11 +472,13 @@ class TestCreatePermissionSet:
                 "records": [
                     {
                         "Id": "0PS000000000000",
-                        "Name": "testns__PermSet1",
+                        "Name": "PermSet1",
+                        "NamespacePrefix": "testns",
                     },
                     {
                         "Id": "0PS000000000001",
                         "Name": "PermSet2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -478,8 +496,11 @@ class TestCreatePermissionSet:
         task()
 
         assert len(responses.calls) == 3
-        # Verify that the SOQL query contains the namespaced permission set name
-        assert "testns__PermSet1" in responses.calls[1].request.url
+        # Verify that the SOQL query contains the namespaced permission set name with namespace prefix condition
+        assert (
+            "NamespacePrefix+%3D+%27testns%27+AND+Name+%3D+%27PermSet1%27"
+            in responses.calls[1].request.url
+        )
 
     @responses.activate
     def test_namespace_injection_unmanaged(self):
@@ -512,7 +533,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27PermSet1%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28Name+%3D+%27PermSet1%27%29",
             status=200,
             json={
                 "done": True,
@@ -521,6 +542,7 @@ class TestCreatePermissionSet:
                     {
                         "Id": "0PS000000000000",
                         "Name": "PermSet1",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -544,16 +566,29 @@ class TestCreatePermissionSet:
     @responses.activate
     def test_namespaced_org_token(self):
         """Test that %%%NAMESPACED_ORG%%% token gets replaced in namespaced org context"""
+        org_config = OrgConfig(
+            {
+                "instance_url": "https://test.salesforce.com",
+                "id": "https://test.salesforce.com/ORG_ID/USER_ID",
+                "access_token": "TOKEN",
+                "org_id": "ORG_ID",
+                "username": "test-cci@example.com",
+                "namespace": "testns",
+            },
+            "test",
+            keychain=DummyKeychain(),
+        )
+        org_config.refresh_oauth_token = mock.Mock()
         task = create_task(
             AssignPermissionSets,
             {
                 "api_names": "%%%NAMESPACED_ORG%%%PermSet1",
             },
+            project_config=create_project_config(
+                "TestRepo", "TestOwner", namespace="testns"
+            ),
+            org_config=org_config,
         )
-        # Simulate namespaced org context (packaging org)
-        task.project_config.config["project"]["package"]["namespace"] = "testns"
-        task.org_config._installed_packages = {}
-        task.org_config.namespace = "testns"  # This makes it a namespaced org
 
         responses.add(
             method="GET",
@@ -572,7 +607,7 @@ class TestCreatePermissionSet:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CName+FROM+PermissionSet+WHERE+Name+IN+%28%27testns__PermSet1%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+Name+FROM+PermissionSet+WHERE+%28%28NamespacePrefix+%3D+%27testns%27+AND+Name+%3D+%27PermSet1%27%29%29",
             status=200,
             json={
                 "done": True,
@@ -580,7 +615,8 @@ class TestCreatePermissionSet:
                 "records": [
                     {
                         "Id": "0PS000000000000",
-                        "Name": "testns__PermSet1",
+                        "Name": "PermSet1",
+                        "NamespacePrefix": "testns",
                     },
                 ],
             },
@@ -598,7 +634,7 @@ class TestCreatePermissionSet:
 
         assert len(responses.calls) == 3
         # Verify that the SOQL query contains the namespaced permission set name
-        assert "testns__PermSet1" in responses.calls[1].request.url
+        assert "PermSet1" in responses.calls[1].request.url
 
 
 class TestCreatePermissionSetLicense:
@@ -944,7 +980,7 @@ class TestCreatePermissionSetGroup:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CDeveloperName+FROM+PermissionSetGroup+WHERE+DeveloperName+IN+%28%27PermSetGroup1%27%2C+%27PermSetGroup2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+DeveloperName+FROM+PermissionSetGroup+WHERE+%28DeveloperName+%3D+%27PermSetGroup1%27+OR+DeveloperName+%3D+%27PermSetGroup2%27%29",
             status=200,
             json={
                 "done": True,
@@ -953,10 +989,12 @@ class TestCreatePermissionSetGroup:
                     {
                         "Id": "0PG000000000000",
                         "DeveloperName": "PermSetGroup1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PG000000000001",
                         "DeveloperName": "PermSetGroup2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -1017,7 +1055,7 @@ class TestCreatePermissionSetGroup:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CDeveloperName+FROM+PermissionSetGroup+WHERE+DeveloperName+IN+%28%27PermSetGroup1%27%2C+%27PermSetGroup2%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+DeveloperName+FROM+PermissionSetGroup+WHERE+%28DeveloperName+%3D+%27PermSetGroup1%27+OR+DeveloperName+%3D+%27PermSetGroup2%27%29",
             status=200,
             json={
                 "done": True,
@@ -1026,10 +1064,12 @@ class TestCreatePermissionSetGroup:
                     {
                         "Id": "0PG000000000000",
                         "DeveloperName": "PermSetGroup1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PG000000000001",
                         "DeveloperName": "PermSetGroup2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
@@ -1112,7 +1152,7 @@ class TestCreatePermissionSetGroup:
         )
         responses.add(
             method="GET",
-            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2CDeveloperName+FROM+PermissionSetGroup+WHERE+DeveloperName+IN+%28%27PermSetGroup1%27%2C+%27PermSetGroup2%27%2C+%27PermSetGroup3%27%29",
+            url=f"{task.org_config.instance_url}/services/data/v{CURRENT_SF_API_VERSION}/query/?q=SELECT+Id%2C+NamespacePrefix%2C+DeveloperName+FROM+PermissionSetGroup+WHERE+%28DeveloperName+%3D+%27PermSetGroup1%27+OR+DeveloperName+%3D+%27PermSetGroup2%27+OR+DeveloperName+%3D+%27PermSetGroup3%27%29",
             status=200,
             json={
                 "done": True,
@@ -1121,10 +1161,12 @@ class TestCreatePermissionSetGroup:
                     {
                         "Id": "0PG000000000000",
                         "DeveloperName": "PermSetGroup1",
+                        "NamespacePrefix": None,
                     },
                     {
                         "Id": "0PG000000000001",
                         "DeveloperName": "PermSetGroup2",
+                        "NamespacePrefix": None,
                     },
                 ],
             },
