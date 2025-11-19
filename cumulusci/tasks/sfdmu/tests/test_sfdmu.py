@@ -819,3 +819,194 @@ class TestSfdmuTask:
 
             # Verify that _process_csv_exports was NOT called
             task._process_csv_exports.assert_not_called()
+
+    def test_return_always_success_option_exists(self):
+        """Test that return_always_success option is properly defined."""
+        assert "return_always_success" in SfdmuTask.task_options
+        assert SfdmuTask.task_options["return_always_success"]["required"] is False
+        assert SfdmuTask.task_options["return_always_success"]["default"] is False
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_return_always_success_false_fails_on_error(self, mock_sfdx):
+        """Test that task fails when return_always_success is False and command fails."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "qa",
+                    "path": base_dir,
+                    "return_always_success": False,
+                },
+            )
+
+            # Mock sfdx command to raise an error
+            mock_sfdx.side_effect = Exception("SFDMU command failed")
+
+            # Mock _validate_org
+            mock_org = mock.Mock()
+            mock_org.sfdx_alias = "test_org"
+            task._validate_org = mock.Mock(return_value=mock_org)
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Task should raise the exception
+            with pytest.raises(Exception, match="SFDMU command failed"):
+                task._run_task()
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_return_always_success_true_continues_on_error(self, mock_sfdx):
+        """Test that task continues when return_always_success is True and command fails."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "qa",
+                    "path": base_dir,
+                    "return_always_success": True,
+                },
+            )
+
+            # Mock sfdx command to raise an error
+            mock_sfdx.side_effect = Exception("SFDMU command failed")
+
+            # Mock _validate_org
+            mock_org = mock.Mock()
+            mock_org.sfdx_alias = "test_org"
+            task._validate_org = mock.Mock(return_value=mock_org)
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Task should NOT raise exception - should complete successfully
+            task._run_task()  # Should not raise
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_return_always_success_true_logs_warning_on_nonzero_exit(self, mock_sfdx):
+        """Test that task logs warning when return_always_success is True and exit code is non-zero."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "qa",
+                    "path": base_dir,
+                    "return_always_success": True,
+                },
+            )
+
+            # Mock sfdx command to return non-zero exit code
+            mock_sfdx_result = mock.Mock()
+            mock_sfdx_result.returncode = 1  # Failed
+            mock_sfdx_result.stdout_text = iter([])
+            mock_sfdx_result.stderr_text = iter([])
+            mock_sfdx.return_value = mock_sfdx_result
+
+            # Mock _validate_org
+            mock_org = mock.Mock()
+            mock_org.sfdx_alias = "test_org"
+            task._validate_org = mock.Mock(return_value=mock_org)
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Mock logger to capture warnings
+            task.logger = mock.Mock()
+
+            # Run the task
+            task._run_task()
+
+            # Verify warning was logged
+            task.logger.warning.assert_called_once()
+            warning_message = task.logger.warning.call_args[0][0]
+            assert "failed with exit code 1" in warning_message
+            assert "return_always_success is True" in warning_message
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_return_always_success_default_false(self, mock_sfdx):
+        """Test that return_always_success defaults to False."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            # Create task without specifying return_always_success
+            task = create_task(
+                SfdmuTask,
+                {"source": "dev", "target": "qa", "path": base_dir},
+            )
+
+            # Mock sfdx command to raise an error
+            mock_sfdx.side_effect = Exception("SFDMU command failed")
+
+            # Mock _validate_org
+            mock_org = mock.Mock()
+            mock_org.sfdx_alias = "test_org"
+            task._validate_org = mock.Mock(return_value=mock_org)
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Task should raise the exception (default behavior)
+            with pytest.raises(Exception, match="SFDMU command failed"):
+                task._run_task()
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_return_always_success_true_with_csvfile_export(self, mock_sfdx):
+        """Test that CSV post-processing still runs when return_always_success is True and command fails."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "csvfile",
+                    "path": base_dir,
+                    "return_always_success": True,
+                },
+            )
+            task.project_config.project__package__namespace = "testns"
+
+            # Mock sfdx command to raise an error
+            mock_sfdx.side_effect = Exception("SFDMU command failed")
+
+            # Mock _validate_org
+            mock_source_org = mock.Mock()
+            mock_source_org.sfdx_alias = "test_dev"
+            task._validate_org = mock.Mock(
+                side_effect=lambda org: mock_source_org if org == "dev" else None
+            )
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Spy on _process_csv_exports
+            task._process_csv_exports = mock.Mock()
+
+            # Run the task - should not raise
+            task._run_task()
+
+            # Verify that _process_csv_exports was still called
+            task._process_csv_exports.assert_called_once()

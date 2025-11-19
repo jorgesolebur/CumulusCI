@@ -36,6 +36,11 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "description": "Additional parameters to append to the sf sfdmu command (e.g., '--simulation --noprompt --nowarnings')",
             "required": False,
         },
+        "return_always_success": {
+            "description": "If True, the task will return success (exit code 0) even if SFDMU fails. A warning will be logged instead of raising an error.",
+            "required": False,
+            "default": False,
+        },
     }
 
     def _init_options(self, kwargs):
@@ -318,21 +323,40 @@ class SfdmuTask(BaseSalesforceTask, Command):
         command = "sf sfdmu run " + " ".join(command_parts)
         self.logger.info(f"Executing: {command}")
 
-        p: sarge.Command = sfdx(
-            "sfdmu run",
-            log_note="Running SFDmu",
-            args=command_parts,
-            check_return=True,
-            username=None,
-        )
+        # Determine if we should fail on error or just warn
+        return_always_success = self.options.get("return_always_success", False)
 
-        for line in p.stdout_text:
-            self.logger.info(line)
+        try:
+            p: sarge.Command = sfdx(
+                "sfdmu run",
+                log_note="Running SFDmu",
+                args=command_parts,
+                check_return=not return_always_success,  # Don't check return if return_always_success is True
+                username=None,
+            )
 
-        for line in p.stderr_text:
-            self.logger.error(line)
+            for line in p.stdout_text:
+                self.logger.info(line)
 
-        self.logger.info("SFDmu task completed successfully")
+            for line in p.stderr_text:
+                self.logger.error(line)
+
+            # Check if command failed when return_always_success is True
+            if return_always_success and p.returncode != 0:
+                self.logger.warning(
+                    f"SFDmu command failed with exit code {p.returncode}, but return_always_success is True. "
+                    "Task will continue and return success."
+                )
+            else:
+                self.logger.info("SFDmu task completed successfully")
+        except Exception as e:
+            if return_always_success:
+                self.logger.warning(
+                    f"SFDmu command failed with error: {str(e)}, but return_always_success is True. "
+                    "Task will continue and return success."
+                )
+            else:
+                raise
 
         # Post-process CSV files if target is csvfile
         if self.options["target"] == "csvfile":
