@@ -36,6 +36,11 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "description": "Additional parameters to append to the sf sfdmu command (e.g., '--simulation --noprompt --nowarnings')",
             "required": False,
         },
+        "return_always_success": {
+            "description": "If True, the task will return success (exit code 0) even if SFDMU fails. A warning will be logged instead of raising an error.",
+            "required": False,
+            "default": False,
+        },
     }
 
     def _init_options(self, kwargs):
@@ -198,6 +203,77 @@ class SfdmuTask(BaseSalesforceTask, Command):
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
 
+    def _process_csv_exports(self, execute_path, base_path):
+        """Process CSV files when target is csvfile.
+
+        This method performs the following operations:
+        1. Replace namespace prefix with %%%MANAGED_OR_NAMESPACED_ORG%%% in CSV file contents
+        2. Rename CSV files replacing namespace prefix with ___MANAGED_OR_NAMESPACED_ORG___
+        3. Copy all CSV files from execute folder to base path, replacing existing files
+        """
+        namespace = self.project_config.project__package__namespace
+        if not namespace:
+            self.logger.info("No namespace configured, skipping CSV post-processing")
+            return
+
+        namespace_prefix = namespace + "__"
+        content_token = "%%%MANAGED_OR_NAMESPACED_ORG%%%"
+        filename_token = "___MANAGED_OR_NAMESPACED_ORG___"
+
+        # Get all CSV files in execute directory
+        csv_files = [f for f in os.listdir(execute_path) if f.endswith(".csv")]
+
+        if not csv_files:
+            self.logger.info("No CSV files found in execute directory")
+            return
+
+        self.logger.info(f"Processing {len(csv_files)} CSV file(s) for export")
+
+        # Process each CSV file
+        processed_files = []
+        for filename in csv_files:
+            file_path = os.path.join(execute_path, filename)
+
+            # Step 1: Replace namespace prefix in file contents
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            if namespace_prefix in content:
+                content = content.replace(namespace_prefix, content_token)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                self.logger.debug(f"Replaced namespace prefix in content of {filename}")
+
+            # Step 2: Rename file if it contains namespace prefix
+            new_filename = filename.replace(namespace_prefix, filename_token)
+            if new_filename != filename:
+                new_file_path = os.path.join(execute_path, new_filename)
+                os.rename(file_path, new_file_path)
+                self.logger.debug(f"Renamed file: {filename} -> {new_filename}")
+                file_path = new_file_path
+                filename = new_filename
+
+            processed_files.append((file_path, filename))
+
+        # Step 3: Delete all CSV files in base_path and copy processed files
+        self.logger.debug(f"Copying processed CSV files to {base_path}")
+
+        # Remove existing CSV files in base_path
+        for item in os.listdir(base_path):
+            if item.endswith(".csv"):
+                item_path = os.path.join(base_path, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                    self.logger.debug(f"Removed existing file: {item}")
+
+        # Copy processed files to base_path
+        for file_path, filename in processed_files:
+            target_path = os.path.join(base_path, filename)
+            shutil.copy2(file_path, target_path)
+            self.logger.debug(f"Copied {filename} to {base_path}")
+
+        self.logger.info("CSV post-processing completed successfully")
+
     def _run_task(self):
         """Execute the SFDmu task."""
         # Validate source and target orgs
@@ -247,18 +323,41 @@ class SfdmuTask(BaseSalesforceTask, Command):
         command = "sf sfdmu run " + " ".join(command_parts)
         self.logger.info(f"Executing: {command}")
 
-        p: sarge.Command = sfdx(
-            "sfdmu run",
-            log_note="Running SFDmu",
-            args=command_parts,
-            check_return=True,
-            username=None,
-        )
+        # Determine if we should fail on error or just warn
+        return_always_success = self.options.get("return_always_success", False)
 
-        for line in p.stdout_text:
-            self.logger.info(line)
+        try:
+            p: sarge.Command = sfdx(
+                "sfdmu run",
+                log_note="Running SFDmu",
+                args=command_parts,
+                check_return=not return_always_success,  # Don't check return if return_always_success is True
+                username=None,
+            )
 
-        for line in p.stderr_text:
-            self.logger.error(line)
+            for line in p.stdout_text:
+                self.logger.info(line)
 
-        self.logger.info("SFDmu task completed successfully")
+            for line in p.stderr_text:
+                self.logger.error(line)
+
+            # Check if command failed when return_always_success is True
+            if return_always_success and p.returncode != 0:
+                self.logger.warning(
+                    f"SFDmu command failed with exit code {p.returncode}, but return_always_success is True. "
+                    "Task will continue and return success."
+                )
+            else:
+                self.logger.info("SFDmu task completed successfully")
+        except Exception as e:
+            if return_always_success:
+                self.logger.warning(
+                    f"SFDmu command failed with error: {str(e)}, but return_always_success is True. "
+                    "Task will continue and return success."
+                )
+            else:
+                raise
+
+        # Post-process CSV files if target is csvfile
+        if self.options["target"] == "csvfile":
+            self._process_csv_exports(execute_path, self.options["path"])
