@@ -1,4 +1,4 @@
-# CumulusCI
+# CumulusCI Plus
 
 [![Code Coverage](https://coveralls.io/repos/github/SFDO-Tooling/CumulusCI/badge.svg?branch=main)](https://coveralls.io/github/SFDO-Tooling/CumulusCI?branch=main)
 [![PyPI](https://img.shields.io/pypi/v/cumulusci)](https://pypi.org/project/cumulusci-plus/)
