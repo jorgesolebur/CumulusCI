@@ -2,6 +2,21 @@
 
 <!-- latest-start -->
 
+## v5.0.35 (2025-11-20)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/pm 2198 by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#129](https://github.com/jorgesolebur/CumulusCI/pull/129)
+* Improvements with SFDMU when exporting data from org with namespace injection by [@jorgesolebur](https://github.com/jorgesolebur) in [#131](https://github.com/jorgesolebur/CumulusCI/pull/131)
+* Rename project from CumulusCI to CumulusCI Plus by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#133](https://github.com/jorgesolebur/CumulusCI/pull/133)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.34...v5.0.35
+
+
+<!-- latest-stop -->
+
 ## v5.0.34 (2025-11-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +28,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.33...v5.0.34
 
-
-<!-- latest-stop -->
 
 ## v5.0.33 (2025-11-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
