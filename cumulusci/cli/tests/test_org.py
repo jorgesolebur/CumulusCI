@@ -116,6 +116,7 @@ class TestOrgCommands:
                 "IsSandbox": False,
                 "InstanceName": "CS420",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
             status=200,
         )
@@ -173,6 +174,7 @@ class TestOrgCommands:
                 "IsSandbox": False,
                 "InstanceName": "CS420",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
             status=200,
         )
@@ -304,6 +306,7 @@ class TestOrgCommands:
                 "IsSandbox": True,
                 "InstanceName": "CS420",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
             status=200,
         )
@@ -439,6 +442,7 @@ class TestOrgCommands:
                 "IsSandbox": True,
                 "InstanceName": "CS420",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
             status=200,
         )
@@ -494,6 +498,7 @@ class TestOrgCommands:
                 "IsSandbox": True,
                 "InstanceName": "CS420",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
             status=200,
         )

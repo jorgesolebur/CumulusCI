@@ -1222,6 +1222,7 @@ class TestOrgConfig:
                 "IsSandbox": False,
                 "InstanceName": "cs420",
                 "NamespacePrefix": "ns",
+                "Name": "Test Org",
             },
         )
 
