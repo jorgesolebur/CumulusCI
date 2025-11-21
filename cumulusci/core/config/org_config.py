@@ -63,7 +63,7 @@ class OrgConfig(BaseConfig):
     client_secret: str
     connected_app: str
     serialization_format: str
-
+    org_name: str
     createable: Optional[bool] = None
 
     # make sure it can be mocked for tests
@@ -246,6 +246,7 @@ class OrgConfig(BaseConfig):
             "is_sandbox": self._org_sobject["IsSandbox"],
             "instance_name": self._org_sobject["InstanceName"],
             "namespace": self._org_sobject["NamespacePrefix"],
+            "org_name": self._org_sobject["Name"],
         }
         self.config.update(result)
 

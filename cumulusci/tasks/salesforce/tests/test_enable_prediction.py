@@ -60,6 +60,7 @@ def mock_oauth():
                 "IsSandbox": False,
                 "InstanceName": "NA149",
                 "NamespacePrefix": None,
+                "Name": "Test Org",
             },
         )
         rsps.add(
@@ -187,6 +188,7 @@ def test_run_task__namespaced_org(mock_oauth, task):
             "IsSandbox": False,
             "InstanceName": "NA149",
             "NamespacePrefix": "foo",
+            "Name": "Test Org",
         },
     )
 
