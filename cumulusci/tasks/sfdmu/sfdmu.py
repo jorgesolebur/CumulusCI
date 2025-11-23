@@ -47,7 +47,20 @@ class SfdmuTask(BaseSalesforceTask, Command):
         super()._init_options(kwargs)
 
         # Convert path to absolute path
-        self.options["path"] = os.path.abspath(self.options["path"])
+        if "path" in self.options and self.options["path"]:
+            if os.path.isabs(self.options["path"]):
+                # Path is already absolute, normalize it
+                self.options["path"] = os.path.abspath(self.options["path"])
+            else:
+                # Path is relative, join with repo_root
+                repo_root = self.project_config.repo_root
+                if not repo_root:
+                    raise TaskOptionsError(
+                        "Cannot resolve relative path: no repository root found"
+                    )
+                self.options["path"] = os.path.abspath(
+                    os.path.join(repo_root, self.options["path"])
+                )
 
         # Validate that the path exists and contains export.json
         if not os.path.exists(self.options["path"]):
