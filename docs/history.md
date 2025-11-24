@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.37 (2025-11-24)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix coverage execution for deployed package metadata in namespaced org. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#139](https://github.com/jorgesolebur/CumulusCI/pull/139)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.36...v5.0.37
+
+
+<!-- latest-stop -->
+
 ## v5.0.36 (2025-11-23)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.35...v5.0.36
 
-
-<!-- latest-stop -->
 
 ## v5.0.35 (2025-11-20)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
