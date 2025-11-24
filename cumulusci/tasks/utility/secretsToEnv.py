@@ -27,8 +27,8 @@ class GenericOptions(CCIOptions):
 class SecretsToEnv(BaseTask):
     class Options(GenericOptions):
         secrets: Union[ListOfStringsOption, MappingOption] = Field(
-            [],
-            description="List of secret keys to retrieve be it with a list of keys or a mapping of secret name to key. Defaults to empty list.",
+            ...,
+            description="List of secret keys to retrieve be it with a list of keys or a mapping of key to secret name.",
         )
 
     parsed_options: Options

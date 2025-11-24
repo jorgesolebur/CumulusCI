@@ -897,7 +897,7 @@ class RunApexTests(BaseSalesforceApiTask):
             )
 
         if self.code_coverage_level or self.required_per_class_code_coverage_percent:
-            if self.parsed_options.namespace not in self.org_config.installed_packages:
+            if not self.parsed_options.managed:
                 self._check_code_coverage()
             else:
                 self.logger.info(
