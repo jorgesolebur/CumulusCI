@@ -17,7 +17,7 @@ class TestSecretsToEnvOptions:
 
     def test_default_options(self):
         """Test initialization with default options."""
-        task_config = TaskConfig({"options": {}})
+        task_config = TaskConfig({"options": {"secrets": ["TEST_SECRET"]}})
         with tempfile.TemporaryDirectory() as tmpdir:
             env_path = os.path.join(tmpdir, ".env")
             task_config.options["env_path"] = env_path
@@ -31,7 +31,7 @@ class TestSecretsToEnvOptions:
             assert task.parsed_options.env_path == Path(env_path)
             assert task.parsed_options.secrets_provider is None
             assert task.parsed_options.provider_options == {}
-            assert task.parsed_options.secrets == []
+            assert task.parsed_options.secrets == ["TEST_SECRET"]
 
     def test_custom_options(self):
         """Test initialization with custom options."""
@@ -90,6 +90,7 @@ class TestSecretsToEnvInitialization:
                 "options": {
                     "env_path": ".env",
                     "secrets_provider": "local",
+                    "secrets": ["TEST_SECRET"],
                 }
             }
         )
@@ -112,7 +113,9 @@ class TestSecretsToEnvInitialization:
             with open(env_path, "w") as f:
                 f.write('EXISTING_KEY="existing_value"\n')
 
-            task_config = TaskConfig({"options": {"env_path": env_path}})
+            task_config = TaskConfig(
+                {"options": {"env_path": env_path, "secrets": ["TEST_SECRET"]}}
+            )
 
             task = SecretsToEnv(
                 project_config=mock.Mock(),
@@ -202,7 +205,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_success(self):
         """Test _get_credential successfully retrieves credential."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -227,7 +232,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_escapes_quotes(self):
         """Test _get_credential escapes double quotes."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -246,7 +253,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_escapes_newlines(self):
         """Test _get_credential escapes newlines."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -265,7 +274,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_handles_both_quotes_and_newlines(self):
         """Test _get_credential handles both quotes and newlines."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -284,7 +295,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_with_none_value_raises_error(self):
         """Test _get_credential raises error when provider returns None."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -304,7 +317,9 @@ class TestSecretsToEnvGetCredential:
 
     def test_get_credential_uses_env_key_parameter(self):
         """Test _get_credential uses custom env_key when provided."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -328,7 +343,9 @@ class TestSecretsToEnvGetCredential:
         import logging
 
         caplog.set_level(logging.INFO)
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -352,7 +369,9 @@ class TestSecretsToEnvGetAllCredentials:
 
     def test_get_all_credentials_success(self):
         """Test _get_all_credentials successfully retrieves all credentials."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -382,7 +401,9 @@ class TestSecretsToEnvGetAllCredentials:
 
     def test_get_all_credentials_escapes_quotes(self):
         """Test _get_all_credentials escapes quotes in all values."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -405,7 +426,9 @@ class TestSecretsToEnvGetAllCredentials:
 
     def test_get_all_credentials_escapes_newlines(self):
         """Test _get_all_credentials escapes newlines in all values."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -428,7 +451,9 @@ class TestSecretsToEnvGetAllCredentials:
 
     def test_get_all_credentials_with_none_value_raises_error(self):
         """Test _get_all_credentials raises error when provider returns None."""
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
@@ -453,7 +478,9 @@ class TestSecretsToEnvGetAllCredentials:
         import logging
 
         caplog.set_level(logging.INFO)
-        task_config = TaskConfig({"options": {"env_path": ".env"}})
+        task_config = TaskConfig(
+            {"options": {"env_path": ".env", "secrets": ["TEST_SECRET"]}}
+        )
 
         task = SecretsToEnv(
             project_config=mock.Mock(),
