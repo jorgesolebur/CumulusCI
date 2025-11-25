@@ -1,7 +1,7 @@
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 
 # Abstract Base Class for Credential Providers
@@ -166,23 +166,52 @@ class AwsSecretsManagerProvider(CredentialProvider):
 
             get_secret_value_response = client.get_secret_value(SecretId=secret_name)
 
-            secret = get_secret_value_response["SecretString"]
+            if "SecretString" in get_secret_value_response:
+                secret = json.loads(get_secret_value_response["SecretString"])
+            elif "SecretBinary" in get_secret_value_response:
+                file_path = self.create_binary_file(
+                    secret_name, get_secret_value_response["SecretBinary"]
+                )
+                secret_key = key if key and key != "*" else os.path.basename(file_path)
+                secret = {secret_key: file_path}
+            else:
+                raise ValueError(f"Secret {secret_name} is not a valid secret.")
 
             # Assuming the secret is a JSON string with the credentials
             # We need to check the binary type of the secret at later development
-            self.secrets_cache[secret_name] = json.loads(secret)
+            self.secrets_cache[secret_name] = secret
 
             return self.secrets_cache[secret_name]
         except ClientError as e:
             # For a list of exceptions thrown, see
             # https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
             raise e
+        except ValueError:
+            # Re-raise ValueError as-is (e.g., invalid secret format)
+            raise
         except ImportError:
             raise RuntimeError(
                 "boto3 is not installed. Please install it using 'pip install boto3' or 'pipx inject cumulusci-plus-azure-devops boto3'."
             )
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve secret '{key}': {e}")
+
+    def create_binary_file(self, secret_name: str, content: Union[str, bytes]) -> str:
+        """
+        Write the binary content to a file.
+        secret_name is relative path to the root of the project.
+        create the directory if it doesn't exist.
+        return the absolute path to the file with windows or linux path separator.
+        """
+        absolute_path = os.path.abspath(os.path.join(".cci", secret_name))
+
+        try:
+            os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
+            with open(absolute_path, "wb") as f:
+                f.write(content)
+            return absolute_path
+        except Exception as e:
+            raise RuntimeError(f"Failed to create binary file {absolute_path}: {e}")
 
 
 # Concrete Credential Provider for Azure Variable Groups
