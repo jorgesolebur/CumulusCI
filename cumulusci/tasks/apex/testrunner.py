@@ -246,7 +246,8 @@ class RunApexTests(BaseSalesforceApiTask):
             description="Defines a dynamic filter to apply to test classes from the org that match test_name_match. Supported values: "
             "'package_only' - only runs test classes that exist in the default package directory (force-app/ or src/),"
             "'delta_changes' - only runs test classes that are affected by the delta changes in the current branch (force-app/ or src/),"
-            "Default is None, which means no dynamic filter is applied and all test classes from the org that match test_name_match are run.",
+            "Default is None, which means no dynamic filter is applied and all test classes from the org that match test_name_match are run."
+            "Setting this option, the org code coverage will not be calculated.",
         )
         base_ref: Optional[str] = Field(
             None,
@@ -897,12 +898,14 @@ class RunApexTests(BaseSalesforceApiTask):
             )
 
         if self.code_coverage_level or self.required_per_class_code_coverage_percent:
-            if not self.parsed_options.managed:
-                self._check_code_coverage()
-            else:
+            if self.parsed_options.managed:
                 self.logger.info(
                     "This org contains a managed installation; not checking code coverage."
                 )
+            elif self.parsed_options.dynamic_filter is not None:
+                self.logger.info("Dynamic filter is set; not checking code coverage.")
+            else:
+                self._check_code_coverage()
         else:
             self.logger.info(
                 "No code coverage level specified; not checking code coverage."
