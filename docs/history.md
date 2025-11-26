@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.38 (2025-11-26)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Handle AWS binary secret files. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#141](https://github.com/jorgesolebur/CumulusCI/pull/141)
+* Skip code coverage for dynamic filter tests execution. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#143](https://github.com/jorgesolebur/CumulusCI/pull/143)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.37...v5.0.38
+
+
+<!-- latest-stop -->
+
 ## v5.0.37 (2025-11-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.36...v5.0.37
 
-
-<!-- latest-stop -->
 
 ## v5.0.36 (2025-11-23)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
