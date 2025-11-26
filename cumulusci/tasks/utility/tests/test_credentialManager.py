@@ -367,6 +367,517 @@ class TestAwsSecretsManagerProvider:
 
             assert result is None
 
+    def test_get_credentials_with_binary_secret(self):
+        """Test get_credentials with binary secret content."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"binary_secret_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            # Mock the create_binary_file method
+            with mock.patch.object(
+                provider,
+                "create_binary_file",
+                return_value="/tmp/.cci/my-secret/cert.pem",
+            ) as mock_create_file:
+                result = provider.get_credentials(
+                    "CERT_FILE", {"secret_name": "my-secret/cert"}
+                )
+
+                # Verify create_binary_file was called with correct arguments
+                mock_create_file.assert_called_once_with(
+                    "my-secret/cert", binary_content
+                )
+
+                # Verify the result contains the file path
+                assert result == "/tmp/.cci/my-secret/cert.pem"
+
+    def test_get_credentials_with_binary_secret_wildcard_key(self):
+        """Test get_all_credentials with binary secret when key is '*' uses basename."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"binary_secret_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with mock.patch.object(
+                provider,
+                "create_binary_file",
+                return_value="/absolute/path/to/.cci/my-secret/file.key",
+            ) as mock_create_file, mock.patch(
+                "os.path.basename", return_value="file.key"
+            ):
+                # Use wildcard key with get_all_credentials
+                result = provider.get_all_credentials(
+                    "*", {"secret_name": "my-secret/file"}
+                )
+
+                mock_create_file.assert_called_once_with(
+                    "my-secret/file", binary_content
+                )
+
+                # When key is "*", should use basename of file path as the key in dict
+                assert isinstance(result, dict)
+                assert "file.key" in result
+                assert result["file.key"] == "/absolute/path/to/.cci/my-secret/file.key"
+
+    def test_get_all_credentials_with_binary_secret(self):
+        """Test get_all_credentials returns dict with file path for binary secrets."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"certificate_data"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with mock.patch.object(
+                provider,
+                "create_binary_file",
+                return_value="/path/to/.cci/certs/ca.crt",
+            ):
+                result = provider.get_all_credentials(
+                    "SSL_CERT", {"secret_name": "certs/ca"}
+                )
+
+                # Should return a dict with key mapped to file path
+                assert isinstance(result, dict)
+                assert "SSL_CERT" in result
+                assert result["SSL_CERT"] == "/path/to/.cci/certs/ca.crt"
+
+    def test_get_credentials_raises_error_for_invalid_secret_response(self):
+        """Test get_credentials raises ValueError when response has neither SecretString nor SecretBinary."""
+        # Create a dummy ClientError class for exception handling
+        class ClientError(Exception):
+            pass
+
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        # Return a response with neither SecretString nor SecretBinary
+        mock_client.get_secret_value.return_value = {}
+
+        # Create a proper mock for botocore.exceptions
+        mock_botocore_exceptions = type(sys)("botocore.exceptions")
+        mock_botocore_exceptions.ClientError = ClientError
+
+        with mock.patch.dict(
+            sys.modules,
+            {"boto3": mock_boto3, "botocore.exceptions": mock_botocore_exceptions},
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with pytest.raises(ValueError) as exc_info:
+                provider.get_credentials("API_KEY", {"secret_name": "invalid-secret"})
+
+            assert "is not a valid secret" in str(exc_info.value)
+            assert "invalid-secret" in str(exc_info.value)
+
+    def test_create_binary_file_success(self):
+        """Test create_binary_file creates file successfully."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_binary_content"
+        secret_name = "test-secret/file"
+        expected_path = "/abs/path/.cci/test-secret/file"
+
+        with mock.patch("os.makedirs") as mock_makedirs, mock.patch(
+            "builtins.open", mock.mock_open()
+        ) as mock_file, mock.patch(
+            "os.path.abspath", return_value=expected_path
+        ), mock.patch(
+            "os.path.dirname", return_value="/abs/path/.cci/test-secret"
+        ), mock.patch(
+            "os.path.join", return_value=".cci/test-secret/file"
+        ):
+
+            result = provider.create_binary_file(secret_name, binary_content)
+
+            # Verify directory creation with exist_ok=True
+            mock_makedirs.assert_called_once_with(
+                "/abs/path/.cci/test-secret", exist_ok=True
+            )
+
+            # Verify file was opened in binary write mode
+            mock_file.assert_called_once_with(expected_path, "wb")
+
+            # Verify content was written
+            mock_file().write.assert_called_once_with(binary_content)
+
+            # Verify return value is absolute path
+            assert result == expected_path
+
+    @mock.patch("os.name", "posix")
+    def test_create_binary_file_linux_path_separator(self):
+        """Test create_binary_file uses Linux path separator."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_content"
+        secret_name = "secrets/database/cert"
+        expected_path = "/home/user/project/.cci/secrets/database/cert"
+
+        with mock.patch("os.makedirs"), mock.patch(
+            "builtins.open", mock.mock_open()
+        ), mock.patch("os.path.abspath", return_value=expected_path), mock.patch(
+            "os.path.dirname", return_value="/home/user/project/.cci/secrets/database"
+        ), mock.patch(
+            "os.path.join", return_value=".cci/secrets/database/cert"
+        ):
+
+            result = provider.create_binary_file(secret_name, binary_content)
+
+            # On Linux, path should use forward slashes
+            assert "/" in result
+            assert "\\" not in result
+            assert result == expected_path
+
+    @mock.patch("os.name", "nt")
+    def test_create_binary_file_windows_path_separator(self):
+        """Test create_binary_file uses Windows path separator."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_content"
+        secret_name = "secrets/database/cert"
+        expected_path = "C:\\Users\\user\\project\\.cci\\secrets\\database\\cert"
+
+        with mock.patch("os.makedirs"), mock.patch(
+            "builtins.open", mock.mock_open()
+        ), mock.patch("os.path.abspath", return_value=expected_path), mock.patch(
+            "os.path.dirname",
+            return_value="C:\\Users\\user\\project\\.cci\\secrets\\database",
+        ), mock.patch(
+            "os.path.join", return_value=".cci\\secrets\\database\\cert"
+        ):
+
+            result = provider.create_binary_file(secret_name, binary_content)
+
+            # On Windows, path should use backslashes
+            assert "\\" in result
+            assert result == expected_path
+
+    def test_create_binary_file_creates_nested_directories(self):
+        """Test create_binary_file creates nested directories if they don't exist."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_content"
+        secret_name = "deep/nested/path/secret"
+
+        with mock.patch("os.makedirs") as mock_makedirs, mock.patch(
+            "builtins.open", mock.mock_open()
+        ), mock.patch(
+            "os.path.abspath", return_value="/path/.cci/deep/nested/path/secret"
+        ), mock.patch(
+            "os.path.dirname", return_value="/path/.cci/deep/nested/path"
+        ):
+
+            provider.create_binary_file(secret_name, binary_content)
+
+            # Verify makedirs was called with exist_ok=True
+            mock_makedirs.assert_called_once_with(
+                "/path/.cci/deep/nested/path", exist_ok=True
+            )
+
+    def test_create_binary_file_handles_write_error(self):
+        """Test create_binary_file raises RuntimeError when file write fails."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_content"
+        secret_name = "test-secret/file"
+        expected_path = "/abs/path/.cci/test-secret/file"
+
+        with mock.patch("os.makedirs"), mock.patch(
+            "builtins.open", side_effect=IOError("Permission denied")
+        ), mock.patch("os.path.abspath", return_value=expected_path), mock.patch(
+            "os.path.dirname", return_value="/abs/path/.cci/test-secret"
+        ), mock.patch(
+            "os.path.join", return_value=".cci/test-secret/file"
+        ):
+
+            with pytest.raises(RuntimeError) as exc_info:
+                provider.create_binary_file(secret_name, binary_content)
+
+            assert "Failed to create binary file" in str(exc_info.value)
+            assert expected_path in str(exc_info.value)
+
+    def test_create_binary_file_handles_directory_creation_error(self):
+        """Test create_binary_file raises RuntimeError when directory creation fails."""
+        provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+        binary_content = b"test_content"
+        secret_name = "test-secret/file"
+
+        with mock.patch(
+            "os.makedirs", side_effect=OSError("No space left on device")
+        ), mock.patch(
+            "os.path.abspath", return_value="/abs/path/.cci/test-secret/file"
+        ):
+
+            with pytest.raises(RuntimeError) as exc_info:
+                provider.create_binary_file(secret_name, binary_content)
+
+            assert "Failed to create binary file" in str(exc_info.value)
+
+    def test_binary_secret_caching(self):
+        """Test that binary secrets are cached properly."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"cached_binary_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with mock.patch.object(
+                provider, "create_binary_file", return_value="/path/to/.cci/my-cert.pem"
+            ) as mock_create_file:
+                # First call - should hit AWS and create file
+                result1 = provider.get_credentials(
+                    "CERT", {"secret_name": "my-app/cert"}
+                )
+                assert result1 == "/path/to/.cci/my-cert.pem"
+
+                # Second call - should use cache
+                result2 = provider.get_credentials(
+                    "CERT", {"secret_name": "my-app/cert"}
+                )
+                assert result2 == "/path/to/.cci/my-cert.pem"
+
+                # Should only call AWS and create file once
+                assert mock_client.get_secret_value.call_count == 1
+                assert mock_create_file.call_count == 1
+
+    def test_get_all_credentials_with_binary_secret_empty_key(self):
+        """Test get_all_credentials with binary secret when key is empty string uses basename."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"binary_secret_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with mock.patch.object(
+                provider,
+                "create_binary_file",
+                return_value="/path/to/.cci/my-secret/cert.pem",
+            ) as mock_create_file, mock.patch(
+                "os.path.basename", return_value="cert.pem"
+            ):
+                # Use empty string as key with get_all_credentials
+                result = provider.get_all_credentials(
+                    "", {"secret_name": "my-secret/cert"}
+                )
+
+                mock_create_file.assert_called_once_with(
+                    "my-secret/cert", binary_content
+                )
+
+                # When key is empty, should use basename of file path as dict key
+                assert isinstance(result, dict)
+                assert "cert.pem" in result
+                assert result["cert.pem"] == "/path/to/.cci/my-secret/cert.pem"
+
+    def test_get_credentials_with_binary_secret_normal_key(self):
+        """Test get_credentials with binary secret when key is provided uses the key."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"binary_secret_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            with mock.patch.object(
+                provider,
+                "create_binary_file",
+                return_value="/path/to/.cci/my-secret/cert.pem",
+            ) as mock_create_file:
+                # Use normal key
+                result = provider.get_credentials(
+                    "MY_CERT", {"secret_name": "my-secret/cert"}
+                )
+
+                mock_create_file.assert_called_once_with(
+                    "my-secret/cert", binary_content
+                )
+
+                # When key is provided and not "*", should use the key directly
+                assert result == "/path/to/.cci/my-secret/cert.pem"
+
+    @mock.patch("os.name", "posix")
+    def test_get_credentials_with_binary_secret_linux(self):
+        """Test get_credentials with binary secret on Linux system."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"linux_binary_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            linux_path = "/home/user/project/.cci/secrets/database/cert.pem"
+            with mock.patch.object(
+                provider, "create_binary_file", return_value=linux_path
+            ) as mock_create_file:
+                result = provider.get_credentials(
+                    "DB_CERT", {"secret_name": "secrets/database/cert"}
+                )
+
+                mock_create_file.assert_called_once_with(
+                    "secrets/database/cert", binary_content
+                )
+
+                # Verify Linux path format
+                assert "/" in result
+                assert "\\" not in result
+                assert result == linux_path
+
+    @mock.patch("os.name", "nt")
+    def test_get_credentials_with_binary_secret_windows(self):
+        """Test get_credentials with binary secret on Windows system."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"windows_binary_content"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            windows_path = "C:\\Users\\user\\project\\.cci\\secrets\\database\\cert.pem"
+            with mock.patch.object(
+                provider, "create_binary_file", return_value=windows_path
+            ) as mock_create_file:
+                result = provider.get_credentials(
+                    "DB_CERT", {"secret_name": "secrets/database/cert"}
+                )
+
+                mock_create_file.assert_called_once_with(
+                    "secrets/database/cert", binary_content
+                )
+
+                # Verify Windows path format
+                assert "\\" in result
+                assert result == windows_path
+
+    @mock.patch("os.name", "posix")
+    def test_get_all_credentials_with_binary_secret_linux(self):
+        """Test get_all_credentials with binary secret on Linux system."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"linux_certificate_data"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            linux_path = "/home/user/project/.cci/certs/ca.crt"
+            with mock.patch.object(
+                provider, "create_binary_file", return_value=linux_path
+            ):
+                result = provider.get_all_credentials(
+                    "SSL_CERT", {"secret_name": "certs/ca"}
+                )
+
+                # Should return a dict with key mapped to file path
+                assert isinstance(result, dict)
+                assert "SSL_CERT" in result
+                assert "/" in result["SSL_CERT"]
+                assert "\\" not in result["SSL_CERT"]
+                assert result["SSL_CERT"] == linux_path
+
+    @mock.patch("os.name", "nt")
+    def test_get_all_credentials_with_binary_secret_windows(self):
+        """Test get_all_credentials with binary secret on Windows system."""
+        mock_client = mock.Mock()
+        mock_session = mock.Mock()
+        mock_session.client.return_value = mock_client
+        mock_boto3 = mock.Mock()
+        mock_boto3.session.Session.return_value = mock_session
+
+        binary_content = b"windows_certificate_data"
+        mock_client.get_secret_value.return_value = {"SecretBinary": binary_content}
+
+        with mock.patch.dict(
+            sys.modules, {"boto3": mock_boto3, "botocore.exceptions": mock.Mock()}
+        ):
+            provider = AwsSecretsManagerProvider(aws_region="us-east-1")
+
+            windows_path = "C:\\Users\\user\\project\\.cci\\certs\\ca.crt"
+            with mock.patch.object(
+                provider, "create_binary_file", return_value=windows_path
+            ):
+                result = provider.get_all_credentials(
+                    "SSL_CERT", {"secret_name": "certs/ca"}
+                )
+
+                # Should return a dict with key mapped to file path
+                assert isinstance(result, dict)
+                assert "SSL_CERT" in result
+                assert "\\" in result["SSL_CERT"]
+                assert result["SSL_CERT"] == windows_path
+
 
 class TestAzureVariableGroupProvider:
     """Test cases for AzureVariableGroupProvider."""
