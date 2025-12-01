@@ -452,6 +452,18 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
                         ):
                             return parts[0]
 
+    @property
+    def is_dependency_flow(self) -> bool:
+        return (
+            False
+            if self.executing_dependency_flow is None
+            else self.executing_dependency_flow
+        )
+
+    @is_dependency_flow.setter
+    def is_dependency_flow(self, value: bool):
+        self.executing_dependency_flow = value
+
     def get_repo(self) -> AbstractRepo:
         repo = self.repo_service.get_repository()
         if repo is None:
