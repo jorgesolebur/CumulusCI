@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.39 (2025-12-01)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix local execution with AWS type secrets. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#145](https://github.com/jorgesolebur/CumulusCI/pull/145)
+* Add dependency execution context. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#147](https://github.com/jorgesolebur/CumulusCI/pull/147)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.38...v5.0.39
+
+
+<!-- latest-stop -->
+
 ## v5.0.38 (2025-11-26)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.37...v5.0.38
 
-
-<!-- latest-stop -->
 
 ## v5.0.37 (2025-11-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
