@@ -738,10 +738,14 @@ class UnmanagedVcsDependencyFlow(UnmanagedStaticDependency, ABC):
             )
         )
 
+        project_config.is_dependency_flow = True
+
         start_time = datetime.now()
         coordinator.run(org)
         duration = datetime.now() - start_time
         context.logger.info(f"Ran {self.flow_name} in {format_duration(duration)}")
+
+        project_config.is_dependency_flow = False
 
 
 class BasePackageVersionDependency(StaticDependency, ABC):
