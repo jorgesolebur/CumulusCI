@@ -131,6 +131,34 @@ class TestEnvironmentVariableProvider:
         result = provider.get_credentials("NONEXISTENT_KEY", {"value": None})
         assert result is None
 
+    @mock.patch.dict(os.environ, {"MYAPP_API_KEY": "env_api_key_secret"})
+    def test_get_credentials_api_key(self):
+        """Test get_credentials retrieves API_KEY secret from environment."""
+        provider = EnvironmentVariableProvider(key_prefix="MYAPP_")
+        result = provider.get_credentials("API_KEY", {"value": None})
+        assert result == "env_api_key_secret"
+
+    @mock.patch.dict(os.environ, {"TEST_API_KEY": "test_api_value"})
+    def test_get_credentials_api_key_with_default(self):
+        """Test get_credentials retrieves API_KEY with default value fallback."""
+        provider = EnvironmentVariableProvider(key_prefix="TEST_")
+        result = provider.get_credentials("API_KEY", {"value": "default_key"})
+        assert result == "test_api_value"
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_get_credentials_api_key_missing_uses_default(self):
+        """Test get_credentials uses default for missing API_KEY."""
+        provider = EnvironmentVariableProvider(key_prefix="MISSING_")
+        result = provider.get_credentials("API_KEY", {"value": "fallback_key"})
+        assert result == "fallback_key"
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_get_credentials_api_key_missing_no_default(self):
+        """Test get_credentials returns None for missing API_KEY without default."""
+        provider = EnvironmentVariableProvider(key_prefix="MISSING_")
+        result = provider.get_credentials("API_KEY", {"value": None})
+        assert result is None
+
     def test_get_all_credentials_not_supported(self):
         """Test that get_all_credentials raises NotImplementedError."""
         provider = EnvironmentVariableProvider()
@@ -921,6 +949,27 @@ class TestAzureVariableGroupProvider:
         result = provider.get_credentials("my.var.name", {})
         assert result == "value123"
 
+    @mock.patch.dict(os.environ, {"MYAPP_API_KEY": "azure_api_key_secret"})
+    def test_get_credentials_api_key(self):
+        """Test get_credentials retrieves API_KEY secret from Azure variables."""
+        provider = AzureVariableGroupProvider(key_prefix="MYAPP_")
+        result = provider.get_credentials("API_KEY", {"value": None})
+        assert result == "azure_api_key_secret"
+
+    @mock.patch.dict(os.environ, {"TEST_API_KEY": "test_api_value"})
+    def test_get_credentials_api_key_with_default(self):
+        """Test get_credentials retrieves API_KEY with default value fallback."""
+        provider = AzureVariableGroupProvider(key_prefix="TEST_")
+        result = provider.get_credentials("API_KEY", {"value": "default_key"})
+        assert result == "test_api_value"
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_get_credentials_api_key_missing_no_default(self):
+        """Test get_credentials returns None for missing API_KEY without default."""
+        provider = AzureVariableGroupProvider(key_prefix="MISSING_")
+        result = provider.get_credentials("API_KEY", {"value": None})
+        assert result is None
+
     def test_get_all_credentials_not_supported(self):
         """Test that get_all_credentials raises NotImplementedError."""
         provider = AzureVariableGroupProvider()
@@ -1073,3 +1122,29 @@ class TestProviderIntegration:
         provider = CredentialManager.get_provider(key_prefix="MYAPP_")
         credentials = provider.get_credentials("API_TOKEN", {})
         assert credentials == "ado_token_xyz"
+
+    @mock.patch.dict(
+        os.environ,
+        {
+            "CUMULUSCI_SECRETS_TYPE": "ado_variables",
+            "MYAPP_API_KEY": "ado_api_key_123",
+        },
+    )
+    def test_full_workflow_ado_provider_api_key(self):
+        """Test complete workflow using Azure DevOps variables provider with API_KEY."""
+        provider = CredentialManager.get_provider(key_prefix="MYAPP_")
+        credentials = provider.get_credentials("API_KEY", {"value": None})
+        assert credentials == "ado_api_key_123"
+
+    @mock.patch.dict(
+        os.environ,
+        {
+            "CUMULUSCI_SECRETS_TYPE": "environment",
+            "MYAPP_API_KEY": "env_api_key_456",
+        },
+    )
+    def test_full_workflow_environment_provider_api_key(self):
+        """Test complete workflow using environment provider with API_KEY."""
+        provider = CredentialManager.get_provider(key_prefix="MYAPP_")
+        credentials = provider.get_credentials("API_KEY", {"value": "default_key"})
+        assert credentials == "env_api_key_456"
