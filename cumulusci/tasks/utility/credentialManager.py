@@ -66,6 +66,9 @@ class DevEnvironmentVariableProvider(CredentialProvider):
         self, key: str, options: Optional[dict[str, Any]] = None
     ) -> Any:
         value = options.get("value", None)
+        if isinstance(value, dict):
+            value = next(iter(value.values()))
+
         self.logger.info(f"Credentials for {key} from local environment is {value}.")
         return value
 
@@ -89,7 +92,12 @@ class EnvironmentVariableProvider(CredentialProvider):
         self, key: str, options: Optional[dict[str, Any]] = None
     ) -> Any:
         value = options.get("value", None)
+        if isinstance(value, dict):
+            value = next(iter(value.values()))
+
         ret_value = os.getenv(self.get_key(key))
+        if ret_value is None and value is not None:
+            ret_value = os.getenv(self.get_key(value))
         if ret_value is None:
             self.logger.info(f"Credentials for {key} from environment is {value}.")
         return ret_value or value
@@ -231,9 +239,17 @@ class AzureVariableGroupProvider(CredentialProvider):
         Looks for AWS credentials in environment variables exposed by
         an Azure variable group.
         """
+        value = options.get("value", None)
+        if isinstance(value, dict):
+            value = next(iter(value.values()))
+
         # Azure pipelines convert variable names to uppercase and replace dots with underscores.
-        key_env_var = self.get_key(key)
-        return os.getenv(key_env_var.upper().replace(".", "_"))
+        ret_value = os.getenv(self.get_key(key).upper().replace(".", "_"))
+
+        if ret_value is None and value is not None:
+            ret_value = os.getenv(self.get_key(value).upper().replace(".", "_"))
+
+        return ret_value
 
     def get_all_credentials(
         self, key: str, options: Optional[dict[str, Any]] = None
