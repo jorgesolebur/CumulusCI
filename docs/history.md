@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.40 (2025-12-03)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Update External Auth Identity provider by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#149](https://github.com/jorgesolebur/CumulusCI/pull/149)
+* Add tokens for org config name by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#151](https://github.com/jorgesolebur/CumulusCI/pull/151)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.39...v5.0.40
+
+
+<!-- latest-stop -->
+
 ## v5.0.39 (2025-12-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.38...v5.0.39
 
-
-<!-- latest-stop -->
 
 ## v5.0.38 (2025-11-26)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
