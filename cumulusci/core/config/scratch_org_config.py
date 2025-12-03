@@ -162,6 +162,18 @@ class ScratchOrgConfig(SfdxOrgConfig):
             args += ["-a", self.sfdx_alias]
         with open(self.config_file, "r") as org_def:
             org_def_data = json.load(org_def)
+            if (
+                "orgName" in org_def_data
+                and org_def_data["orgName"] is not None
+                and self.keychain.project_config.project__name is not None
+            ):
+                org_def_data["orgName"] = (
+                    org_def_data["orgName"]
+                    .replace(
+                        "%%%PROJECT_NAME%%%", self.keychain.project_config.project__name
+                    )
+                    .replace("%%%CONFIG_NAME%%%", self.name.upper())
+                )
             org_def_has_email = "adminEmail" in org_def_data
         if self.email_address and not org_def_has_email:
             args += [f"--admin-email={self.email_address}"]
