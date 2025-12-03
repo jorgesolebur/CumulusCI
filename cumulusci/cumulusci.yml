@@ -874,6 +874,10 @@ tasks:
         class_path: cumulusci.tasks.salesforce.update_external_credential.UpdateExternalCredential
         description: Update external credential parameters
         group: Metadata Transformations
+    update_external_auth_identity_provider:
+        class_path: cumulusci.tasks.salesforce.update_external_auth_identity_provider.UpdateExternalAuthIdentityProvider
+        description: Update external auth identity provider parameters and credentials
+        group: Metadata Transformations
 
 flows:
     ci_beta:

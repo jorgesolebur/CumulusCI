@@ -156,13 +156,18 @@ class AwsSecretsManagerProvider(CredentialProvider):
             raise ValueError("Secret name is required for AWS Secrets Manager.")
 
         try:
-            if secret_name in self.secrets_cache:
-                return self.secrets_cache[secret_name]
-
             import json
 
             import boto3
             from botocore.exceptions import ClientError
+        except ImportError:
+            raise RuntimeError(
+                "boto3 is not installed. Please install it using 'pip install boto3' or 'pipx inject cumulusci-plus-azure-devops boto3'."
+            )
+
+        try:
+            if secret_name in self.secrets_cache:
+                return self.secrets_cache[secret_name]
 
             # Boto3 automatically handles credential lookup. In an Azure Pipeline,
             # it will find the temporary credentials provided by the AWS Service Connection.
@@ -197,10 +202,6 @@ class AwsSecretsManagerProvider(CredentialProvider):
         except ValueError:
             # Re-raise ValueError as-is (e.g., invalid secret format)
             raise
-        except ImportError:
-            raise RuntimeError(
-                "boto3 is not installed. Please install it using 'pip install boto3' or 'pipx inject cumulusci-plus-azure-devops boto3'."
-            )
         except Exception as e:
             raise RuntimeError(f"Failed to retrieve secret '{key}': {e}")
 
