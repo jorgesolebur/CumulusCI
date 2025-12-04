@@ -57,6 +57,7 @@ dependencies = [
     "xmltodict",
     "docutils<=0.21.2",
     "python-dotenv",
+    "boto3"
 ]
 
 [dependency-groups]
@@ -91,8 +92,7 @@ select = [
     "annoy",
     "numpy",
     "pandas",
-    "scikit-learn",
-    "boto3"
+    "scikit-learn"
 ]
 
 [project.scripts]
