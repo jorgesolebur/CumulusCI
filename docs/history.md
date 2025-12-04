@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.41 (2025-12-04)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add boto3 as mandatory dependency by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#153](https://github.com/jorgesolebur/CumulusCI/pull/153)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.40...v5.0.41
+
+
+<!-- latest-stop -->
+
 ## v5.0.40 (2025-12-03)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.39...v5.0.40
 
-
-<!-- latest-stop -->
 
 ## v5.0.39 (2025-12-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
