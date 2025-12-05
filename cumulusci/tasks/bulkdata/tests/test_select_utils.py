@@ -624,6 +624,10 @@ def test_vectorize_records_mixed_numerical_boolean_categorical():
     sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
     reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
 )
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Annoy library has known compatibility issues on Linux with Python 3.12",
+)
 def test_annoy_post_process():
     # Test data
     load_records = [["Alice", "Engineer"], ["Bob", "Doctor"]]
@@ -657,6 +661,10 @@ def test_annoy_post_process():
 @pytest.mark.skipif(
     sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
     reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
+)
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Annoy library has known compatibility issues on Linux with Python 3.12",
 )
 def test_annoy_post_process__insert_records():
     # Test data
@@ -707,6 +715,10 @@ def test_annoy_post_process__insert_records():
     sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
     reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
 )
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Annoy library has known compatibility issues on Linux with Python 3.12",
+)
 def test_annoy_post_process__no_query_records():
     # Test data
     load_records = [["Alice", "Engineer"], ["Bob", "Doctor"]]
@@ -742,6 +754,10 @@ def test_annoy_post_process__no_query_records():
 @pytest.mark.skipif(
     sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
     reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
+)
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Annoy library has known compatibility issues on Linux with Python 3.12",
 )
 def test_annoy_post_process__insert_records_with_polymorphic_fields():
     # Test data
@@ -803,6 +819,10 @@ def test_annoy_post_process__insert_records_with_polymorphic_fields():
 @pytest.mark.skipif(
     sys.platform == "darwin" and sys.version_info[:2] in [(3, 11), (3, 13)],
     reason="Annoy library has known compatibility issues on macOS with Python 3.11 and 3.13",
+)
+@pytest.mark.skipif(
+    sys.platform == "linux" and sys.version_info[:2] == (3, 12),
+    reason="Annoy library has known compatibility issues on Linux with Python 3.12",
 )
 def test_single_record_match_annoy_post_process():
     # Mock data where only the first query record matches the first load record
