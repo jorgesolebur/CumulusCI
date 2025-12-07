@@ -2,6 +2,21 @@
 
 <!-- latest-start -->
 
+## v5.0.42 (2025-12-07)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add generic task to update records. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#155](https://github.com/jorgesolebur/CumulusCI/pull/155)
+* Custom Application profile overrides. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#156](https://github.com/jorgesolebur/CumulusCI/pull/156)
+* Update External Creds with auth provider. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#159](https://github.com/jorgesolebur/CumulusCI/pull/159)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.41...v5.0.42
+
+
+<!-- latest-stop -->
+
 ## v5.0.41 (2025-12-04)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.40...v5.0.41
 
-
-<!-- latest-stop -->
 
 ## v5.0.40 (2025-12-03)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
