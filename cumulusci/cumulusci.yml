@@ -168,6 +168,10 @@ tasks:
         description: Inserts a record of any sObject using the REST API
         class_path: cumulusci.tasks.salesforce.insert_record.InsertRecord
         group: Data Operations
+    update_record:
+        description: Updates one or more records of any sObject using the REST API
+        class_path: cumulusci.tasks.salesforce.update_record.UpdateRecord
+        group: Data Operations
     create_package:
         description: Creates a package in the target org with the default package name for the project
         class_path: cumulusci.tasks.salesforce.CreatePackage
@@ -1621,7 +1625,7 @@ project:
         apex_test_access:
         package_metadata_access:
         unpackaged_metadata_path:
-        api_version: "63.0"
+        api_version: "64.0"
     git:
         default_branch: master
         prefix_feature: feature/

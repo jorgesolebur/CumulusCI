@@ -65,7 +65,7 @@ def mock_oauth():
         )
         rsps.add(
             "GET",
-            url="https://test-dev-ed.my.salesforce.com/services/data/v63.0/tooling/query/?q=SELECT%20SubscriberPackage.Id,%20SubscriberPackage.Name,%20SubscriberPackage.NamespacePrefix,%20SubscriberPackageVersionId%20FROM%20InstalledSubscriberPackage",
+            url=f"https://test-dev-ed.my.salesforce.com/services/data/v{CURRENT_SF_API_VERSION}/tooling/query/?q=SELECT%20SubscriberPackage.Id,%20SubscriberPackage.Name,%20SubscriberPackage.NamespacePrefix,%20SubscriberPackageVersionId%20FROM%20InstalledSubscriberPackage",
             json={"records": []},
             status=200,
         )
@@ -205,7 +205,7 @@ def test_run_task__managed_org(mock_oauth, task):
 
     mock_oauth.remove(
         "GET",
-        url="https://test-dev-ed.my.salesforce.com/services/data/v63.0/tooling/query/?q=SELECT%20SubscriberPackage.Id,%20SubscriberPackage.Name,%20SubscriberPackage.NamespacePrefix,%20SubscriberPackageVersionId%20FROM%20InstalledSubscriberPackage",
+        url=f"https://test-dev-ed.my.salesforce.com/services/data/v{CURRENT_SF_API_VERSION}/tooling/query/?q=SELECT%20SubscriberPackage.Id,%20SubscriberPackage.Name,%20SubscriberPackage.NamespacePrefix,%20SubscriberPackageVersionId%20FROM%20InstalledSubscriberPackage",
     )
 
     mock_oauth.add(
