@@ -28,7 +28,8 @@ Each parameter in the `parameters` or `transform_parameters` list can include th
 ### Parameter Types (one required per parameter)
 
 -   `auth_header` (HttpHeader): Auth header with name, value, and optional metadata
--   `auth_provider` (str): Auth provider name (only subscriber editable in 2GP)
+-   `auth_provider` (str): Auth provider name (only subscriber editable in 2GP) - **Mutually exclusive with `external_auth_identity_provider`**
+-   `external_auth_identity_provider` (str): External auth identity provider name - **Mutually exclusive with `auth_provider`**
 -   `auth_provider_url` (str): Auth provider URL
 -   `auth_provider_url_query_parameter` (ExtParameter): Auth provider URL query parameter with name and value
 -   `auth_parameter` (ExtParameter): Auth parameter with name and value
@@ -196,6 +197,20 @@ tasks:
                       value: '{"alg":"RS256","typ":"JWT"}'
 ```
 
+### Example 8: Update with External Auth Identity Provider
+
+```yaml
+tasks:
+    update_external_auth:
+        class_path: cumulusci.tasks.salesforce.update_external_credential.UpdateExternalCredential
+        options:
+            name: CognitoCredential
+            parameters:
+                - external_auth_identity_provider: "MyExternalAuthProvider"
+```
+
+**Note:** Adding an `external_auth_identity_provider` will automatically remove any existing `auth_provider` parameters due to mutual exclusivity.
+
 ## Using in Flows
 
 ```yaml
@@ -247,6 +262,42 @@ The task matches existing parameters based on:
 -   `sequenceNumber` (if specified)
 
 If a matching parameter is found, it will be updated. If not found, a new parameter will be added.
+
+### AuthProvider and ExternalAuthIdentityProvider Mutual Exclusivity
+
+**Important:** `AuthProvider` and `ExternalAuthIdentityProvider` parameter types are mutually exclusive and cannot coexist in the same External Credential.
+
+When you add or update either of these parameter types:
+
+-   **Adding/Updating `auth_provider`**: Automatically removes all `ExternalAuthIdentityProvider` parameters
+-   **Adding/Updating `external_auth_identity_provider`**: Automatically removes all `AuthProvider` parameters
+
+This behavior ensures compliance with Salesforce's requirement that these two authentication methods cannot be used together in a single External Credential.
+
+**Example Scenario:**
+
+```yaml
+# Initial state: External Credential has ExternalAuthIdentityProvider
+# Current parameters:
+#   - ExternalAuthIdentityProvider: "Cognito"
+#   - AuthParameter: "scope=openid"
+
+# Update with AuthProvider
+tasks:
+    update_to_auth_provider:
+        class_path: cumulusci.tasks.salesforce.update_external_credential.UpdateExternalCredential
+        options:
+            name: MyExternalCredential
+            parameters:
+                - auth_provider: "MyAuthProvider"
+
+# Result: 
+#   - AuthProvider: "MyAuthProvider" (new)
+#   - AuthParameter: "scope=openid" (preserved)
+#   - ExternalAuthIdentityProvider: removed automatically
+```
+
+The task logs the number of conflicting parameters removed for transparency.
 
 ### Template Parameters
 
@@ -308,7 +359,8 @@ A new CumulusCI task has been created to update External Credential parameters i
 **Supported Parameters:**
 
 -   AuthHeader
--   AuthProvider (subscriber editable in 2GP)
+-   AuthProvider (subscriber editable in 2GP) - **Mutually exclusive with ExternalAuthIdentityProvider**
+-   ExternalAuthIdentityProvider - **Mutually exclusive with AuthProvider**
 -   AuthProviderUrl
 -   AuthProviderUrlQueryParameter
 -   AuthParameter
@@ -327,7 +379,7 @@ A new CumulusCI task has been created to update External Credential parameters i
 
 **Test Coverage:**
 
--   23 test cases covering:
+-   28 test cases covering:
     -   Parameter model validation
     -   Environment variable transformation
     -   Successful updates
@@ -336,8 +388,10 @@ A new CumulusCI task has been created to update External Credential parameters i
     -   Multiple parameters
     -   Adding new parameters
     -   Sequence numbers
+    -   AuthProvider and ExternalAuthIdentityProvider mutual exclusivity
+    -   Conflict removal and logging
 
-**Test Results:** All 23 tests passing ✓
+**Test Results:** All 28 tests passing ✓
 
 ### 3. Task Registration
 
@@ -433,7 +487,7 @@ cd /Users/rupesh.j/Work/CumulusCI
 python -m pytest cumulusci/tasks/salesforce/tests/test_update_external_credential.py -v
 ```
 
-All 23 tests pass successfully.
+All 28 tests pass successfully.
 
 ## Next Steps
 

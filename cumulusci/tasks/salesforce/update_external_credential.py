@@ -4,8 +4,10 @@ from typing import Any, Dict, List, Optional
 from pydantic.v1 import root_validator
 
 from cumulusci.core.exceptions import SalesforceDXException
+from cumulusci.core.utils import determine_managed_mode
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
+from cumulusci.utils import inject_namespace
 from cumulusci.utils.options import CCIOptions, Field
 
 
@@ -109,6 +111,10 @@ class ExternalCredentialParameter(CCIOptions):
         False,
         description="Is the value a secret. [default to False]",
     )
+    external_auth_identity_provider: str = Field(
+        None,
+        description="External auth identity provider name. [default to None]",
+    )
 
     @root_validator
     def check_parameters(cls, values):
@@ -125,6 +131,7 @@ class ExternalCredentialParameter(CCIOptions):
             "named_principal",
             "per_user_principal",
             "signing_certificate",
+            "external_auth_identity_provider",
         ]
 
         provided_params = [
@@ -157,9 +164,15 @@ class ExternalCredentialParameter(CCIOptions):
 
         if self.auth_provider is not None:
             ext_cred_param["parameterType"] = "AuthProvider"
-            ext_cred_param["parameterValue"] = self.auth_provider
             ext_cred_param["parameterName"] = "AuthProvider"
-            ext_cred_param["authProvider"] = ext_cred_param["parameterValue"]
+            ext_cred_param["authProvider"] = self.auth_provider
+
+        if self.external_auth_identity_provider is not None:
+            ext_cred_param["parameterType"] = "ExternalAuthIdentityProvider"
+            ext_cred_param["parameterName"] = "ExternalAuthIdentityProvider"
+            ext_cred_param[
+                "externalAuthIdentityProvider"
+            ] = self.external_auth_identity_provider
 
         if self.auth_provider_url is not None:
             ext_cred_param["parameterType"] = "AuthProviderUrl"
@@ -451,6 +464,16 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
     ):
         """Update the parameters"""
         for param_input in external_credential_parameters:
+
+            if param_input.external_auth_identity_provider is not None:
+                param_input.external_auth_identity_provider = self._inject_namespace(
+                    param_input.external_auth_identity_provider
+                )
+            if param_input.auth_provider is not None:
+                param_input.auth_provider = self._inject_namespace(
+                    param_input.auth_provider
+                )
+
             param_to_update = param_input.get_external_credential_parameter()
             secret = param_to_update.pop("secret", False)
 
@@ -458,6 +481,15 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
             param_to_match = {
                 k: v for k, v in param_to_update.items() if k != "parameterValue"
             }
+
+            if param_to_update.get("parameterType") == "ExternalAuthIdentityProvider":
+                self._remove_conflicting_parameters(
+                    external_credential, "ExternalAuthIdentityProvider", log=False
+                )
+            elif param_to_update.get("parameterType") == "AuthProvider":
+                self._remove_conflicting_parameters(
+                    external_credential, "AuthProvider", log=False
+                )
 
             # Find existing parameter
             cred_param = next(
@@ -481,7 +513,7 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
                         if cred_param.get("parameterName")
                         else ""
                     )
-                    + f" with new value {param_to_update['parameterValue'] if not secret else '********'}"
+                    + f" with new value {param_to_update.get('parameterValue', '') if not secret else '********'}"
                 )
             else:
                 # Add new parameter
@@ -499,8 +531,49 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
                         if copy_template_param.get("parameterName")
                         else ""
                     )
-                    + f" with new value {param_to_update['parameterValue'] if not secret else '********'}"
+                    + f" with new value {param_to_update.get('parameterValue', '') if not secret else '********'}"
                 )
+
+            # Enforce mutual exclusivity between AuthProvider and ExternalAuthIdentityProvider
+            # If auth_provider is provided, remove any ExternalAuthIdentityProvider parameters
+            # If external_auth_identity_provider is provided, remove any AuthProvider parameters
+
+            if param_to_update.get("parameterType") == "AuthProvider":
+                self._remove_conflicting_parameters(
+                    external_credential, "ExternalAuthIdentityProvider"
+                )
+            elif param_to_update.get("parameterType") == "ExternalAuthIdentityProvider":
+                self._remove_conflicting_parameters(external_credential, "AuthProvider")
+
+    def _remove_conflicting_parameters(
+        self, external_credential: Dict[str, Any], parameter_type: str, log: bool = True
+    ):
+        """Remove conflicting parameter types from external credential.
+
+        Args:
+            external_credential: The external credential object
+            parameter_type: The parameter type to remove (e.g., 'AuthProvider' or 'ExternalAuthIdentityProvider')
+        """
+        if "externalCredentialParameters" not in external_credential:
+            return
+
+        original_count = len(external_credential["externalCredentialParameters"])
+
+        # Filter out parameters with the conflicting type
+        external_credential["externalCredentialParameters"] = [
+            param
+            for param in external_credential["externalCredentialParameters"]
+            if param.get("parameterType") != parameter_type
+        ]
+
+        removed_count = original_count - len(
+            external_credential["externalCredentialParameters"]
+        )
+
+        if removed_count > 0 and log:
+            self.logger.info(
+                f"Removed {removed_count} conflicting parameter(s) of type '{parameter_type}'"
+            )
 
     def _get_external_credential_template_parameter(self) -> Dict[str, Any]:
         """Get the external credential template parameter"""
@@ -560,3 +633,15 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
                 raise SalesforceDXException(msg)
 
             self.logger.info(f"Updated credential {param.named_principal.name}")
+
+    def _inject_namespace(self, value: str) -> str:
+        _, value = inject_namespace(
+            "",
+            value,
+            namespace=self.parsed_options.namespace,
+            managed=determine_managed_mode(
+                self.options, self.project_config, self.org_config
+            ),
+            namespaced_org=self.org_config.namespaced or False,
+        )
+        return value
