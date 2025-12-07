@@ -6,6 +6,7 @@ from cumulusci.tasks.metadata_etl.base import (
     MetadataOperation,
     UpdateMetadataFirstChildTextTask,
 )
+from cumulusci.tasks.metadata_etl.applications import AddProfileActionOverrides
 from cumulusci.tasks.metadata_etl.duplicate_rules import SetDuplicateRuleStatus
 from cumulusci.tasks.metadata_etl.layouts import AddRelatedLists
 from cumulusci.tasks.metadata_etl.objects import SetObjectSettings
@@ -18,6 +19,7 @@ flake8 = (
     BaseMetadataSynthesisTask,
     BaseMetadataTransformTask,
     MetadataSingleEntityTransformTask,
+    AddProfileActionOverrides,
     AddRelatedLists,
     AddPermissionSetPermissions,
     AddValueSetEntries,

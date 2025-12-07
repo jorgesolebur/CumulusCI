@@ -665,6 +665,12 @@ tasks:
         class_path: cumulusci.tasks.metadata_etl.SetOrgWideDefaults
         options:
             namespace_inject: $project_config.project__package__namespace
+    applications_profile_action_overrides:
+        group: Metadata Transformations
+        description: Adds / Updates profile action overrides to the Custom Application.
+        class_path: cumulusci.tasks.metadata_etl.applications.AddProfileActionOverrides
+        options:
+            namespace_inject: $project_config.project__package__namespace
     strip_unwanted_components:
         description: Removes components from src folder which are not mentioned in given package.xml file
         class_path: cumulusci.tasks.metadata.package.RemoveUnwantedComponents
