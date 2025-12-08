@@ -140,10 +140,13 @@ class RunTaskCommand(click.MultiCommand):
 
     def get_command(self, ctx, task_name):
         runtime = ctx.obj
-        if runtime.project_config is None:
-            raise runtime.project_config_error
         runtime._load_keychain()
-        task_config = runtime.project_config.get_task(task_name)
+        if runtime.project_config is None:
+            task_config = runtime.universal_config.get_task(task_name)
+            if not task_config.is_global:
+                raise runtime.project_config_error
+        else:
+            task_config = runtime.project_config.get_task(task_name)
 
         if "options" not in task_config.config:
             task_config.config["options"] = {}
@@ -157,14 +160,10 @@ class RunTaskCommand(click.MultiCommand):
         def run_task(*args, **kwargs):
             """Callback function that executes when the command fires."""
             # Load environment variables FIRST, before any task processing
-            if kwargs.get("loadenv", None):
+            if kwargs.get("loadenv", None) and runtime.project_config is not None:
                 # Load .env file from the project root directory
-                env_path = (
-                    Path(runtime.project_config.repo_root) / ".env"
-                    if runtime.project_config
-                    else None
-                )
-                if env_path:
+                env_path = Path(runtime.project_config.repo_root) / ".env"
+                if env_path and env_path.exists():
                     load_dotenv(env_path)
 
             org, org_config = runtime.get_org(

@@ -771,10 +771,12 @@ tasks:
         description: "Copy a file for src to dest with environment variable support, Ex: &TMPDIR&/src resolves to /tmp/src on linux or %TMPDIR%/src on windows."
         class_path: cumulusci.tasks.util.CopyFile
         group: Utilities
+        is_global: True
     load_dot_env:
         description: "Log the contents of the .env file"
         class_path: cumulusci.tasks.util.LoadDotEnv
         group: Utilities
+        is_global: True
     configure_env:
         description: Get or set environment variables.
         class_path: cumulusci.tasks.utility.env_management.EnvManagement
@@ -783,6 +785,7 @@ tasks:
         description: Get all environment variables from a target JSON file and generates a .env file that can be used to set up the environment variables for the deployment
         class_path: cumulusci.tasks.utility.secretsToEnv.SecretsToEnv
         group: Utilities
+        is_global: True
     directory_recreator:
         description: Remove and recreate a directory
         class_path: cumulusci.tasks.utility.directoryRecreator.DirectoryRecreator

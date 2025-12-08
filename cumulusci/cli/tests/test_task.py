@@ -52,12 +52,42 @@ def test_task_run(runtime):
 
 
 def test_task_run__no_project(runtime):
+    # Add task to universal_config so it can be found
+    runtime.universal_config.config["tasks"] = {**test_tasks}
     runtime.project_config = None
     runtime.project_config_error = Exception("Broken")
     multi_cmd = task.RunTaskCommand()
     with pytest.raises(Exception, match="Broken"):
         with click.Context(multi_cmd, obj=runtime) as ctx:
             multi_cmd.get_command(ctx, "dummy-task")
+
+
+def test_task_run__global_task_without_project(runtime):
+    """Test that a global task can run without a project context."""
+    # Define a global task
+    global_task = {
+        "global-dummy-task": {
+            "class_path": "cumulusci.cli.tests.utils.DummyTask",
+            "description": "This is a global dummy task.",
+            "is_global": True,
+        }
+    }
+
+    # Add global task to universal_config
+    runtime.universal_config.config["tasks"] = {**global_task}
+    runtime.project_config = None
+    runtime.project_config_error = Exception("No project config")
+
+    DummyTask._run_task = Mock()
+    multi_cmd = task.RunTaskCommand()
+
+    # Should NOT raise an exception because the task is global
+    with click.Context(multi_cmd, obj=runtime) as ctx:
+        cmd = multi_cmd.get_command(ctx, "global-dummy-task")
+        cmd.callback(runtime, "global-dummy-task", color="blue")
+
+    # Verify the task was executed
+    DummyTask._run_task.assert_called_once()
 
 
 def test_task_run__debug_before(runtime):
@@ -276,6 +306,10 @@ def test_task_run__loadenv_with_project_root(load_dotenv, runtime):
     # Create a temporary directory for the test
     with tempfile.TemporaryDirectory() as temp_dir:
         runtime.project_config._repo_info = {"root": temp_dir}
+
+        # Create the .env file so it exists
+        env_path = Path(temp_dir) / ".env"
+        env_path.write_text("TEST_VAR=test_value\n")
 
         multi_cmd = task.RunTaskCommand()
         with click.Context(multi_cmd, obj=runtime) as ctx:

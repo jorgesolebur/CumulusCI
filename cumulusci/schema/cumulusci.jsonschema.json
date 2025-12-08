@@ -122,6 +122,11 @@
                 "name": {
                     "title": "Name",
                     "type": "string"
+                },
+                "is_global": {
+                    "title": "Is Global",
+                    "default": false,
+                    "type": "boolean"
                 }
             },
             "additionalProperties": false
