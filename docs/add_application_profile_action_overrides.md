@@ -1,8 +1,8 @@
-# AddProfileActionOverrides Task
+# add_applications_profile_action_overrides Task
 
 ## Overview
 
-The `AddProfileActionOverrides` task allows you to add or update `profileActionOverrides` in Salesforce CustomApplication metadata files. This is useful for customizing how different profiles interact with standard Salesforce actions (View, Edit, New, etc.) by redirecting them to custom Lightning pages, Visualforce pages, or Lightning components.
+The `add_applications_profile_action_overrides` task allows you to add or update `profileActionOverrides` in Salesforce Custom Application metadata files. This is useful for customizing how different profiles interact with standard Salesforce actions (View, Edit, New, etc.) by redirecting them to custom Lightning pages, Visualforce pages, or Lightning components.
 
 ## Task Class
 
@@ -52,9 +52,7 @@ The task identifies duplicate overrides by matching on:
 ### Basic Example - Single Override
 
 ```yaml
-tasks:
-  add_account_view_override:
-    class_path: cumulusci.tasks.metadata_etl.applications.AddProfileActionOverrides
+  add_applications_profile_action_overrides:
     options:
       applications:
         - name: "AdministrationConsole"
@@ -71,9 +69,7 @@ tasks:
 ### Multiple Overrides Example
 
 ```yaml
-tasks:
-  add_multiple_overrides:
-    class_path: cumulusci.tasks.metadata_etl.applications.AddProfileActionOverrides
+  add_applications_profile_action_overrides:
     options:
       applications:
         - name: "AdministrationConsole"
@@ -104,9 +100,7 @@ tasks:
 ### Override Without Record Type
 
 ```yaml
-tasks:
-  add_generic_contact_override:
-    class_path: cumulusci.tasks.metadata_etl.applications.AddProfileActionOverrides
+  add_applications_profile_action_overrides:
     options:
       applications:
         - name: "SalesConsole"
@@ -123,9 +117,7 @@ tasks:
 ### With Namespace Injection
 
 ```yaml
-tasks:
-  add_namespaced_override:
-    class_path: cumulusci.tasks.metadata_etl.applications.AddProfileActionOverrides
+  add_applications_profile_action_overrides:
     options:
       managed: True
       applications:
@@ -150,7 +142,7 @@ flows:
     steps:
       # ... other steps ...
       5.1:
-        task: add_profile_action_overrides
+        task: add_applications_profile_action_overrides
         options:
           applications:
             - name: "AdministrationConsole"
@@ -169,12 +161,12 @@ flows:
 
 ```bash
 # Basic usage
-cci task run add_profile_action_overrides \
+cci task run add_applications_profile_action_overrides \
   --applications '[{"name":"AdministrationConsole","overrides":[{"action_name":"View","content":"CustomPage","form_factor":"Large","page_or_sobject_type":"Account","type":"Flexipage","profile":"Admin"}]}]' \
   --org dev
 
 # With namespace injection
-cci task run add_profile_action_overrides \
+cci task run add_applications_profile_action_overrides \
   --managed True \
   --applications '[{"name":"%%%NAMESPACE%%%AdministrationConsole","overrides":[{"action_name":"View","content":"%%%NAMESPACE%%%CustomPage","form_factor":"Large","page_or_sobject_type":"Account","type":"Flexipage","profile":"Admin"}]}]' \
   --org dev
@@ -185,10 +177,6 @@ cci task run add_profile_action_overrides \
 ```python
 from cumulusci.core.runtime import BaseCumulusCI
 from cumulusci.tasks.metadata_etl.applications import AddProfileActionOverrides
-
-# Get runtime
-runtime = BaseCumulusCI()
-runtime.keychain.get_default_org()
 
 # Configure and run task
 task_config = {
