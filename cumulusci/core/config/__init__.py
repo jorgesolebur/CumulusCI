@@ -68,6 +68,7 @@ class TaskConfig(BaseConfig):
     name: str
     checks: list
     project_config: "BaseProjectConfig"
+    is_global: bool
 
     # TODO: What if an intermediate repo "allows" a downstream repo?
     #       Only the top repo should be allowed to do so.

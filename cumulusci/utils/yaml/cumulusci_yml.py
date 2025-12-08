@@ -68,6 +68,7 @@ class Task(CCIDictModel):
     options: Dict[str, Any] = VSCodeFriendlyDict
     ui_options: Dict[str, Any] = VSCodeFriendlyDict
     name: str = None  # get rid of this???
+    is_global: bool = False
 
 
 class Flow(CCIDictModel):
