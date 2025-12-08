@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.43 (2025-12-08)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Clean profile action overrides task for custom applications. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#161](https://github.com/jorgesolebur/CumulusCI/pull/161)
+* Add task execution in universal context. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#163](https://github.com/jorgesolebur/CumulusCI/pull/163)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.42...v5.0.43
+
+
+<!-- latest-stop -->
+
 ## v5.0.42 (2025-12-07)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -14,8 +28,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.41...v5.0.42
 
-
-<!-- latest-stop -->
 
 ## v5.0.41 (2025-12-04)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
