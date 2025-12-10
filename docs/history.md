@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.44 (2025-12-10)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Escape characters in quotes to write to file. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#165](https://github.com/jorgesolebur/CumulusCI/pull/165)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.43...v5.0.44
+
+
+<!-- latest-stop -->
+
 ## v5.0.43 (2025-12-08)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.42...v5.0.43
 
-
-<!-- latest-stop -->
 
 ## v5.0.42 (2025-12-07)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
