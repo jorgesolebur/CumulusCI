@@ -64,18 +64,21 @@ class SecretsToEnv(BaseTask):
 
         self._init_secrets()
 
-        output_file = self.parsed_options.env_path
-
         for secret_key, secret_name in self.secrets.items():
             if secret_key == "*":
                 self.env_values.update(
                     self._get_all_credentials(secret_key, secret_name=secret_name)
                 )
             else:
-                safe_value, _ = self._get_credential(
+                self.env_values[secret_key] = self._get_credential(
                     secret_key, secret_key, secret_name=secret_name
                 )
-                self.env_values[secret_key] = safe_value
+        self.return_values = {"env_values": self.env_values}
+        self._write_env_file()
+
+    def _write_env_file(self):
+        safe_env_values = {}
+        output_file = self.parsed_options.env_path
 
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_file) or ".", exist_ok=True)
@@ -83,7 +86,37 @@ class SecretsToEnv(BaseTask):
         # Write env file with UTF-8 encoding to support Unicode characters
         with open(output_file, "w", encoding="utf-8") as env_file:
             for key, value in self.env_values.items():
-                env_file.write(f'{key}="{value}"\n')
+                safe_env_values[key] = self._escape_env_value(value)
+                env_file.write(f'{key}="{safe_env_values[key]}"\n')
+
+        self.return_values["safe_env_values"] = safe_env_values
+
+    # https://pypi.org/project/python-dotenv/ -> README -> Escaping Values
+    def _escape_env_value(self, value):
+        """
+        Escape special characters for .env file values in double quotes.
+        Escapes: \\, \', \", \a, \b, \f, \n, \r, \t, \v
+        """
+        if not isinstance(value, str):
+            return value
+
+        escape_map = {
+            "\\": "\\\\",  # Backslash must be first
+            "'": "\\'",  # Single quote
+            '"': '\\"',  # Double quote
+            "\a": "\\a",  # Bell/Alert
+            "\b": "\\b",  # Backspace
+            "\f": "\\f",  # Form feed
+            "\n": "\\n",  # Newline
+            "\r": "\\r",  # Carriage return
+            "\t": "\\t",  # Tab
+            "\v": "\\v",  # Vertical tab
+        }
+
+        for char, escaped in escape_map.items():
+            value = value.replace(char, escaped)
+
+        return value
 
     def _get_credential(
         self,
@@ -108,8 +141,7 @@ class SecretsToEnv(BaseTask):
         self.logger.info(
             f"Set secrets env var from {self.provider.provider_type}: {env_key}={display_value}"
         )
-        safe_value = cred_secret_value.replace('"', '\\"').replace("\n", "\\n")
-        return safe_value, cred_secret_value
+        return cred_secret_value
 
     def _get_all_credentials(
         self, credential_key, display_value="*****", secret_name=None
@@ -129,7 +161,6 @@ class SecretsToEnv(BaseTask):
             self.logger.info(
                 f"Set secrets env var from {self.provider.provider_type}: {key}={display_value}"
             )
-            safe_value = value.replace('"', '\\"').replace("\n", "\\n")
-            dict_values[key] = safe_value
+            dict_values[key] = value
 
         return dict_values
