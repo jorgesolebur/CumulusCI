@@ -173,11 +173,11 @@ def main(args=None):
         with set_debug_mode(debug):
             try:
                 runtime = CliRuntime(load_keychain=False)
+                runtime.check_cumulusci_version()
             except Exception as e:
                 handle_exception(e, is_error_command, tempfile_path, debug)
                 sys.exit(1)
 
-            runtime.check_cumulusci_version()
             should_show_stacktraces = runtime.universal_config.cli__show_stacktraces
 
             init_logger(debug=debug)
@@ -233,7 +233,8 @@ def handle_exception(
         with open(logfile_path, "a") as log_file:
             traceback.print_exc(file=log_file)  # log stacktrace silently
 
-    if should_show_stacktraces and not isinstance(error, USAGE_ERRORS):
+    # Show stacktraces when explicitly requested (e.g., --debug flag)
+    if should_show_stacktraces:
         error_console.print_exception()
 
 

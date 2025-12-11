@@ -53,7 +53,10 @@ class SfdxOrgConfig(OrgConfig):
                     "Failed to parse json from output.\n  "
                     f"Exception: {e.__class__.__name__}\n  Output: {''.join(stdout_list)}"
                 )
-            org_id = org_info["result"]["accessToken"].split("!")[0]
+            org_id = (
+                org_info["result"].get("id")
+                or org_info["result"]["accessToken"].split("!")[0]
+            )
 
         sfdx_info = {
             "instance_url": org_info["result"]["instanceUrl"],
