@@ -14,12 +14,63 @@ except ImportError:
     pass
 
 
+def _set_windows_console_encoding():
+    """Set Windows console encoding to UTF-8 to support Unicode characters.
+
+    This function attempts multiple methods to set UTF-8 encoding on Windows:
+    1. Sets PYTHONIOENCODING environment variable
+    2. Sets sys.stdout and sys.stderr encoding
+    3. Uses Windows console API if available
+    """
+    if os.name != "nt":  # Only on Windows
+        return
+
+    try:
+        # Method 1: Set environment variable (affects subprocesses too)
+        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+        # Method 2: Reconfigure stdout/stderr with UTF-8 encoding
+        # This works if the streams support reconfiguration
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError):
+                pass
+
+        if hasattr(sys.stderr, "reconfigure"):
+            try:
+                sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, ValueError):
+                pass
+
+        # Method 3: Use Windows console API to set code page to UTF-8 (65001)
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            # Set console output code page to UTF-8
+            kernel32.SetConsoleOutputCP(65001)
+            # Set console input code page to UTF-8 (optional, for input)
+            kernel32.SetConsoleCP(65001)
+        except (AttributeError, OSError):
+            # Windows API not available or failed, continue with other methods
+            pass
+
+    except Exception:
+        # If any method fails, continue - encoding setup is best-effort
+        # The console should handle UTF-8 if Windows API calls succeed
+        pass
+
+
 def init_logger(debug=False):
     """Initialize the logger"""
 
     logger = logging.getLogger(__name__.split(".")[0])
     for handler in logger.handlers:  # pragma: no cover
         logger.removeHandler(handler)
+
+    # Set Windows console encoding to UTF-8 before initializing colorama
+    _set_windows_console_encoding()
 
     if os.name == "nt" and "colorama" in sys.modules:  # pragma: no cover
         colorama.init()
