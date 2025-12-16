@@ -38,8 +38,18 @@ class AddIPRanges(MetadataSingleEntityTransformTask):
     def _transform_entity(
         self, metadata: MetadataElement, api_name: str
     ) -> MetadataElement:
+        import json
+        
+        # Parse JSON string if ranges is a string
+        options = self.options.copy()
+        if isinstance(options.get("ranges"), str):
+            try:
+                options["ranges"] = json.loads(options["ranges"])
+            except json.JSONDecodeError as e:
+                raise TaskOptionsError(f"Invalid JSON in ranges option: {e}")
+        
         try:
-            opts = AddIPRangesOptions.parse_obj(self.options)
+            opts = AddIPRangesOptions.parse_obj(options)
         except pydantic.ValidationError as exc:
             raise TaskOptionsError(f"Invalid options: {exc}")
 
