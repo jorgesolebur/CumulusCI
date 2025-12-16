@@ -23,7 +23,7 @@ from cumulusci.utils.logging import tee_stdout_stderr
 
 from .error import error
 from .flow import flow
-from .logger import get_tempfile_logger, init_logger
+from .logger import _set_windows_console_encoding, get_tempfile_logger, init_logger
 from .org import org
 from .plan import plan
 from .project import project
@@ -151,6 +151,9 @@ def main(args=None):
 
         # (If enabled) set up requests to validate certs using system CA certs instead of certifi
         init_requests_trust()
+
+        # Set Windows console encoding early (before wrapping stdout/stderr)
+        _set_windows_console_encoding()
 
         # Check for updates _unless_ we've been asked to output JSON,
         # or if we're going to check anyway as part of the `version` command.

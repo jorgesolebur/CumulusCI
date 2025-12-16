@@ -36,11 +36,13 @@ def reset_signal_handler_flag():
 @mock.patch("cumulusci.cli.cci.get_tempfile_logger")
 @mock.patch("cumulusci.cli.cci.init_logger")
 @mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
 @mock.patch("cumulusci.cli.cci.CliRuntime")
 @mock.patch("cumulusci.cli.cci.cli")
 def test_main(
     cli,
     CliRuntime,
+    set_windows_encoding,
     check_latest_version,
     init_logger,
     get_tempfile_logger,
@@ -49,6 +51,8 @@ def test_main(
     get_tempfile_logger.return_value = mock.Mock(), "tempfile.log"
     cci.main()
 
+    # Verify _set_windows_console_encoding is called
+    set_windows_encoding.assert_called_once()
     check_latest_version.assert_called_once()
     init_logger.assert_called_once()
     CliRuntime.assert_called_once()
@@ -60,6 +64,7 @@ def test_main(
 @mock.patch("cumulusci.cli.cci.get_tempfile_logger")
 @mock.patch("cumulusci.cli.cci.init_logger")
 @mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
 @mock.patch("cumulusci.cli.cci.CliRuntime")
 @mock.patch("cumulusci.cli.cci.cli")
 @mock.patch("pdb.post_mortem")
@@ -69,6 +74,7 @@ def test_main__debug(
     post_mortem,
     cli,
     CliRuntime,
+    set_windows_encoding,
     check_latest_version,
     init_logger,
     get_tempfile_logger,
@@ -79,6 +85,7 @@ def test_main__debug(
 
     cci.main(["cci", "--debug"])
 
+    set_windows_encoding.assert_called_once()
     check_latest_version.assert_called_once()
     init_logger.assert_called_once_with(debug=True)
     CliRuntime.assert_called_once()
