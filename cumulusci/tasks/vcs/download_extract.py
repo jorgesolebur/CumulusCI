@@ -1,7 +1,7 @@
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import yaml
 
@@ -11,13 +11,76 @@ from cumulusci.core.tasks import BaseTask
 from cumulusci.utils import download_extract_vcs_from_repo, filter_namelist
 from cumulusci.utils.options import (
     CCIOptions,
+    CCIOptionType,
     Field,
     ListOfStringsOption,
-    MappingOption,
+    parse_list_of_pairs_dict_arg,
 )
 from cumulusci.vcs.bootstrap import get_repo_from_url
 from cumulusci.vcs.models import AbstractRepo
 from cumulusci.vcs.utils import get_ref_from_options
+
+
+class DownloadExtractRenamesOption(CCIOptionType):
+    """Parses renames option from string, dict, or list of dicts format.
+
+    Supports:
+    - String format: "src/old.py:src/new.py,docs/:documentation/"
+    - Dict format: {"src/old.py": "src/new.py", "docs/": "documentation/"}
+    - List of dicts format: [{"local": "src/old.py", "target": "src/new.py"}, ...]
+    """
+
+    @classmethod
+    def from_str(cls, v) -> Dict[str, str]:
+        """Parse string format like "key:value,key2:value2" """
+        return parse_list_of_pairs_dict_arg(v)
+
+    @classmethod
+    def validate(cls, v):
+        """Validate and convert renames from various input formats."""
+        if v is None:
+            return {}
+
+        # Handle string format (delegates to from_str)
+        if isinstance(v, str):
+            return super().validate(v)
+
+        # Handle dict format - return as-is
+        if isinstance(v, dict):
+            return v
+
+        # Handle list of dicts format (for backward compatibility)
+        if isinstance(v, list):
+            if not v:  # Empty list
+                return {}
+
+            # Validate all items are dicts with correct keys
+            is_list_of_dicts = all(isinstance(pair, dict) for pair in v)
+            dicts_have_correct_keys = is_list_of_dicts and all(
+                {"local", "target"} == pair.keys() for pair in v
+            )
+
+            ERROR_MSG = "Renamed paths must be a list of dicts with `local:` and `target:` keys."
+            if not dicts_have_correct_keys:
+                raise TaskOptionsError(ERROR_MSG)
+
+            # Convert list of dicts to flat dict
+            local_to_target_paths = {}
+            for rename in v:
+                local_path = rename.get("local")
+                target_path = rename.get("target")
+
+                if local_path and target_path:
+                    local_to_target_paths[local_path] = target_path
+                else:
+                    raise TaskOptionsError(ERROR_MSG)
+
+            return local_to_target_paths
+
+        # Invalid type
+        raise TaskOptionsError(
+            f"Renames must be a string, dict, or list of dicts, got {type(v).__name__}"
+        )
 
 
 class DownloadExtract(BaseTask):
@@ -67,8 +130,8 @@ class DownloadExtract(BaseTask):
                 "Directories must end with a trailing slash."
             ),
         )
-        renames: Optional[MappingOption] = Field(
-            None,
+        renames: Optional[DownloadExtractRenamesOption] = Field(
+            {},
             description=(
                 "A list of paths to rename in the target repo, "
                 "given as `local:` `target:` pairs."
@@ -108,45 +171,6 @@ class DownloadExtract(BaseTask):
         with timestamp_file(self.parsed_options.target_directory) as f:
             yaml.dump({"commit": self.commit, "timestamp": time.time()}, f)
 
-    def _process_renames(self, renamed_paths):
-        """
-        For each entry in renames, process renames and store them
-        in self.local_to_target_paths.
-        """
-        if not renamed_paths:
-            return {}
-
-        # MappingOption already returns a dict, so we can use it directly
-        if isinstance(renamed_paths, dict):
-            return renamed_paths
-
-        # Handle list of dicts format (for backward compatibility)
-        if isinstance(renamed_paths, list):
-            is_list_of_dicts = all(isinstance(pair, dict) for pair in renamed_paths)
-            dicts_have_correct_keys = is_list_of_dicts and all(
-                {"local", "target"} == pair.keys() for pair in renamed_paths
-            )
-
-            ERROR_MSG = "Renamed paths must be a list of dicts with `local:` and `target:` keys."
-            if not dicts_have_correct_keys:
-                raise TaskOptionsError(ERROR_MSG)
-
-            local_to_target_paths = {}
-
-            for rename in renamed_paths:
-                local_path = rename.get("local")
-                target_path = rename.get("target")
-
-                if local_path and target_path:
-                    local_to_target_paths[local_path] = target_path
-                else:
-                    raise TaskOptionsError(ERROR_MSG)
-
-            return local_to_target_paths
-
-        # If it's neither dict nor list, return empty dict
-        return {}
-
     def _set_ref(self):
         if self.parsed_options.branch:
             branch = self.parsed_options.branch
@@ -154,12 +178,8 @@ class DownloadExtract(BaseTask):
             return
 
         try:
-            # Use options dict format for get_ref_from_options compatibility
-            ref_options = {
-                "tag_name": self.parsed_options.tag_name,
-                "ref": self.parsed_options.ref,
-            }
-            self.ref = get_ref_from_options(self.project_config, ref_options)
+            # Pass parsed_options directly - Pydantic models support dict-like access
+            self.ref = get_ref_from_options(self.project_config, self.parsed_options)
         except CumulusCIException:
             # If no ref, tag_name or branch is set, default to the repo's default branch
             self.ref = f"heads/{self.repo.default_branch}"
@@ -180,14 +200,11 @@ class DownloadExtract(BaseTask):
         zf.close()
 
     def _rename_files(self, zip_dir):
-        renames = self._process_renames(
-            self.parsed_options.renames if self.parsed_options.renames else {}
-        )
-
-        if not renames:
+        # renames are already processed by DownloadExtractRenamesOption
+        if not self.parsed_options.renames:
             return
 
-        for local_name, target_name in renames.items():
+        for local_name, target_name in self.parsed_options.renames.items():
             local_path = Path(zip_dir, local_name)
             if local_path.exists():
                 target_path = Path(zip_dir, target_name)

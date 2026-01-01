@@ -128,6 +128,11 @@ def flow_info(runtime, flow_name):
     help="If set, deletes the scratch org after the flow completes",
 )
 @click.option(
+    "--no-org",
+    is_flag=True,
+    help="If set, does not need an org for the flow to run against, no-org and org options are mutually exclusive",
+)
+@click.option(
     "--debug", is_flag=True, help="Drops into pdb, the Python debugger, on an exception"
 )
 @click.option(
@@ -142,12 +147,17 @@ def flow_info(runtime, flow_name):
     help="Disables all prompts.  Set for non-interactive mode use such as calling from scripts or CI systems",
 )
 @pass_runtime(require_keychain=True)
-def flow_run(runtime, flow_name, org, delete_org, debug, o, no_prompt):
+def flow_run(runtime, flow_name, org, delete_org, no_org, debug, o, no_prompt):
 
     # Get necessary configs
-    org, org_config = runtime.get_org(org)
-    if delete_org and not org_config.scratch:
-        raise click.UsageError("--delete-org can only be used with a scratch org")
+    org_config = None
+    if no_org:
+        if org:
+            raise click.UsageError("--no-org and --org are mutually exclusive")
+    else:
+        org, org_config = runtime.get_org(org, fail_if_missing=True)
+        if not org_config.scratch:
+            raise click.UsageError("--delete-org can only be used with a scratch org")
 
     # Parse command line options
     options = defaultdict(dict)

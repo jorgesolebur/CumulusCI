@@ -795,10 +795,6 @@ tasks:
         description: Consolidate unpackaged metadata from multiple sources into a single directory
         class_path: cumulusci.tasks.utility.copyContents.ConsolidateUnpackagedMetadata
         group: Utilities
-    execute_remote_script:
-        description: Download and execute a Python script from a VCS repository
-        class_path: cumulusci.tasks.vcs.executeRemoteScript.ExecuteRemoteScript
-        group: VCS
     download_extract:
         description: Downloads files and folders from a VCS repository.
         class_path: cumulusci.tasks.vcs.download_extract.DownloadExtract
