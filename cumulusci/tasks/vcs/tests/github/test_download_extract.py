@@ -28,11 +28,11 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["repo_url"] == self.repo_url
-        assert task.options["target_directory"] == "test_dir"
-        assert task.options["include"] is None
-        assert task.options["renames"] == {}
-        assert task.options["force"] is False
+        assert task.parsed_options.repo_url == self.repo_url
+        assert task.parsed_options.target_directory == "test_dir"
+        assert task.parsed_options.include is None
+        assert task.parsed_options.renames == {}
+        assert task.parsed_options.force is False
 
     def test_init_options__with_include_list(self):
         """Test initialization with include list"""
@@ -47,7 +47,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["include"] == ["src/", "docs/README.md"]
+        assert task.parsed_options.include == ["src/", "docs/README.md"]
 
     def test_init_options__with_include_string(self):
         """Test initialization with include as string"""
@@ -62,7 +62,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["include"] == ["src/", "docs/README.md"]
+        assert task.parsed_options.include == ["src/", "docs/README.md"]
 
     def test_init_options__with_force_true(self):
         """Test initialization with force option as True"""
@@ -77,7 +77,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["force"] is True
+        assert task.parsed_options.force is True
 
     def test_init_options__with_force_string(self):
         """Test initialization with force option as string"""
@@ -92,7 +92,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["force"] is True
+        assert task.parsed_options.force is True
 
     def test_process_renames__valid_renames(self):
         """Test processing valid renames"""
@@ -114,7 +114,7 @@ class TestDownloadExtract:
             "src/old.py": "src/new.py",
             "docs/": "documentation/",
         }
-        assert task.options["renames"] == expected_renames
+        assert task.parsed_options.renames == expected_renames
 
     def test_process_renames__empty_renames(self):
         """Test processing empty renames"""
@@ -129,7 +129,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["renames"] == {}
+        assert task.parsed_options.renames == {}
 
     def test_process_renames__none_renames(self):
         """Test processing None renames"""
@@ -143,7 +143,7 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        assert task.options["renames"] == {}
+        assert task.parsed_options.renames == {}
 
     def test_process_renames__invalid_not_list_of_dicts(self):
         """Test processing invalid renames - not list of dicts"""
@@ -276,7 +276,7 @@ class TestDownloadExtract:
         task._set_ref()
 
         assert task.ref == "tags/v1.0.0"
-        mock_get_ref.assert_called_once_with(task.project_config, task.options)
+        mock_get_ref.assert_called_once_with(task.project_config, task.parsed_options)
 
     @mock.patch("cumulusci.tasks.vcs.download_extract.get_repo_from_url")
     @mock.patch("cumulusci.tasks.vcs.download_extract.get_ref_from_options")
@@ -301,7 +301,7 @@ class TestDownloadExtract:
         task._set_ref()
 
         assert task.ref == "refs/heads/feature-branch"
-        mock_get_ref.assert_called_once_with(task.project_config, task.options)
+        mock_get_ref.assert_called_once_with(task.project_config, task.parsed_options)
 
     @mock.patch("cumulusci.tasks.vcs.download_extract.get_repo_from_url")
     @mock.patch("cumulusci.tasks.vcs.download_extract.get_ref_from_options")
@@ -369,7 +369,7 @@ class TestDownloadExtract:
         task._set_target_directory()
 
         expected_path = os.path.join(self.project_config.repo_root, "test_dir")
-        assert task.options["target_directory"] == expected_path
+        assert task.parsed_options.target_directory == expected_path
 
     def test_set_target_directory__absolute_path(self):
         """Test _set_target_directory with absolute path"""
@@ -387,7 +387,7 @@ class TestDownloadExtract:
 
             task._set_target_directory()
 
-            assert task.options["target_directory"] == absolute_path
+            assert task.parsed_options.target_directory == absolute_path
         finally:
             # Clean up the temporary directory
             os.rmdir(absolute_path)
@@ -815,7 +815,7 @@ class TestDownloadExtract:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             target_dir = os.path.join(temp_dir, "test_dir")
-            task.options["target_directory"] = target_dir
+            task.parsed_options.target_directory = target_dir
 
             # Ensure the target directory doesn't exist initially
             assert not os.path.exists(target_dir)
@@ -848,7 +848,7 @@ class TestDownloadExtract:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             target_dir = os.path.join(temp_dir, "test_dir")
-            task.options["target_directory"] = target_dir
+            task.parsed_options.target_directory = target_dir
 
             mock_file = mock.Mock()
             mock_timestamp_file.return_value.__enter__.return_value = mock_file
@@ -888,7 +888,7 @@ class TestDownloadExtract:
 
         with tempfile.TemporaryDirectory() as temp_dir:
             target_dir = os.path.join(temp_dir, "test_dir")
-            task.options["target_directory"] = target_dir
+            task.parsed_options.target_directory = target_dir
 
             with mock.patch.object(task, "_check_latest_commit", return_value=True):
                 with mock.patch.object(task, "_set_target_directory"):
@@ -897,4 +897,4 @@ class TestDownloadExtract:
                             task()
 
                             # Should proceed with download even if no changes
-                            assert task.options["force"] is True
+                            assert task.parsed_options.force is True
