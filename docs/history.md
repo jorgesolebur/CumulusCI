@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.47 (2026-01-01)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/run flow without org by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#172](https://github.com/jorgesolebur/CumulusCI/pull/172)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.46...v5.0.47
+
+
+<!-- latest-stop -->
+
 ## v5.0.46 (2025-12-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.45...v5.0.46
 
-
-<!-- latest-stop -->
 
 ## v5.0.45 (2025-12-11)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
