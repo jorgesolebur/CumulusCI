@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.48 (2026-01-06)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Remove duplicate elements from the object xml.(To fix listViews error) by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#174](https://github.com/jorgesolebur/CumulusCI/pull/174)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.47...v5.0.48
+
+
+<!-- latest-stop -->
+
 ## v5.0.47 (2026-01-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.46...v5.0.47
 
-
-<!-- latest-stop -->
 
 ## v5.0.46 (2025-12-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
