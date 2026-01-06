@@ -61,6 +61,10 @@ class SetFieldHelpText(MetadataSingleEntityTransformTask):
     def _transform_entity(self, metadata: MetadataElement, api_name: str):
         for field, help_text in self.api_name_list[api_name]:
             self._modify_help_text(metadata, api_name, field, help_text)
+
+        # Remove duplicate elements before returning
+        self._remove_duplicate_elements(metadata)
+
         return metadata
 
     def _modify_help_text(

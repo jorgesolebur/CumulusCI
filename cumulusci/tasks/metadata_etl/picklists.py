@@ -91,6 +91,9 @@ class AddPicklistEntries(MetadataSingleEntityTransformTask):
         for pl in self.picklists[api_name]:
             self._modify_picklist(metadata, api_name, pl)
 
+        # Remove duplicate elements before returning
+        self._remove_duplicate_elements(metadata)
+
         return metadata
 
     def _modify_picklist(self, metadata: MetadataElement, api_name: str, picklist: str):
