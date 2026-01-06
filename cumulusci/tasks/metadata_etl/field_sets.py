@@ -48,6 +48,9 @@ class AddFieldsToFieldSet(MetadataSingleEntityTransformTask):
         for field_name in self.fields:
             self._add_field(field_set, field_name)
 
+        # Remove duplicate elements before returning
+        self._remove_duplicate_elements(metadata)
+
         return metadata
 
     def _add_field(self, field_set: MetadataElement, field_name: str):

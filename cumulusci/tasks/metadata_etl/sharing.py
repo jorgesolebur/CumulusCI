@@ -96,6 +96,9 @@ class SetOrgWideDefaults(MetadataSingleEntityTransformTask, BaseSalesforceApiTas
                 internal_model = metadata.append("sharingModel")
             internal_model.text = desired_internal_model
 
+        # Remove duplicate elements before returning
+        self._remove_duplicate_elements(metadata)
+
         return metadata
 
     def _poll_action(self):

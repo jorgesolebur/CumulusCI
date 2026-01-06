@@ -1,7 +1,10 @@
 import tempfile
 from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 from pathlib import Path
 from urllib.parse import quote, unquote
+
+from lxml import etree
 
 from cumulusci.core.config import TaskConfig
 from cumulusci.core.enums import StrEnum
@@ -351,6 +354,60 @@ class MetadataSingleEntityTransformTask(BaseMetadataTransformTask, metaclass=ABC
                 removed_api_names.add(api_name)
 
         self.api_names = self.api_names - removed_api_names
+
+    def _normalize_element(self, element: etree._Element) -> str:
+        """Normalize an XML element for comparison by serializing it.
+
+        This creates a canonical representation that ignores whitespace
+        differences. Elements are serialized with sorted attributes.
+        """
+        # Create a deep copy to avoid modifying the original
+        element_copy = etree.fromstring(etree.tostring(element))
+
+        # Sort attributes for consistent comparison
+        if element_copy.attrib:
+            sorted_attrs = dict(sorted(element_copy.attrib.items()))
+            element_copy.attrib.clear()
+            element_copy.attrib.update(sorted_attrs)
+
+        # Serialize to string for comparison
+        # Strip whitespace from text/tail for normalization
+        return etree.tostring(element_copy, encoding="unicode", method="xml")
+
+    def _remove_duplicate_elements(self, metadata: MetadataElement) -> None:
+        """Remove duplicate XML elements from metadata.
+
+        For elements with the same tag name, compares their normalized content
+        and removes duplicates, keeping only unique elements based on their
+        actual content (not just tag name).
+        """
+        # Get all direct child elements grouped by tag name
+        tag_to_elements = defaultdict(list)
+
+        # Iterate through all direct children of the metadata element
+        for child in metadata._element:
+            tag_name = child.tag.split("}")[1] if "}" in child.tag else child.tag
+            tag_to_elements[tag_name].append(child)
+
+        # Remove duplicates based on content comparison
+        for tag_name, elements in tag_to_elements.items():
+            if len(elements) > 1:
+                # Track seen content to identify duplicates
+                seen_content = set()
+                duplicates_to_remove = []
+
+                for element in elements:
+                    normalized = self._normalize_element(element)
+                    if normalized in seen_content:
+                        # This is a duplicate, mark for removal
+                        duplicates_to_remove.append(element)
+                    else:
+                        # First time seeing this content, keep it
+                        seen_content.add(normalized)
+
+                # Remove duplicates (in reverse order to maintain indices)
+                for duplicate in reversed(duplicates_to_remove):
+                    metadata._element.remove(duplicate)
 
 
 class UpdateMetadataFirstChildTextTask(MetadataSingleEntityTransformTask):

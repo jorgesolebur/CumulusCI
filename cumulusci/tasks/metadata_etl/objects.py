@@ -58,6 +58,10 @@ class SetObjectSettings(MetadataSingleEntityTransformTask):
             self._apply_setting(metadata, setting, True)
         for setting in self.options["disable"]:
             self._apply_setting(metadata, setting, False)
+
+        # Remove duplicate elements before returning
+        self._remove_duplicate_elements(metadata)
+
         return metadata
 
     def _apply_setting(self, metadata: MetadataElement, setting: str, enable: bool):
