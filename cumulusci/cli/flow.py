@@ -156,7 +156,7 @@ def flow_run(runtime, flow_name, org, delete_org, no_org, debug, o, no_prompt):
             raise click.UsageError("--no-org and --org are mutually exclusive")
     else:
         org, org_config = runtime.get_org(org, fail_if_missing=True)
-        if not org_config.scratch:
+        if delete_org and not org_config.scratch:
             raise click.UsageError("--delete-org can only be used with a scratch org")
 
     # Parse command line options
