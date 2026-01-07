@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.49 (2026-01-07)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Throw error only when the delete_org option passed. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#176](https://github.com/jorgesolebur/CumulusCI/pull/176)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.48...v5.0.49
+
+
+<!-- latest-stop -->
+
 ## v5.0.48 (2026-01-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.47...v5.0.48
 
-
-<!-- latest-stop -->
 
 ## v5.0.47 (2026-01-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
