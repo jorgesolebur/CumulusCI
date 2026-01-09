@@ -149,6 +149,10 @@ def flow_info(runtime, flow_name):
 @pass_runtime(require_keychain=True)
 def flow_run(runtime, flow_name, org, delete_org, no_org, debug, o, no_prompt):
 
+    # Set click.no_prompt to disable all prompts in non-interactive mode
+    if no_prompt:
+        click.no_prompt = True
+
     # Get necessary configs
     org_config = None
     if no_org:
