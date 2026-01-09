@@ -881,6 +881,10 @@ tasks:
         options:
             package_name: $project_config.project__package__name
             fail_on_error: False
+    delete_package:
+        class_path: cumulusci.tasks.salesforce.deprecate_package.DeprecatePackage
+        description: Deprecate a Salesforce Package2 (2GP package) and its associated Package2Version records.
+        group: Salesforce Packages
     update_named_credential:
         class_path: cumulusci.tasks.salesforce.update_named_credential.UpdateNamedCredential
         description: Update named credential parameters

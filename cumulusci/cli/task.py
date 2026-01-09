@@ -159,6 +159,10 @@ class RunTaskCommand(click.MultiCommand):
 
         def run_task(*args, **kwargs):
             """Callback function that executes when the command fires."""
+            # Set click.no_prompt to disable all prompts in non-interactive mode
+            if kwargs.get("no_prompt", False):
+                click.no_prompt = True
+
             # Load environment variables FIRST, before any task processing
             if kwargs.get("loadenv", None) and runtime.project_config is not None:
                 # Load .env file from the project root directory

@@ -742,6 +742,7 @@ class RestApiDmlOperation(BaseDmlOperation):
         selection_priority_fields=None,
         content_type=None,
         threshold=None,
+        tooling=False,
     ):
         super().__init__(
             sobject=sobject,
@@ -752,10 +753,10 @@ class RestApiDmlOperation(BaseDmlOperation):
         )
 
         # Because we send values in JSON, we must convert Booleans and nulls
-        describe = {
-            field["name"]: field
-            for field in getattr(context.sf, sobject).describe()["fields"]
-        }
+        obj = getattr(context.sf, sobject)
+        if tooling:
+            obj.base_url = obj.base_url.replace("/sobjects/", "/tooling/sobjects/")
+        describe = {field["name"]: field for field in obj.describe()["fields"]}
         self.boolean_fields = [
             f for f in fields if "." not in f and describe[f]["type"] == "boolean"
         ]

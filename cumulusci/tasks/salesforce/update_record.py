@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic.v1 import root_validator
 
 from cumulusci.core.exceptions import SalesforceException
+from cumulusci.tasks.bulkdata.step import DataOperationType, RestApiDmlOperation
 from cumulusci.tasks.salesforce import BaseSalesforceApiTask
 from cumulusci.utils.options import CCIOptions, Field, MappingOption
 
@@ -94,7 +95,10 @@ class UpdateRecord(BaseSalesforceApiTask):
 
     def _update_by_id(self, record_id):
         """Update a single record by ID"""
-        object_handler = getattr(self.api, self.parsed_options.object)
+        if self.parsed_options.tooling:
+            object_handler = self._get_tooling_object(self.parsed_options.object)
+        else:
+            object_handler = getattr(self.api, self.parsed_options.object)
 
         try:
             rc = object_handler.update(record_id, self.final_values)
@@ -162,11 +166,9 @@ class UpdateRecord(BaseSalesforceApiTask):
             # Single record: use direct update
             self._update_by_id(records[0]["Id"])
         else:
-            # Multiple records: use bulk update
-            self._update_records_bulk(records)
+            self._update_bulk(records)
 
-    def _update_records_bulk(self, records):
-        """Update multiple records using Bulk API"""
+    def _update_bulk(self, records):
         # Prepare data for bulk update
         update_data = []
         for record in records:
@@ -179,39 +181,94 @@ class UpdateRecord(BaseSalesforceApiTask):
         )
 
         try:
-            # Use Bulk API for update
-            results = self.bulk.update(self.parsed_options.object, update_data)
-
-            # Process results
-            success_count = 0
-            failed_records = []
-
-            for idx, result in enumerate(results):
-                record_id = update_data[idx]["Id"]
-                if result.success:
-                    success_count += 1
-                    self.logger.info(f"Updated record: {record_id}")
-                else:
-                    error_msg = f"Failed to update record {record_id}: {result.error}"
-                    failed_records.append({"id": record_id, "error": result.error})
-                    self.logger.error(error_msg)
-
-            # Summary logging
-            self.logger.info(
-                f"Bulk update complete: {success_count}/{len(update_data)} records updated successfully"
-            )
-
-            # Handle failures
-            if failed_records and self.parsed_options.fail_on_error:
-                error_summary = "\n".join(
-                    [f"  - {rec['id']}: {rec['error']}" for rec in failed_records]
-                )
-                raise SalesforceException(
-                    f"Failed to update {len(failed_records)} record(s):\n{error_summary}"
-                )
-
+            if self.parsed_options.tooling:
+                self._update_records_tooling(update_data)
+            else:
+                # Multiple records: use bulk update
+                self._update_records_bulk(update_data)
         except Exception as e:
             if self.parsed_options.fail_on_error:
                 raise SalesforceException(f"Bulk update failed: {str(e)}")
             else:
                 self.logger.error(f"Bulk update failed: {str(e)}")
+
+    def _update_records_bulk(self, update_data):
+        """Update multiple records using Bulk API"""
+        # Use Bulk API for update
+        results = self.bulk.update(self.parsed_options.object, update_data)
+
+        # Process results
+        success_count = 0
+        failed_records = []
+
+        for idx, result in enumerate(results):
+            record_id = update_data[idx]["Id"]
+            if result.success:
+                success_count += 1
+                self.logger.info(f"Updated record: {record_id}")
+            else:
+                error_msg = f"Failed to update record {record_id}: {result.error}"
+                failed_records.append({"id": record_id, "error": result.error})
+                self.logger.error(error_msg)
+
+        # Summary logging
+        self.logger.info(
+            f"Bulk update complete: {success_count}/{len(update_data)} records updated successfully"
+        )
+
+        # Handle failures
+        if failed_records and self.parsed_options.fail_on_error:
+            error_summary = "\n".join(
+                [f"  - {rec['id']}: {rec['error']}" for rec in failed_records]
+            )
+            raise SalesforceException(
+                f"Failed to update {len(failed_records)} record(s):\n{error_summary}"
+            )
+
+    def _update_records_tooling(self, update_data):
+        fields = list(update_data[0].keys())
+        dml_op = RestApiDmlOperation(
+            sobject=self.parsed_options.object,
+            operation=DataOperationType.UPDATE,
+            api_options={},
+            context=self,
+            fields=fields,
+            tooling=True,
+        )
+
+        dml_op.start()
+        dml_op.load_records(
+            iter([tuple(record[field] for field in fields) for record in update_data])
+        )
+        dml_op.end()
+
+        # Process results
+        success_count = 0
+        failed_records = []
+
+        for idx, result in enumerate(dml_op.get_results()):
+            if result.success:
+                success_count += 1
+                self.logger.info(f"Updated record: {update_data[idx]['Id']}")
+            else:
+                error_msg = (
+                    f"Failed to update record {update_data[idx]['Id']}: {result.error}"
+                )
+                failed_records.append(
+                    {"id": update_data[idx]["Id"], "error": result.error}
+                )
+                self.logger.error(error_msg)
+
+        # Summary logging
+        self.logger.info(
+            f"Bulk update complete: {success_count}/{len(update_data)} records updated successfully"
+        )
+
+        # Handle failures
+        if failed_records and self.parsed_options.fail_on_error:
+            error_summary = "\n".join(
+                [f"  - {rec['id']}: {rec['error']}" for rec in failed_records]
+            )
+            raise SalesforceException(
+                f"Failed to update {len(failed_records)} record(s):\n{error_summary}"
+            )
