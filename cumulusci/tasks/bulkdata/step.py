@@ -777,8 +777,7 @@ class RestApiDmlOperation(BaseDmlOperation):
         self.threshold = threshold
 
     def _record_to_json(self, rec):
-        result = {"attributes": {"type": self.sobject}}
-        result.update(dict(zip(self.fields, rec)))
+        result = dict(zip(self.fields, rec))
         for boolean_field in self.boolean_fields:
             try:
                 result[boolean_field] = process_bool_arg(result[boolean_field] or False)
@@ -797,6 +796,7 @@ class RestApiDmlOperation(BaseDmlOperation):
         elif self.operation in (DataOperationType.UPDATE, DataOperationType.UPSERT):
             result = {k: (result[k] if result[k] != "" else None) for k in result}
 
+        result["attributes"] = {"type": self.sobject}
         return result
 
     def get_prev_record_values(self, records):

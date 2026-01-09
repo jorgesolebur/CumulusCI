@@ -437,6 +437,9 @@ class TestDeprecatePackage:
     def test_run_task_with_versions_and_confirmation(self, mock_confirm):
         """Test full task execution with versions and user confirmation"""
         mock_confirm.return_value = True
+        import click
+
+        click.no_prompt = False
 
         task = create_task(
             DeprecatePackage,
@@ -501,6 +504,9 @@ class TestDeprecatePackage:
     def test_run_task_user_cancels(self, mock_confirm):
         """Test user cancellation"""
         mock_confirm.return_value = False
+        import click
+
+        click.no_prompt = False
 
         task = create_task(
             DeprecatePackage,
@@ -702,6 +708,10 @@ class TestDeprecatePackage:
 
     def test_run_task_no_versions_with_confirmation(self):
         """Test task execution with no versions but with confirmation"""
+        import click
+
+        click.no_prompt = False
+
         task = create_task(
             DeprecatePackage,
             {
