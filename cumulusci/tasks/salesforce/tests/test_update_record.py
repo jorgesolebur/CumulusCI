@@ -3,6 +3,7 @@ from unittest import mock
 import pytest
 
 from cumulusci.core.exceptions import SalesforceException
+from cumulusci.tasks.bulkdata.step import DataOperationResult, DataOperationType
 from cumulusci.tasks.salesforce.update_record import UpdateRecord
 
 from .util import create_task
@@ -510,3 +511,225 @@ class TestUpdateRecord:
             }
         finally:
             del os.environ["TEST_STATUS_VALUE"]
+
+    def test_run_task_with_tooling_api_bulk_update_success(self):
+        """Test tooling API bulk update with multiple records - all succeed"""
+        task = create_task(
+            UpdateRecord,
+            {
+                "object": "PermissionSet",
+                "where": "Label:TestPermissionSet",
+                "values": "Label:UpdatedLabel",
+                "tooling": True,
+            },
+        )
+        task._init_task()
+        task.tooling = mock.Mock()
+        task.api = task.tooling
+        task.tooling.query.return_value = {
+            "records": [
+                {"Id": "0PS3D000000MKTqWAO"},
+                {"Id": "0PS3D000000MKTqWAO2"},
+            ],
+            "totalSize": 2,
+        }
+
+        # Mock RestApiDmlOperation
+        mock_dml_op = mock.Mock()
+        mock_dml_op.get_results.return_value = [
+            DataOperationResult("0PS3D000000MKTqWAO", True, ""),
+            DataOperationResult("0PS3D000000MKTqWAO2", True, ""),
+        ]
+
+        with mock.patch(
+            "cumulusci.tasks.salesforce.update_record.RestApiDmlOperation",
+            return_value=mock_dml_op,
+        ) as mock_rest_api:
+            task._run_task()
+
+        # Verify RestApiDmlOperation was created correctly
+        mock_rest_api.assert_called_once()
+        call_kwargs = mock_rest_api.call_args[1]
+        assert call_kwargs["sobject"] == "PermissionSet"
+        assert call_kwargs["operation"] == DataOperationType.UPDATE
+        assert call_kwargs["tooling"] is True
+        assert call_kwargs["fields"] == ["Id", "Label"]
+
+        # Verify DML operation methods were called
+        mock_dml_op.start.assert_called_once()
+        mock_dml_op.load_records.assert_called_once()
+        mock_dml_op.end.assert_called_once()
+        mock_dml_op.get_results.assert_called_once()
+
+    def test_run_task_with_tooling_api_bulk_update_partial_failure_fail_on_error_true(
+        self,
+    ):
+        """Test tooling API bulk update with partial failures - fail_on_error=True"""
+        task = create_task(
+            UpdateRecord,
+            {
+                "object": "PermissionSet",
+                "where": "Label:TestPermissionSet",
+                "values": "Label:UpdatedLabel",
+                "tooling": True,
+                "fail_on_error": True,
+            },
+        )
+        task._init_task()
+        task.tooling = mock.Mock()
+        task.api = task.tooling
+        task.tooling.query.return_value = {
+            "records": [
+                {"Id": "0PS3D000000MKTqWAO"},
+                {"Id": "0PS3D000000MKTqWAO2"},
+            ],
+            "totalSize": 2,
+        }
+
+        # Mock RestApiDmlOperation with one success and one failure
+        mock_dml_op = mock.Mock()
+        mock_dml_op.get_results.return_value = [
+            DataOperationResult("0PS3D000000MKTqWAO", True, ""),
+            DataOperationResult("0PS3D000000MKTqWAO2", False, "Update failed"),
+        ]
+
+        with mock.patch(
+            "cumulusci.tasks.salesforce.update_record.RestApiDmlOperation",
+            return_value=mock_dml_op,
+        ):
+            with pytest.raises(SalesforceException) as exc_info:
+                task._run_task()
+
+        assert "Failed to update 1 record(s)" in str(exc_info.value)
+        assert "0PS3D000000MKTqWAO2: Update failed" in str(exc_info.value)
+
+    def test_run_task_with_tooling_api_bulk_update_partial_failure_fail_on_error_false(
+        self,
+    ):
+        """Test tooling API bulk update with partial failures - fail_on_error=False"""
+        task = create_task(
+            UpdateRecord,
+            {
+                "object": "PermissionSet",
+                "where": "Label:TestPermissionSet",
+                "values": "Label:UpdatedLabel",
+                "tooling": True,
+                "fail_on_error": False,
+            },
+        )
+        task._init_task()
+        task.tooling = mock.Mock()
+        task.api = task.tooling
+        task.tooling.query.return_value = {
+            "records": [
+                {"Id": "0PS3D000000MKTqWAO"},
+                {"Id": "0PS3D000000MKTqWAO2"},
+            ],
+            "totalSize": 2,
+        }
+
+        # Mock RestApiDmlOperation with one success and one failure
+        mock_dml_op = mock.Mock()
+        mock_dml_op.get_results.return_value = [
+            DataOperationResult("0PS3D000000MKTqWAO", True, ""),
+            DataOperationResult("0PS3D000000MKTqWAO2", False, "Update failed"),
+        ]
+
+        with mock.patch(
+            "cumulusci.tasks.salesforce.update_record.RestApiDmlOperation",
+            return_value=mock_dml_op,
+        ):
+            # Should not raise an exception
+            task._run_task()
+
+        # Verify DML operation methods were called
+        mock_dml_op.start.assert_called_once()
+        mock_dml_op.load_records.assert_called_once()
+        mock_dml_op.end.assert_called_once()
+        mock_dml_op.get_results.assert_called_once()
+
+    def test_run_task_with_tooling_api_bulk_update_all_failures_fail_on_error_true(
+        self,
+    ):
+        """Test tooling API bulk update with all failures - fail_on_error=True"""
+        task = create_task(
+            UpdateRecord,
+            {
+                "object": "PermissionSet",
+                "where": "Label:TestPermissionSet",
+                "values": "Label:UpdatedLabel",
+                "tooling": True,
+                "fail_on_error": True,
+            },
+        )
+        task._init_task()
+        task.tooling = mock.Mock()
+        task.api = task.tooling
+        task.tooling.query.return_value = {
+            "records": [
+                {"Id": "0PS3D000000MKTqWAO"},
+                {"Id": "0PS3D000000MKTqWAO2"},
+            ],
+            "totalSize": 2,
+        }
+
+        # Mock RestApiDmlOperation with all failures
+        mock_dml_op = mock.Mock()
+        mock_dml_op.get_results.return_value = [
+            DataOperationResult("0PS3D000000MKTqWAO", False, "Error 1"),
+            DataOperationResult("0PS3D000000MKTqWAO2", False, "Error 2"),
+        ]
+
+        with mock.patch(
+            "cumulusci.tasks.salesforce.update_record.RestApiDmlOperation",
+            return_value=mock_dml_op,
+        ):
+            with pytest.raises(SalesforceException) as exc_info:
+                task._run_task()
+
+        assert "Failed to update 2 record(s)" in str(exc_info.value)
+        assert "0PS3D000000MKTqWAO: Error 1" in str(exc_info.value)
+        assert "0PS3D000000MKTqWAO2: Error 2" in str(exc_info.value)
+
+    def test_run_task_with_tooling_api_bulk_update_load_records_format(self):
+        """Test that load_records is called with correct tuple format for tooling API"""
+        task = create_task(
+            UpdateRecord,
+            {
+                "object": "PermissionSet",
+                "where": "Label:TestPermissionSet",
+                "values": "Label:UpdatedLabel,Description:TestDesc",
+                "tooling": True,
+            },
+        )
+        task._init_task()
+        task.tooling = mock.Mock()
+        task.api = task.tooling
+        task.tooling.query.return_value = {
+            "records": [
+                {"Id": "0PS3D000000MKTqWAO"},
+                {"Id": "0PS3D000000MKTqWAO2"},
+            ],
+            "totalSize": 2,
+        }
+
+        # Mock RestApiDmlOperation
+        mock_dml_op = mock.Mock()
+        mock_dml_op.get_results.return_value = [
+            DataOperationResult("0PS3D000000MKTqWAO", True, ""),
+            DataOperationResult("0PS3D000000MKTqWAO2", True, ""),
+        ]
+
+        with mock.patch(
+            "cumulusci.tasks.salesforce.update_record.RestApiDmlOperation",
+            return_value=mock_dml_op,
+        ):
+            task._run_task()
+
+        # Verify load_records was called with tuples in correct order
+        load_records_call = mock_dml_op.load_records.call_args[0][0]
+        records_list = list(load_records_call)
+        assert len(records_list) == 2
+        # Fields should be in order: Id, Label, Description
+        assert records_list[0] == ("0PS3D000000MKTqWAO", "UpdatedLabel", "TestDesc")
+        assert records_list[1] == ("0PS3D000000MKTqWAO2", "UpdatedLabel", "TestDesc")

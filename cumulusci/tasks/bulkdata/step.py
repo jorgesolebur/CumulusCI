@@ -742,6 +742,7 @@ class RestApiDmlOperation(BaseDmlOperation):
         selection_priority_fields=None,
         content_type=None,
         threshold=None,
+        tooling=False,
     ):
         super().__init__(
             sobject=sobject,
@@ -752,10 +753,10 @@ class RestApiDmlOperation(BaseDmlOperation):
         )
 
         # Because we send values in JSON, we must convert Booleans and nulls
-        describe = {
-            field["name"]: field
-            for field in getattr(context.sf, sobject).describe()["fields"]
-        }
+        obj = getattr(context.sf, sobject)
+        if tooling:
+            obj.base_url = obj.base_url.replace("/sobjects/", "/tooling/sobjects/")
+        describe = {field["name"]: field for field in obj.describe()["fields"]}
         self.boolean_fields = [
             f for f in fields if "." not in f and describe[f]["type"] == "boolean"
         ]
@@ -776,7 +777,8 @@ class RestApiDmlOperation(BaseDmlOperation):
         self.threshold = threshold
 
     def _record_to_json(self, rec):
-        result = dict(zip(self.fields, rec))
+        result = {"attributes": {"type": self.sobject}}
+        result.update(dict(zip(self.fields, rec)))
         for boolean_field in self.boolean_fields:
             try:
                 result[boolean_field] = process_bool_arg(result[boolean_field] or False)
@@ -795,7 +797,6 @@ class RestApiDmlOperation(BaseDmlOperation):
         elif self.operation in (DataOperationType.UPDATE, DataOperationType.UPSERT):
             result = {k: (result[k] if result[k] != "" else None) for k in result}
 
-        result["attributes"] = {"type": self.sobject}
         return result
 
     def get_prev_record_values(self, records):
