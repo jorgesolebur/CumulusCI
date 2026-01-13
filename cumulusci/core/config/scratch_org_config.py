@@ -146,21 +146,8 @@ class ScratchOrgConfig(SfdxOrgConfig):
         self.config["created"] = True
 
     def _build_org_create_args(self) -> List[str]:
-        args = ["-f", self.config_file, "-w", "120"]
-        devhub_username: Optional[str] = self._choose_devhub_username()
-        if devhub_username:
-            args += ["--target-dev-hub", devhub_username]
-        if not self.namespaced:
-            args += ["--no-namespace"]
-        if self.noancestors:
-            args += ["--no-ancestors"]
-        if self.days:
-            args += ["--duration-days", str(self.days)]
-        if self.release:
-            args += [f"--release={self.release}"]
-        if self.sfdx_alias:
-            args += ["-a", self.sfdx_alias]
-        with open(self.config_file, "r") as org_def:
+        config_file = self.config_file
+        with open(config_file, "r") as org_def:
             org_def_data = json.load(org_def)
             if (
                 "orgName" in org_def_data
@@ -174,7 +161,29 @@ class ScratchOrgConfig(SfdxOrgConfig):
                     )
                     .replace("%%%CONFIG_NAME%%%", self.name.upper())
                 )
+                config_file = os.path.join(
+                    self.keychain.project_config.cache_dir, "orgs", f"{self.name}.json"
+                )
+                os.makedirs(os.path.dirname(config_file), exist_ok=True)
+                with open(config_file, "w") as f:
+                    json.dump(org_def_data, f, indent=2, ensure_ascii=False)
+
             org_def_has_email = "adminEmail" in org_def_data
+
+        args = ["-f", config_file, "-w", "120"]
+        devhub_username: Optional[str] = self._choose_devhub_username()
+        if devhub_username:
+            args += ["--target-dev-hub", devhub_username]
+        if not self.namespaced:
+            args += ["--no-namespace"]
+        if self.noancestors:
+            args += ["--no-ancestors"]
+        if self.days:
+            args += ["--duration-days", str(self.days)]
+        if self.release:
+            args += [f"--release={self.release}"]
+        if self.sfdx_alias:
+            args += ["-a", self.sfdx_alias]
         if self.email_address and not org_def_has_email:
             args += [f"--admin-email={self.email_address}"]
         if self.default:
