@@ -297,9 +297,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
         - Import / transfer: target org
         - Export: source org (target is csvfile)
         """
-        org_config = (
-            target_org_config if target_org_config is not None else source_org_config
-        )
+        org_config = target_org_config if target_org_config is not None else None
         if org_config is None:
             return None
 

@@ -777,12 +777,9 @@ class TestSfdmuTask:
             # Run the task
             task._run_task()
 
-            # Verify SFDMU was invoked with --canmodify <source instance_url>
+            # When exporting to csvfile there is no target org, so --canmodify is not added
             _, kwargs = mock_sfdx.call_args
-            assert (
-                kwargs["args"][kwargs["args"].index("--canmodify") + 1]
-                == "th-uat-1.my.salesforce.com"
-            )
+            assert "--canmodify" not in kwargs["args"]
 
             # Verify that _process_csv_exports was called
             task._process_csv_exports.assert_called_once()
