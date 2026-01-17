@@ -293,9 +293,8 @@ class SfdmuTask(BaseSalesforceTask, Command):
         SFDMU's --canmodify expects the org domain/hostname (no scheme), e.g.
         th-uat-1.my.salesforce.com
 
-        We use the org that will be modified:
-        - Import / transfer: target org
-        - Export: source org (target is csvfile)
+        We use the target org (the org being modified). If target=csvfile,
+        there is no target org so this returns None.
         """
         org_config = target_org_config if target_org_config is not None else None
         if org_config is None:
@@ -305,8 +304,10 @@ class SfdmuTask(BaseSalesforceTask, Command):
         get_domain = getattr(org_config, "get_domain", None)
         if callable(get_domain):
             domain = get_domain()
-            if domain:
-                return str(domain)
+            # Guard against tests using mock.Mock(), which will happily provide a
+            # callable get_domain() returning another Mock object.
+            if isinstance(domain, str) and domain:
+                return domain
 
         # Fallback: parse from instance_url.
         instance_url = getattr(org_config, "instance_url", None)
