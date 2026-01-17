@@ -762,6 +762,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_source_org = mock.Mock()
             mock_source_org.sfdx_alias = "test_dev"
+            mock_source_org.instance_url = "https://th-uat-1.my.salesforce.com"
             task._validate_org = mock.Mock(
                 side_effect=lambda org: mock_source_org if org == "dev" else None
             )
@@ -775,6 +776,13 @@ class TestSfdmuTask:
 
             # Run the task
             task._run_task()
+
+            # Verify SFDMU was invoked with --canmodify <source instance_url>
+            _, kwargs = mock_sfdx.call_args
+            assert (
+                kwargs["args"][kwargs["args"].index("--canmodify") + 1]
+                == "th-uat-1.my.salesforce.com"
+            )
 
             # Verify that _process_csv_exports was called
             task._process_csv_exports.assert_called_once()
@@ -806,6 +814,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
+            mock_org.instance_url = "https://th-uat-1.my.salesforce.com"
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
@@ -816,6 +825,13 @@ class TestSfdmuTask:
 
             # Run the task
             task._run_task()
+
+            # Verify SFDMU was invoked with --canmodify <target instance_url>
+            _, kwargs = mock_sfdx.call_args
+            assert (
+                kwargs["args"][kwargs["args"].index("--canmodify") + 1]
+                == "th-uat-1.my.salesforce.com"
+            )
 
             # Verify that _process_csv_exports was NOT called
             task._process_csv_exports.assert_not_called()
