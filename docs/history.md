@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.52 (2026-01-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Enable suppoort for --canmodify in SFDMU for prod orgs by [@jorgesolebur](https://github.com/jorgesolebur) in [#182](https://github.com/jorgesolebur/CumulusCI/pull/182)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.51...v5.0.52
+
+
+<!-- latest-stop -->
+
 ## v5.0.51 (2026-01-13)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.50...v5.0.51
 
-
-<!-- latest-stop -->
 
 ## v5.0.50 (2026-01-09)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
