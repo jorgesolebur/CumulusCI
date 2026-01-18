@@ -287,6 +287,25 @@ class SfdmuTask(BaseSalesforceTask, Command):
 
         self.logger.info("CSV post-processing completed successfully")
 
+    def _get_canmodify_value(self, source_org_config, target_org_config):
+        """Return the value for --canmodify, or None if not applicable.
+
+        SFDMU's --canmodify expects the org domain/hostname (no scheme), e.g.
+        th-uat-1.my.salesforce.com
+
+        We use the target org (the org being modified). If target=csvfile,
+        there is no target org so this returns None.
+        """
+        org_config = target_org_config if target_org_config is not None else None
+        if org_config is None:
+            return None
+
+        # Prefer OrgConfig.get_domain() when available.
+        domain = org_config.get_domain()
+        if domain:
+            return domain
+        return None
+
     def _run_task(self):
         """Execute the SFDmu task."""
         # Validate source and target orgs
@@ -323,6 +342,15 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "-p",
             execute_path,
         ]
+
+        # Respect an explicitly provided --canmodify in additional_params.
+        additional_params_tokens = (self.options.get("additional_params") or "").split()
+        if "--canmodify" not in additional_params_tokens:
+            canmodify_value = self._get_canmodify_value(
+                source_org_config, target_org_config
+            )
+            if canmodify_value:
+                command_parts.extend(["--canmodify", canmodify_value])
 
         # Append additional parameters if provided
         if self.options.get("additional_params"):
