@@ -301,23 +301,10 @@ class SfdmuTask(BaseSalesforceTask, Command):
             return None
 
         # Prefer OrgConfig.get_domain() when available.
-        get_domain = getattr(org_config, "get_domain", None)
-        if callable(get_domain):
-            domain = get_domain()
-            # Guard against tests using mock.Mock(), which will happily provide a
-            # callable get_domain() returning another Mock object.
-            if isinstance(domain, str) and domain:
-                return domain
-
-        # Fallback: parse from instance_url.
-        instance_url = getattr(org_config, "instance_url", None)
-        if not instance_url:
-            return None
-
-        from urllib.parse import urlparse
-
-        parsed = urlparse(str(instance_url).rstrip("/"))
-        return parsed.hostname or None
+        domain = org_config.get_domain()
+        if domain:
+            return domain
+        return None
 
     def _run_task(self):
         """Execute the SFDmu task."""

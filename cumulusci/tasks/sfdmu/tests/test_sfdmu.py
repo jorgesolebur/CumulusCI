@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 
+from cumulusci.core.config.org_config import OrgConfig
 from cumulusci.tasks.salesforce.tests.util import create_task
 from cumulusci.tasks.sfdmu.sfdmu import SfdmuTask
 
@@ -812,6 +813,7 @@ class TestSfdmuTask:
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
             mock_org.instance_url = "https://th-uat-1.my.salesforce.com"
+            mock_org.get_domain = mock.Mock(return_value="th-uat-1.my.salesforce.com")
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
@@ -828,6 +830,119 @@ class TestSfdmuTask:
             assert (
                 kwargs["args"][kwargs["args"].index("--canmodify") + 1]
                 == "th-uat-1.my.salesforce.com"
+            )
+
+            # Verify that _process_csv_exports was NOT called
+            task._process_csv_exports.assert_not_called()
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_process_csv_exports_not_called_with_real_get_domain(self, mock_sfdx):
+        """Test that _process_csv_exports is NOT called when target is an org, without mocking get_domain."""
+        from urllib.parse import urlparse
+
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask, {"source": "dev", "target": "qa", "path": base_dir}
+            )
+            task.project_config.project__package__namespace = "testns"
+
+            # Mock sfdx command
+            mock_sfdx_result = mock.Mock()
+            mock_sfdx_result.stdout_text = iter([])
+            mock_sfdx_result.stderr_text = iter([])
+            mock_sfdx.return_value = mock_sfdx_result
+
+            # Mock _validate_org with a mock org that has get_domain as a real method
+            mock_org = mock.Mock()
+            mock_org.sfdx_alias = "test_org"
+            mock_org.instance_url = "https://test-org.my.salesforce.com"
+            # Implement get_domain as a real method (not mocked) that extracts domain from instance_url
+            mock_org.get_domain = lambda: urlparse(mock_org.instance_url).hostname or ""
+            task._validate_org = mock.Mock(return_value=mock_org)
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Spy on _process_csv_exports
+            task._process_csv_exports = mock.Mock()
+
+            # Run the task
+            task._run_task()
+
+            # Verify SFDMU was invoked with --canmodify <target instance_url>
+            _, kwargs = mock_sfdx.call_args
+            assert (
+                kwargs["args"][kwargs["args"].index("--canmodify") + 1]
+                == "test-org.my.salesforce.com"
+            )
+
+            # Verify that _process_csv_exports was NOT called
+            task._process_csv_exports.assert_not_called()
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.sfdx")
+    def test_process_csv_exports_not_called_with_real_target_org(self, mock_sfdx):
+        """Test that _process_csv_exports is NOT called when target is a real org config."""
+        with tempfile.TemporaryDirectory() as base_dir:
+            # Create export.json
+            export_json = os.path.join(base_dir, "export.json")
+            with open(export_json, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask, {"source": "dev", "target": "qa", "path": base_dir}
+            )
+            task.project_config.project__package__namespace = "testns"
+
+            # Mock sfdx command
+            mock_sfdx_result = mock.Mock()
+            mock_sfdx_result.stdout_text = iter([])
+            mock_sfdx_result.stderr_text = iter([])
+            mock_sfdx.return_value = mock_sfdx_result
+
+            # Create a real OrgConfig for target (not mocked)
+            real_target_org = OrgConfig(
+                {
+                    "instance_url": "https://real-target-org.my.salesforce.com",
+                    "id": "https://test.salesforce.com/ORG_ID/USER_ID",
+                    "access_token": "TOKEN",
+                    "org_id": "ORG_ID",
+                    "username": "test-cci@example.com",
+                },
+                "qa",
+            )
+            real_target_org.sfdx_alias = "qa_org"
+
+            # Mock source org
+            mock_source_org = mock.Mock()
+            mock_source_org.sfdx_alias = "dev_org"
+
+            # Mock _validate_org to return real org for target, mocked org for source
+            task._validate_org = mock.Mock(
+                side_effect=lambda org: real_target_org
+                if org == "qa"
+                else mock_source_org
+            )
+
+            # Mock _inject_namespace_tokens
+            task._inject_namespace_tokens = mock.Mock()
+
+            # Spy on _process_csv_exports
+            task._process_csv_exports = mock.Mock()
+
+            # Run the task
+            task._run_task()
+
+            # Verify SFDMU was invoked with --canmodify <target instance_url>
+            # The real OrgConfig.get_domain() extracts domain from instance_url
+            _, kwargs = mock_sfdx.call_args
+            assert (
+                kwargs["args"][kwargs["args"].index("--canmodify") + 1]
+                == "real-target-org.my.salesforce.com"
             )
 
             # Verify that _process_csv_exports was NOT called
@@ -864,6 +979,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
+            mock_org.get_domain = mock.Mock(return_value="test-org.my.salesforce.com")
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
@@ -898,6 +1014,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
+            mock_org.get_domain = mock.Mock(return_value="test-org.my.salesforce.com")
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
@@ -935,6 +1052,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
+            mock_org.get_domain = mock.Mock(return_value="test-org.my.salesforce.com")
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
@@ -973,6 +1091,7 @@ class TestSfdmuTask:
             # Mock _validate_org
             mock_org = mock.Mock()
             mock_org.sfdx_alias = "test_org"
+            mock_org.get_domain = mock.Mock(return_value="test-org.my.salesforce.com")
             task._validate_org = mock.Mock(return_value=mock_org)
 
             # Mock _inject_namespace_tokens
