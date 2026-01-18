@@ -161,12 +161,13 @@ class ScratchOrgConfig(SfdxOrgConfig):
                     )
                     .replace("%%%CONFIG_NAME%%%", self.name.upper())
                 )
-                config_file = os.path.join(
-                    self.keychain.project_config.cache_dir, "orgs", f"{self.name}.json"
-                )
-                os.makedirs(os.path.dirname(config_file), exist_ok=True)
-                with open(config_file, "w") as f:
-                    json.dump(org_def_data, f, indent=2, ensure_ascii=False)
+
+                with self.keychain.project_config.open_cache("orgs") as org_cache:
+                    with (org_cache / f"{self.name}.json").open(
+                        "w", encoding="utf-8"
+                    ) as f:
+                        config_file = f.name.decode("utf-8", errors="ignore")
+                        json.dump(org_def_data, f, indent=2)
 
             org_def_has_email = "adminEmail" in org_def_data
 
