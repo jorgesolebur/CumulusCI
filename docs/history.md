@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.53 (2026-01-19)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Get instance url from the config. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#184](https://github.com/jorgesolebur/CumulusCI/pull/184)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.52...v5.0.53
+
+
+<!-- latest-stop -->
+
 ## v5.0.52 (2026-01-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.51...v5.0.52
 
-
-<!-- latest-stop -->
 
 ## v5.0.51 (2026-01-13)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
