@@ -384,7 +384,7 @@ class OrgConfig(BaseConfig):
         self.keychain.set_org(self, self.global_org)
 
     def get_domain(self):
-        instance_url = self.config.get("instance_url", self.instance_url or "")
+        instance_url = self.config.get("instance_url", "")
         return urlparse(instance_url).hostname or ""
 
     def get_orginfo_cache_dir(self, cachename):
