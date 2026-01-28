@@ -448,16 +448,22 @@ class CustomObjectParser(MetadataFilenameParser):
         if len(item.split("__")) > 2:
             return members
 
-        # Skip standard objects
-        if (
-            not item.endswith("__c.object")
-            and not item.endswith("__mdt.object")
-            and not item.endswith("__e.object")
-            and not item.endswith("__b.object")
-        ):
-            return members
+        # Include custom objects (ending with __c, __mdt, __e, __b)
+        is_custom_object = (
+            item.endswith("__c.object")
+            or item.endswith("__mdt.object")
+            or item.endswith("__e.object")
+            or item.endswith("__b.object")
+        )
 
-        members.append(self.strip_extension(item))
+        # Also include standard objects for object settings (sharingModel, etc.)
+        # This allows Health Cloud objects like DiagnosticSummary, CodeSet, etc.
+        # to have their settings deployed via the objects/ directory
+        is_standard_object_settings = item.endswith(".object") and not is_custom_object
+
+        if is_custom_object or is_standard_object_settings:
+            members.append(self.strip_extension(item))
+
         return members
 
     def _strip_component(self, item, component_list):
@@ -465,13 +471,19 @@ class CustomObjectParser(MetadataFilenameParser):
         if len(item.split("__")) > 2:
             return
 
-        # Skip standard objects
-        if (
-            not item.endswith("__c.object")
-            and not item.endswith("__mdt.object")
-            and not item.endswith("__e.object")
-            and not item.endswith("__b.object")
-        ):
+        # Include custom objects (ending with __c, __mdt, __e, __b)
+        is_custom_object = (
+            item.endswith("__c.object")
+            or item.endswith("__mdt.object")
+            or item.endswith("__e.object")
+            or item.endswith("__b.object")
+        )
+
+        # Also include standard objects for object settings
+        is_standard_object_settings = item.endswith(".object") and not is_custom_object
+
+        # Skip if neither custom object nor standard object settings
+        if not (is_custom_object or is_standard_object_settings):
             return
 
         if self.strip_extension(item) not in component_list:
