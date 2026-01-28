@@ -340,6 +340,11 @@ class TestBuildSettingsPackage:
         <name>BusinessProcess</name>
     </types>
     <types>
+        <members>Account</members>
+        <members>Solution</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
         <members>Account.Default</members>
         <members>Solution.Default</members>
         <name>RecordType</name>

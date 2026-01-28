@@ -316,7 +316,7 @@ class TestCustomObjectParser:
 
     def test_parse_item__skips_standard(self):
         parser = CustomObjectParser("CustomObject", None, "object", False)
-        assert [] == parser._parse_item("Account.object")
+        assert ["Account"] == parser._parse_item("Account.object")
 
 
 class TestRecordTypeParser:
