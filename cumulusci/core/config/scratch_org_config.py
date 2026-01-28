@@ -146,32 +146,11 @@ class ScratchOrgConfig(SfdxOrgConfig):
         self.config["created"] = True
 
     def _build_org_create_args(self) -> List[str]:
-        config_file = self.config_file
-        with open(config_file, "r") as org_def:
+        with open(self.config_file, "r") as org_def:
             org_def_data = json.load(org_def)
-            if (
-                "orgName" in org_def_data
-                and org_def_data["orgName"] is not None
-                and self.keychain.project_config.project__name is not None
-            ):
-                org_def_data["orgName"] = (
-                    org_def_data["orgName"]
-                    .replace(
-                        "%%%PROJECT_NAME%%%", self.keychain.project_config.project__name
-                    )
-                    .replace("%%%CONFIG_NAME%%%", self.name.upper())
-                )
-
-                with self.keychain.project_config.open_cache("orgs") as org_cache:
-                    with (org_cache / f"{self.name}.json").open(
-                        "w", encoding="utf-8"
-                    ) as f:
-                        config_file = f.name.decode("utf-8", errors="ignore")
-                        json.dump(org_def_data, f, indent=2)
-
             org_def_has_email = "adminEmail" in org_def_data
 
-        args = ["-f", config_file, "-w", "120"]
+        args = ["-f", self.config_file, "-w", "120"]
         devhub_username: Optional[str] = self._choose_devhub_username()
         if devhub_username:
             args += ["--target-dev-hub", devhub_username]
