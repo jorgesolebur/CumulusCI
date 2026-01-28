@@ -1,8 +1,11 @@
 import datetime
+import functools
 import json
+import os
 from json.decoder import JSONDecodeError
 
 from cumulusci.core.config import OrgConfig
+from cumulusci.core.config.project_config import BaseProjectConfig
 from cumulusci.core.exceptions import SfdxOrgException
 from cumulusci.core.sfdx import sfdx
 from cumulusci.utils import get_git_config
@@ -12,6 +15,25 @@ nl = "\n"  # fstrings can't contain backslashes
 
 class SfdxOrgConfig(OrgConfig):
     """Org config which loads from sfdx keychain"""
+
+    def _load_config(self):
+        super()._load_config()
+
+        if (
+            self.keychain
+            and self.keychain.project_config
+            and isinstance(self.keychain.project_config, BaseProjectConfig)
+            and self.keychain.project_config.project__name
+            and self.config_file
+            and os.path.exists(self.config_file)
+        ):
+            with self.keychain.project_config.open_cache("orgs") as org_cache:
+                self.config_file = load_config_file(
+                    self.name,
+                    self.keychain.project_config.project__name,
+                    self.config_file,
+                    str(org_cache.getsyspath()),
+                )
 
     @property
     def sfdx_info(self):
@@ -221,3 +243,33 @@ class SfdxOrgConfig(OrgConfig):
         self.sfdx_info
         # Get additional org info by querying API
         self._load_orginfo()
+
+
+@functools.lru_cache(50)
+def load_config_file(
+    org_name: str, project_name: str, config_file: str, org_cache_path: str
+) -> str:
+    if not config_file or not os.path.exists(config_file):
+        return ""
+
+    with open(config_file, "r") as org_def:
+        org_def_data = json.load(org_def)
+        if (
+            "orgName" in org_def_data
+            and org_def_data["orgName"] is not None
+            and project_name
+        ):
+            org_def_data["orgName"] = (
+                org_def_data["orgName"]
+                .replace("%%%PROJECT_NAME%%%", project_name)
+                .replace("%%%CONFIG_NAME%%%", org_name.upper())
+            )
+
+            # Join the cache path with the org-specific filename
+            cached_file_path = os.path.join(org_cache_path, f"{org_name}.json")
+
+            with open(cached_file_path, "w", encoding="utf-8") as f:
+                json.dump(org_def_data, f, indent=2)
+                config_file = cached_file_path
+
+    return config_file
