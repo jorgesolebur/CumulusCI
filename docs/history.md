@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.54 (2026-01-28)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Handle org name token replacement at the base class level. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#186](https://github.com/jorgesolebur/CumulusCI/pull/186)
+* Create package version with settings for objects in package.xml by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#187](https://github.com/jorgesolebur/CumulusCI/pull/187)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.53...v5.0.54
+
+
+<!-- latest-stop -->
+
 ## v5.0.53 (2026-01-19)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.52...v5.0.53
 
-
-<!-- latest-stop -->
 
 ## v5.0.52 (2026-01-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
