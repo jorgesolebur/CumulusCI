@@ -57,7 +57,8 @@ dependencies = [
     "xmltodict",
     "docutils<=0.21.2",
     "python-dotenv",
-    "boto3"
+    "boto3",
+    "setuptools==81.0.0"
 ]
 
 [dependency-groups]
