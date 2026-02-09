@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.55 (2026-02-09)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix setup tools version to 81 by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#190](https://github.com/jorgesolebur/CumulusCI/pull/190)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.54...v5.0.55
+
+
+<!-- latest-stop -->
+
 ## v5.0.54 (2026-01-28)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.53...v5.0.54
 
-
-<!-- latest-stop -->
 
 ## v5.0.53 (2026-01-19)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
