@@ -278,6 +278,10 @@ eventDeliveries:
     - type: EventDelivery
       class: MetadataFilenameParser
       extension: delivery
+extlClntAppOauthPolicies:
+    - type: ExtlClntAppOauthConfigurablePolicies
+      class: MetadataFilenameParser
+      extension: ecaOauthPlcy
 experiences:
     - type: ExperienceBundle
       class: BundleParser
