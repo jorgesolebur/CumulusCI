@@ -5,14 +5,13 @@ from typing import Union
 from dotenv import dotenv_values
 
 from cumulusci.core.tasks import BaseTask
+from cumulusci.tasks.utility.credentialManager import CredentialManager
 from cumulusci.utils.options import (
     CCIOptions,
     Field,
     ListOfStringsOption,
     MappingOption,
 )
-
-from .credentialManager import CredentialManager
 
 
 class GenericOptions(CCIOptions):
