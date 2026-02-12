@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.56 (2026-02-12)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/pm 2648 by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#192](https://github.com/jorgesolebur/CumulusCI/pull/192)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.55...v5.0.56
+
+
+<!-- latest-stop -->
+
 ## v5.0.55 (2026-02-09)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.54...v5.0.55
 
-
-<!-- latest-stop -->
 
 ## v5.0.54 (2026-01-28)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
