@@ -724,6 +724,12 @@ tasks:
         description: Installs all dependencies in project__dependencies into the target org
         class_path: cumulusci.tasks.salesforce.UpdateDependencies
         group: Salesforce Packages
+    update_eca_oauth_policy:
+        group: Metadata Transformations
+        description: Updates ExtlClntAppOauthConfigurablePolicies metadata. For user fields (executeHandlerAs, clientCredentialsFlowUser), pass user_alias to resolve to Username.
+        class_path: cumulusci.tasks.metadata_etl.eca_oauth_policy.UpdateEcaOauthPolicy
+        options:
+            namespace_inject: $project_config.project__package__namespace
     update_metadata_first_child_text:
         group: Metadata Transformations
         description: Updates the text of the first child of Metadata with matching tag.  Adds a child for tag if it does not exist.
