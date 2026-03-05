@@ -364,7 +364,7 @@ class FlowCoordinator:
         self.steps = self._init_steps()
         self._expression_cache = {}
         self._jinja2_context = None
-        self._context_project_config = None
+        self._flow_project_config = None
         self._context_org_config = None
 
     @classmethod
@@ -537,16 +537,17 @@ class FlowCoordinator:
         """Get or create jinja2 context, reusing when possible."""
         if (
             self._jinja2_context is None
-            or self._context_project_config != project_config
+            or self._flow_project_config != project_config
             or self._context_org_config != org_config
         ):
 
             self._jinja2_context = {
-                "project_config": project_config,
+                "project_config": self.project_config,
                 "org_config": org_config,
                 "env": dict(os.environ),
+                "flow_project_config": project_config,
             }
-            self._context_project_config = project_config
+            self._flow_project_config = project_config
             self._context_org_config = org_config
 
         return self._jinja2_context
