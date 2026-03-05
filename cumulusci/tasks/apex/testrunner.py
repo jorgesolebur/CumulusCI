@@ -508,7 +508,8 @@ class RunApexTests(BaseSalesforceApiTask):
                     "options": {
                         "base_ref": self.parsed_options.base_ref,
                         "file_extensions": ["cls", "flow-meta.xml", "trigger"],
-                        "directories": ["force-app", "src"],
+                        "directories": ["force-app"],
+                        "include_uncommitted": True,
                     }
                 }
             ),
@@ -518,17 +519,8 @@ class RunApexTests(BaseSalesforceApiTask):
 
         branch_return_values = task.return_values.copy()
 
-        # Get the list of modified files which are not yet committed.
-        self.logger.info("")
-        self.logger.info("Getting the list of uncommitted files in the current branch.")
-        task.parsed_options.base_ref = "HEAD"
-        task()
-        uncommitted_return_values = task.return_values.copy()
-
         # Get the list of changed files.
-        branch_files = set(branch_return_values.get("files", []))
-        uncommitted_files = set(uncommitted_return_values.get("files", []))
-        changed_files = branch_files.union(uncommitted_files)
+        changed_files = set(branch_return_values.get("files", []))
 
         if not changed_files:
             self.logger.info(
@@ -537,9 +529,7 @@ class RunApexTests(BaseSalesforceApiTask):
             return []
 
         # Extract class names from changed files
-        affected_class_names = branch_return_values.get("file_names", set()).union(
-            uncommitted_return_values.get("file_names", set())
-        )
+        affected_class_names = branch_return_values.get("file_names", set())
 
         if not affected_class_names:
             self.logger.info("No file names found in changed files.")
