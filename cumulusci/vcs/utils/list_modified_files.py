@@ -30,6 +30,10 @@ class ListModifiedFiles(BaseTask):
             ["force-app", "src"],
             description="List of directories to extract. If not set, only the default package directory is extracted. Example: ['force-app', 'src']",
         )
+        include_uncommitted: bool = Field(
+            False,
+            description="If True, includes uncommitted files in the output. If False, only includes committed files in the output. Default is False.",
+        )
 
     parsed_options: Options
 
@@ -37,9 +41,23 @@ class ListModifiedFiles(BaseTask):
         super(ListModifiedFiles, self)._init_options(kwargs)
 
         if self.parsed_options.base_ref is None:
-            self.parsed_options.base_ref = (
-                self.project_config.project__git__default_branch or "main"
-            )
+            self.parsed_options.base_ref = self._get_reference_branch()
+
+    def _get_reference_branch(self) -> str:
+        """Get the reference branch name."""
+        branch = self.project_config.repo_branch
+
+        # If the branch name contains __ get the branch name before the last __
+        if "__" in branch:
+            try:
+                branch = branch.rsplit("__", 1)[0]
+                repo = self.project_config.get_repo()
+                repo_branch = repo.branch(branch)
+                return repo_branch.name
+            except Exception:
+                self.logger.warning(f"Could not find branch {branch} in repository.")
+
+        return self.project_config.project__git__default_branch or "main"
 
     def _run_task(self):
         """Run the task to list modified files."""
@@ -123,7 +141,27 @@ class ListModifiedFiles(BaseTask):
                 )
                 return None
 
-            return set([f.strip() for f in result.stdout.splitlines() if f.strip()])
+            changed_files = set(
+                [f.strip() for f in result.stdout.splitlines() if f.strip()]
+            )
+
+            if self.parsed_options.include_uncommitted:
+                uncommitted_result = subprocess.run(
+                    ["git", "diff", "--name-only", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                uncommitted_files = set(
+                    [
+                        f.strip()
+                        for f in uncommitted_result.stdout.splitlines()
+                        if f.strip()
+                    ]
+                )
+                changed_files = changed_files.union(uncommitted_files)
+
+            return changed_files
 
         except FileNotFoundError:
             self.logger.warning(
