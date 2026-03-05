@@ -349,6 +349,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         )
         self.logger.info(f"  Version Number: {self.return_values['version_number']}")
         self.logger.info(f"  Dependencies: {self.return_values['dependencies']}")
+        self.logger.info(
+            f"  PackageVersionRequest ID: {self.return_values['request_id']}"
+        )
 
     def _get_package_zip_builder_options(self):
         if not self.package_config:
