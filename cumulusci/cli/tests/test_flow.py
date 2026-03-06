@@ -531,7 +531,7 @@ class TestPerformanceImprovements:
 
         # Clear any existing context
         coordinator._jinja2_context = None
-        coordinator._context_project_config = None
+        coordinator._flow_project_config = None
         coordinator._context_org_config = None
 
         step = FlowStepSpec(
@@ -548,7 +548,7 @@ class TestPerformanceImprovements:
         result1 = coordinator._evaluate_flow_step(step)
         assert result1 is True
         assert coordinator._jinja2_context is not None
-        assert coordinator._context_project_config == self.project_config
+        assert coordinator._flow_project_config == self.project_config
         assert coordinator._context_org_config == self.org_config
 
         # Second evaluation should reuse context
