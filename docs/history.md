@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.58 (2026-03-06)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/minor enhancements by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#194](https://github.com/jorgesolebur/CumulusCI/pull/194)
+* Filter the file and names based on extensions. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#196](https://github.com/jorgesolebur/CumulusCI/pull/196)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.56...v5.0.58
+
+
+<!-- latest-stop -->
+
 ## v5.0.57 (2026-03-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.56...v5.0.57
 
-
-<!-- latest-stop -->
 
 ## v5.0.56 (2026-02-12)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
