@@ -48,7 +48,7 @@ class ListModifiedFiles(BaseTask):
         branch = self.project_config.repo_branch
 
         # If the branch name contains __ get the branch name before the last __
-        if "__" in branch:
+        if branch and "__" in branch:
             try:
                 branch = branch.rsplit("__", 1)[0]
                 repo = self.project_config.get_repo()
