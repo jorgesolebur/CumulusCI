@@ -191,7 +191,17 @@ class ListModifiedFiles(BaseTask):
                     filtered_files.add(file_path)
                     break
 
-        return set(filtered_files)
+        if self.parsed_options.file_extensions is not None:
+            filtered_files = set(
+                x
+                for x in filtered_files
+                if any(
+                    x.endswith(ext if ext.startswith(".") else f".{ext}")
+                    for ext in self.parsed_options.file_extensions
+                )
+            )
+
+        return filtered_files
 
     def _extract_file_names_from_files(self, changed_files: Set[str]) -> Set[str]:
         """Extract file names from changed file paths based on specified extensions.

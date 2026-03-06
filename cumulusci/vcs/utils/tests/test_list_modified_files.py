@@ -287,7 +287,7 @@ class TestListModifiedFiles:
 
         task()
 
-        assert len(task.return_values["files"]) == 1
+        assert len(task.return_values["files"]) == 0
         assert task.return_values["file_names"] == set()
 
     @mock.patch("cumulusci.vcs.utils.list_modified_files.subprocess.run")
