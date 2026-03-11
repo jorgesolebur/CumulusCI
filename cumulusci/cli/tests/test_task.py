@@ -318,7 +318,7 @@ def test_task_run__loadenv_with_project_root(load_dotenv, runtime):
 
         # Verify load_dotenv was called with the correct path
         expected_path = Path(temp_dir) / ".env"
-        load_dotenv.assert_called_once_with(expected_path)
+        load_dotenv.assert_called_once_with(dotenv_path=expected_path)
         DummyTask._run_task.assert_called_once()
 
 

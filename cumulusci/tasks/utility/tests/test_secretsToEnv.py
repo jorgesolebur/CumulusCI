@@ -1415,7 +1415,7 @@ class TestSecretsToEnvFileFormat:
                 os.environ.pop(key, None)
 
             # Load the .env file
-            load_dotenv(env_path)
+            load_dotenv(dotenv_path=env_path)
 
             # Verify values are loaded correctly
             assert (

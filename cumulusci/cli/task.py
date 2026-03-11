@@ -168,7 +168,7 @@ class RunTaskCommand(click.MultiCommand):
                 # Load .env file from the project root directory
                 env_path = Path(runtime.project_config.repo_root) / ".env"
                 if env_path and env_path.exists():
-                    load_dotenv(env_path)
+                    load_dotenv(dotenv_path=env_path)
 
             org, org_config = runtime.get_org(
                 kwargs.pop("org", None), fail_if_missing=False
