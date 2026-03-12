@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from cumulusci.utils.yaml.cumulusci_yml import LocalFolderSourceModel
 
@@ -21,8 +22,13 @@ class LocalFolderSource:
 
     def fetch(self):
         """Construct a project config referencing the specified path."""
+        root = os.path.realpath(self.path)
+        # Pass explicit cache_dir so subproject doesn't depend on parent's
+        # repo_root (which may be None in CI/meta-project contexts)
+        cache_dir = Path(root) / ".cci"
         project_config = self.project_config.construct_subproject_config(
-            repo_info={"root": os.path.realpath(self.path)}
+            repo_info={"root": root},
+            cache_dir=cache_dir,
         )
         return project_config
 

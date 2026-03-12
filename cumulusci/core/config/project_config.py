@@ -730,10 +730,15 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
 
     def construct_subproject_config(self, **kwargs) -> "BaseProjectConfig":
         """Construct another project config for an external source"""
+        # Use caller's cache_dir when provided (e.g. from LocalFolderSource) to avoid
+        # accessing self.cache_dir when parent has no repo_root (CI/meta-project contexts)
+        cache_dir = kwargs.pop("cache_dir", None)
+        if cache_dir is None:
+            cache_dir = self.cache_dir
         return self.__class__(
             self.universal_config_obj,
             included_sources=self.included_sources,
-            cache_dir=self.cache_dir,
+            cache_dir=cache_dir,
             **kwargs,
         )
 

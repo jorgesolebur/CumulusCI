@@ -256,7 +256,7 @@ class LoadDotEnv(BaseTask):
     def _run_task(self):
         from dotenv import load_dotenv
 
-        load_dotenv()
+        load_dotenv(dotenv_path=f"{self.project_config.repo_root}/.env")
 
         self.logger.info("Loaded .env file")
 
