@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.59 (2026-03-12)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add ADO download artifact feature by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#198](https://github.com/jorgesolebur/CumulusCI/pull/198)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.58...v5.0.59
+
+
+<!-- latest-stop -->
+
 ## v5.0.58 (2026-03-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -13,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.56...v5.0.58
 
-
-<!-- latest-stop -->
 
 ## v5.0.57 (2026-03-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
