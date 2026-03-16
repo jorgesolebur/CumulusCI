@@ -22,6 +22,7 @@ from cumulusci.core.dependencies.github_resolvers import (
     GitHubBetaReleaseTagResolver,
     GitHubDefaultBranch2GPResolver,
     GitHubExactMatch2GPResolver,
+    GitHubPreviousReleaseBranchCommitStatusResolver,
     GitHubReleaseBranchCommitStatusResolver,
     GitHubReleaseTagResolver,
     GitHubTagResolver,
@@ -37,6 +38,7 @@ from cumulusci.core.dependencies.resolvers import (
     get_static_dependencies,
 )
 from cumulusci.core.exceptions import CumulusCIException, DependencyResolutionError
+from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
 from cumulusci.vcs.bootstrap import locate_commit_status_package_id
 
 
@@ -416,6 +418,22 @@ class TestGitHubReleaseBranchResolver:
         pc.repo_info["branch"] = "main"
         assert not ConcreteGitHubReleaseBranchResolver().is_valid_repo_context(pc)
 
+    def test_is_valid_repo_context__date_format(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "feature/2025-Q1__test"
+        pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = ReleaseBranchFormat(
+            type="date", pattern="yyyy-Qq"
+        )
+
+        assert ConcreteGitHubReleaseBranchResolver().is_valid_repo_context(pc)
+
+        pc.repo_info["branch"] = "feature/FY26Q3S3__test"
+        pc.project__git["release_branch_format"] = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert ConcreteGitHubReleaseBranchResolver().is_valid_repo_context(pc)
+
     def test_can_resolve(self):
         pc = BaseProjectConfig(UniversalConfig())
 
@@ -436,7 +454,7 @@ class TestGitHubReleaseBranchResolver:
         pc.repo_info["branch"] = "feature/232__test"
         pc.project__git["prefix_feature"] = "feature/"
 
-        assert get_release_id(pc) == 232
+        assert get_release_id(pc) == "232"
 
     def test_get_release_id__not_release_branch(self):
         pc = BaseProjectConfig(UniversalConfig())
@@ -462,6 +480,26 @@ class TestGitHubReleaseBranchResolver:
                 get_release_id(pc)
 
             assert "Cannot get current release identifier" in str(e)
+
+    def test_get_release_id__date_format(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "feature/2025-Q1__test"
+        pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = ReleaseBranchFormat(
+            type="date", pattern="yyyy-Qq"
+        )
+
+        assert get_release_id(pc) == "2025-Q1"
+
+    def test_get_release_id__sequential_with_prefix(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "feature/rel-230__test"
+        pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = ReleaseBranchFormat(
+            type="sequential", prefix="rel-"
+        )
+
+        assert get_release_id(pc) == "rel-230"
 
     def test_locate_commit_status_package_id__not_found_with_parent(
         self, github, project_config
@@ -490,6 +528,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
 
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -512,6 +551,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
 
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -531,6 +571,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
 
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -556,6 +597,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         find_repo_feature_prefix_mock.side_effect = NotFoundError
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -570,6 +612,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
 
         project_config.repo_branch = "feature/290__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -577,6 +620,110 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         )
 
         assert resolver.resolve(dep, project_config) == (None, None)
+
+    def test_2gp_release_branch_resolver__date_format_yyyy_mm(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/2025-03__test"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = "date"
+        project_config.project__git__release_branch_format__pattern = "yyyy-mm"
+        project_config.project__git__release_branch_format__prefix = ""
+        project_config.project__git__release_branch_format__max_sprints_per_quarter = 4
+
+        resolver = GitHubReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "parent_sha_2025-03",
+            PackageVersionIdDependency(
+                version_id="04t000000000010", package_name="CumulusCI-2GP-Test"
+            ),
+        )
+
+    def test_2gp_release_branch_resolver__date_format_fyyyqnsn(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/FY26Q3S3__test"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = "date"
+        project_config.project__git__release_branch_format__pattern = "FYyyQqSn"
+        project_config.project__git__release_branch_format__prefix = ""
+        project_config.project__git__release_branch_format__max_sprints_per_quarter = 4
+
+        resolver = GitHubReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "parent_sha_FY26Q3S3",
+            PackageVersionIdDependency(
+                version_id="04t000000000011", package_name="CumulusCI-2GP-Test"
+            ),
+        )
+
+
+class TestGitHubPreviousReleaseBranchCommitStatusResolver:
+    def test_previous_release_branch__date_format_yyyy_qn(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/2025-Q1__test"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = "date"
+        project_config.project__git__release_branch_format__pattern = "yyyy-Qq"
+        project_config.project__git__release_branch_format__prefix = ""
+        project_config.project__git__release_branch_format__max_sprints_per_quarter = 4
+
+        resolver = GitHubPreviousReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        # Resolver checks 2024-Q4, 2024-Q3; feature/2024-Q4 has the package
+        assert resolver.resolve(dep, project_config) == (
+            "parent_sha_2024-Q4",
+            PackageVersionIdDependency(
+                version_id="04t000000000012", package_name="CumulusCI-2GP-Test"
+            ),
+        )
+
+    def test_previous_release_branch__date_format_fyyyqnsn(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/FY26Q3S1__test"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = "date"
+        project_config.project__git__release_branch_format__pattern = "FYyyQqSn"
+        project_config.project__git__release_branch_format__prefix = ""
+        project_config.project__git__release_branch_format__max_sprints_per_quarter = 4
+
+        resolver = GitHubPreviousReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        # FY26Q3S1 -> previous is FY26Q3S0 (i=1); feature/FY26Q3S0 has the package
+        assert resolver.resolve(dep, project_config) == (
+            "parent_sha_FY26Q3S0",
+            PackageVersionIdDependency(
+                version_id="04t000000000013", package_name="CumulusCI-2GP-Test"
+            ),
+        )
 
 
 class TestGitHubExactMatch2GPResolver:

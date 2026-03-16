@@ -3,6 +3,12 @@ import re
 from typing import Any, Optional, Tuple
 from urllib.parse import ParseResult, urlparse
 
+from cumulusci.utils.release_branch import ReleaseBranchFormat
+from cumulusci.utils.release_branch import (
+    get_release_identifier as release_branch_get_identifier,
+)
+from cumulusci.utils.release_branch import is_valid_release_identifier
+
 EMPTY_URL_MESSAGE = """
 The provided URL is empty or no URL under git remote "origin".
 """
@@ -29,19 +35,34 @@ def current_branch(repo_root: str) -> Optional[str]:
                 return "/".join(branch_ref[5:].split("/")[2:])
 
 
-def is_release_branch(branch_name: str, prefix: str) -> bool:
-    """A release branch begins with the given prefix"""
+def is_release_branch(
+    branch_name: str, prefix: str, format_config: Optional[ReleaseBranchFormat] = None
+) -> bool:
+    """A release branch begins with the given prefix and matches the format."""
     if not branch_name.startswith(prefix):
         return False
     parts = branch_name[len(prefix) :].split("__")
-    return len(parts) == 1 and parts[0].isdigit()
+    if not parts:
+        return False
+    identifier = parts[0]
+    if format_config is None:
+        return len(parts) == 1 and identifier.isdigit()
+    return len(parts) == 1 and is_valid_release_identifier(identifier, format_config)
 
 
-def is_release_branch_or_child(branch_name: str, prefix: str) -> bool:
+def is_release_branch_or_child(
+    branch_name: str, prefix: str, format_config: Optional[ReleaseBranchFormat] = None
+) -> bool:
+    """True if branch is a release branch or a child (e.g. feature/230__test)."""
     if not branch_name.startswith(prefix):
         return False
     parts = branch_name[len(prefix) :].split("__")
-    return len(parts) >= 1 and parts[0].isdigit()
+    if not parts:
+        return False
+    identifier = parts[0]
+    if format_config is None:
+        return len(parts) >= 1 and identifier.isdigit()
+    return len(parts) >= 1 and is_valid_release_identifier(identifier, format_config)
 
 
 def get_feature_branch_name(branch_name: str, prefix: str) -> Optional[str]:
@@ -49,8 +70,15 @@ def get_feature_branch_name(branch_name: str, prefix: str) -> Optional[str]:
         return branch_name[len(prefix) :]
 
 
-def get_release_identifier(branch_name: str, prefix: str) -> Optional[str]:
-    if is_release_branch_or_child(branch_name, prefix):
+def get_release_identifier(
+    branch_name: str,
+    prefix: str,
+    format_config: Optional[ReleaseBranchFormat] = None,
+) -> Optional[str]:
+    """Extract release identifier from branch name."""
+    if format_config is not None:
+        return release_branch_get_identifier(branch_name, prefix, format_config)
+    if is_release_branch_or_child(branch_name, prefix, None):
         return get_feature_branch_name(branch_name, prefix).split("__")[0]
 
 
