@@ -390,7 +390,7 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         for i in range(self.branch_offset_start, self.branch_offset_end):
             prev_id = get_previous_identifier(release_id, i, format_config)
             remote_matching_branch = construct_release_branch_name(
-                remote_branch_prefix, prev_id
+                remote_branch_prefix, prev_id, format_config
             )
             try:
                 release_branches.append(repo.branch(remote_matching_branch))

@@ -5,7 +5,9 @@ import subprocess
 from typing import Optional, Set
 
 from cumulusci.core.tasks import BaseTask
+from cumulusci.utils.git import construct_release_branch_name
 from cumulusci.utils.options import CCIOptions, Field, ListOfStringsOption
+from cumulusci.utils.release_branch import get_release_identifier, parse_format_config
 
 
 class ListModifiedFiles(BaseTask):
@@ -45,12 +47,19 @@ class ListModifiedFiles(BaseTask):
 
     def _get_reference_branch(self) -> str:
         """Get the reference branch name."""
-        branch = self.project_config.repo_branch
-
-        # If the branch name contains __ get the branch name before the last __
-        if branch and "__" in branch:
+        format_config = parse_format_config(self.project_config)
+        release_id = get_release_identifier(
+            self.project_config.repo_branch or "",
+            self.project_config.project__git__prefix_feature or "feature/",
+            format_config,
+        )
+        if release_id:
             try:
-                branch = branch.rsplit("__", 1)[0]
+                branch = construct_release_branch_name(
+                    self.project_config.project__git__prefix_feature or "feature/",
+                    release_id,
+                    format_config,
+                )
                 repo = self.project_config.get_repo()
                 repo_branch = repo.branch(branch)
                 return repo_branch.name

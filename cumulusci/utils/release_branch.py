@@ -187,6 +187,7 @@ def get_release_identifier(
     """Extract release identifier from branch name (e.g. feature/230__x -> 230)."""
     if not branch_name.startswith(prefix):
         return None
+
     suffix = branch_name[len(prefix) :]
     parts = suffix.split("__")
     identifier = parts[0]
@@ -297,8 +298,3 @@ def _previous_date_identifier(
         raise ValueError(f"Invalid {pattern} identifier: {identifier}")
 
     return _previous_decrement_with_carry(m.groupdict(), pattern)
-
-
-def construct_release_branch_name(prefix: str, release_identifier: str) -> str:
-    """Build full branch name from feature prefix and release identifier."""
-    return f"{prefix}{release_identifier}"

@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from cumulusci.core.config import BaseProjectConfig, UniversalConfig
+from cumulusci.utils.git import construct_release_branch_name
 from cumulusci.utils.release_branch import (
     _reconstruct_identifier_from_groups,
-    construct_release_branch_name,
     get_previous_identifier,
     get_release_identifier,
     is_valid_release_identifier,
@@ -458,6 +458,25 @@ class TestConstructReleaseBranchName:
         assert construct_release_branch_name("feature/", "2025-Q1") == "feature/2025-Q1"
         assert (
             construct_release_branch_name("feature/", "FY26Q3S3") == "feature/FY26Q3S3"
+        )
+
+
+class TestConstructReleaseBranchNameWithFormatConfig:
+    def test_basic(self):
+        fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
+        assert (
+            construct_release_branch_name("feature/", "230", fmt) == "feature/rel-230"
+        )
+
+    def test_date_format(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq", prefix="FY")
+        assert (
+            construct_release_branch_name("feature/", "2025-Q1", fmt)
+            == "feature/FY2025-Q1"
+        )
+        assert (
+            construct_release_branch_name("feature/", "26Q3S3", fmt)
+            == "feature/FY26Q3S3"
         )
 
 

@@ -82,7 +82,13 @@ def get_release_identifier(
         return get_feature_branch_name(branch_name, prefix).split("__")[0]
 
 
-def construct_release_branch_name(prefix: str, release_identifier: str) -> str:
+def construct_release_branch_name(
+    prefix: str,
+    release_identifier: str,
+    format_config: Optional[ReleaseBranchFormat] = None,
+) -> str:
+    if format_config is not None:
+        return f"{prefix}{format_config.prefix or ''}{release_identifier}"
     return f"{prefix}{release_identifier}"
 
 
