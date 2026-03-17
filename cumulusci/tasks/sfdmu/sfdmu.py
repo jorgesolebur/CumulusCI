@@ -2,17 +2,22 @@
 
 import os
 import shutil
+from typing import List
 
 import sarge
+from pydantic.v1 import ValidationError
 
 from cumulusci.core.exceptions import TaskOptionsError
 from cumulusci.core.sfdx import sfdx
+from cumulusci.core.source_transforms.transforms import (
+    SourceTransform,
+    SourceTransformList,
+)
 from cumulusci.core.tasks import BaseSalesforceTask
 from cumulusci.core.utils import determine_managed_mode
-from cumulusci.tasks.command import Command
 
 
-class SfdmuTask(BaseSalesforceTask, Command):
+class SfdmuTask(BaseSalesforceTask):
     """Execute SFDmu data migration with namespace injection support."""
 
     salesforce_task = (
@@ -41,7 +46,12 @@ class SfdmuTask(BaseSalesforceTask, Command):
             "required": False,
             "default": False,
         },
+        "transforms": {
+            "description": "Apply source transforms before deploying. See the CumulusCI documentation for details on how to specify transforms."
+        },
     }
+
+    transforms: List[SourceTransform] = []
 
     def _init_options(self, kwargs):
         super()._init_options(kwargs)
@@ -69,6 +79,17 @@ class SfdmuTask(BaseSalesforceTask, Command):
         export_json_path = os.path.join(self.options["path"], "export.json")
         if not os.path.exists(export_json_path):
             raise TaskOptionsError(f"export.json not found in {self.options['path']}")
+
+        if "transforms" in self.options:
+            try:
+                self.transforms = SourceTransformList.parse_obj(
+                    self.options["transforms"]
+                ).as_transforms()
+            except ValidationError as e:
+                raise TaskOptionsError(
+                    "The transform spec is not valid. See CumulusCI documentation for details of how to specify transforms. "
+                    f"The validation error was {str(e)}"
+                )
 
     def _validate_org(self, org_name):
         """Validate that a CCI org exists and return the org config."""
@@ -159,7 +180,7 @@ class SfdmuTask(BaseSalesforceTask, Command):
         try:
             # Create zipfile with all files from execute directory
             with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                for root, dirs, files in os.walk(execute_path):
+                for root, _, files in os.walk(execute_path):
                     for file in files:
                         if file.endswith((".json", ".csv")):
                             file_path = os.path.join(root, file)
@@ -179,31 +200,51 @@ class SfdmuTask(BaseSalesforceTask, Command):
                 )
 
                 # Create transform
-                transform = NamespaceInjectionTransform(options)
+                transforms = []
+                transforms.extend(self.transforms)
+
+                # Apply namespace injection
+                transforms.append(NamespaceInjectionTransform(options))
 
                 # Create task context
                 context = TaskContext(
                     org_config_for_injection, self.project_config, self.logger
                 )
 
-                # Apply namespace injection
-                new_zf = transform.process(zf, context)
+                for t in transforms:
+                    # We have to close the existing zipfile and reopen it before processing;
+                    # otherwise we hit a bug in Windows where ZipInfo objects have the wrong path separators.
+                    fp = zf.fp
+                    zf.close()
+                    # Reopen: file-based zip closes fp, BytesIO (from transforms) does not
+                    if getattr(fp, "closed", False):
+                        zf = zipfile.ZipFile(temp_zip_path, "r")
+                    else:
+                        zf = zipfile.ZipFile(fp, "r")
+                    new_zf = t.process(zf, context)
+                    if new_zf != zf:
+                        # Ensure that zipfiles are closed (in case they're filesystem resources)
+                        try:
+                            zf.close()
+                        except ValueError:  # Attempt to close a closed ZF (on Windows)
+                            pass
+                        zf = new_zf
 
                 # Extract processed files back to execute directory
                 # First, remove all existing files
-                for root, dirs, files in os.walk(execute_path):
+                for root, _, files in os.walk(execute_path):
                     for file in files:
                         if file.endswith((".json", ".csv")):
                             os.remove(os.path.join(root, file))
 
                 # Extract processed files
-                for file_info in new_zf.infolist():
+                for file_info in zf.infolist():
                     if file_info.filename.endswith((".json", ".csv")):
                         # Extract to execute directory
                         target_path = os.path.join(execute_path, file_info.filename)
                         # Ensure directory exists
                         os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                        with new_zf.open(file_info) as source:
+                        with zf.open(file_info) as source:
                             with open(target_path, "wb") as target:
                                 target.write(source.read())
 
@@ -212,6 +253,10 @@ class SfdmuTask(BaseSalesforceTask, Command):
                         )
 
         finally:
+            try:
+                zf.close()
+            except ValueError:  # Attempt to close a closed ZF (on Windows)
+                pass
             # Clean up temporary zipfile
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
