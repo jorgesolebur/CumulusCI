@@ -76,14 +76,13 @@ jobs:
             - name: Install dependencies
               run: uv sync -p ${{ matrix.python-version }}
             - name: Install Salesforce CLI
-              run: |
-                  npm install @salesforce/cli --global
-                  # Prevent Node from grabbing too much memory
-                  echo "NODE_OPTIONS=--max-old-space-size=2048" >> $GITHUB_ENV
+              run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
               run: sf --version
             - name: Run Pytest
               run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=2048"
 
     unit_tests_opt_deps:
         name: "Unit tests with optional dependencies: ${{ matrix.os }}-${{ matrix.python-version }}"
@@ -108,13 +107,13 @@ jobs:
             - name: Install dependencies
               run: uv sync --all-extras -p ${{ matrix.python-version }}
             - name: Install Salesforce CLI
-              run: |
-                  npm install @salesforce/cli --global
-                  echo "NODE_OPTIONS=--max-old-space-size=2048" >> $GITHUB_ENV
+              run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
               run: sf --version
             - name: Run Pytest
               run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=2048"
 
     robot_api:
         name: "Robot: No browser"
@@ -135,7 +134,6 @@ jobs:
             - name: Install sfdx
               run: |
                   npm install @salesforce/cli --global
-                  echo "NODE_OPTIONS=--max-old-space-size=2048" >> $GITHUB_ENV
             - name: Authenticate Dev Hub
               run: |
                   sf plugins --core
@@ -152,6 +150,8 @@ jobs:
                     -o name "CumulusCI" \
                     -o suites cumulusci/robotframework/tests \
                     -o include no-browser
+              env:
+                  NODE_OPTIONS: "--max-old-space-size=2048"
             - name: Delete scratch org
               if: always()
               run: |
