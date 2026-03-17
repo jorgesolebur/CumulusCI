@@ -266,6 +266,107 @@ def github():
                     )
                 ),
             ),
+            "feature/2025-03_sha": mock.Mock(
+                sha="feature/2025-03_sha",
+                parents=[{"sha": "parent_sha_2025-03"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "parent_sha_2025-03": mock.Mock(
+                sha="parent_sha_2025-03",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000010",
+                            )
+                        ]
+                    )
+                ),
+            ),
+            "feature/FY26Q3S3_sha": mock.Mock(
+                sha="feature/FY26Q3S3_sha",
+                parents=[{"sha": "parent_sha_FY26Q3S3"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "parent_sha_FY26Q3S3": mock.Mock(
+                sha="parent_sha_FY26Q3S3",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000011",
+                            )
+                        ]
+                    )
+                ),
+            ),
+            "feature/2024-Q4_sha": mock.Mock(
+                sha="feature/2024-Q4_sha",
+                parents=[{"sha": "parent_sha_2024-Q4"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "parent_sha_2024-Q4": mock.Mock(
+                sha="parent_sha_2024-Q4",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000012",
+                            )
+                        ]
+                    )
+                ),
+            ),
+            "feature/FY26Q2S4_sha": mock.Mock(
+                sha="feature/FY26Q2S4_sha",
+                parents=[{"sha": "parent_sha_FY26Q2S4"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "parent_sha_FY26Q2S4": mock.Mock(
+                sha="parent_sha_FY26Q2S4",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000014",
+                            )
+                        ]
+                    )
+                ),
+            ),
+            # FY26Q3S1 -> previous is FY26Q3S0 (date format decrements by 1 only)
+            "feature/FY26Q3S0_sha": mock.Mock(
+                sha="feature/FY26Q3S0_sha",
+                parents=[{"sha": "parent_sha_FY26Q3S0"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "parent_sha_FY26Q3S0": mock.Mock(
+                sha="parent_sha_FY26Q3S0",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000013",
+                            )
+                        ]
+                    )
+                ),
+            ),
         },
     )
 

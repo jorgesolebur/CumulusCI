@@ -375,6 +375,32 @@
             "required": ["parsers"],
             "additionalProperties": false
         },
+        "ReleaseBranchFormat": {
+            "title": "ReleaseBranchFormat",
+            "description": "Configuration for custom release branch identifier formats.",
+            "type": "object",
+            "properties": {
+                "type": {
+                    "title": "Type",
+                    "type": "string"
+                },
+                "prefix": {
+                    "title": "Prefix",
+                    "default": "",
+                    "type": "string"
+                },
+                "pattern": {
+                    "title": "Pattern",
+                    "type": "string"
+                },
+                "max_sprints_per_quarter": {
+                    "title": "Max Sprints Per Quarter",
+                    "default": 6,
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": false
+        },
         "Git": {
             "title": "Git",
             "type": "object",
@@ -409,6 +435,9 @@
                 },
                 "release_notes": {
                     "$ref": "#/definitions/ReleaseNotes"
+                },
+                "release_branch_format": {
+                    "$ref": "#/definitions/ReleaseBranchFormat"
                 },
                 "2gp_context": {
                     "title": "2Gp Context",

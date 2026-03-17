@@ -182,6 +182,45 @@ project:
 These values can be changed to match naming conventions used by your own
 project.
 
+### Custom Release Branch Formats
+
+By default, release branch identifiers are integers (e.g. `feature/230`,
+`feature/232__test`). You can configure custom formats via
+`release_branch_format` under `project.git`:
+
+```yaml
+project:
+    git:
+        prefix_feature: feature/
+        release_branch_format:
+            type: sequential | date
+            prefix: ""              # For sequential: e.g. "rel-" for feature/rel-230
+            pattern: null           # For date: yyyy, yyyy-mm, yyyy-mm-dd, yyyy-Qq, yyyy-SPRINTn, FYyyQqSn
+            max_sprints_per_quarter: 4   # For FYyyQqSn only
+```
+
+**Sequential with prefix**: Use `type: sequential` and `prefix: "rel-"` for
+branches like `feature/rel-230` or `feature/rel-230__test`.
+
+**Date formats** (use `type: date` and set `pattern`):
+
+- `yyyy`: 2025
+- `yyyy-mm`: 2025-03
+- `yyyy-mm-dd`: 2025-03-15
+- `yyyy-Qq`: 2025-Q1 (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec)
+- `yyyy-SPRINTn`: 2025-SPRINT1 (SPRINTn maps to quarter q)
+- `FYyyQqSn`: FY26Q3S3 (FY26=calendar year 2026, Q3=Quarter 3, S3=Sprint 3).
+  Set `max_sprints_per_quarter` (default 4) for sprint rollover when
+  computing previous release branches.
+
+**Note**: 
+- The lower case strings y, m, q, d are the values and upper case are treated as string literals
+- The following tasks use release branch logic and currently
+support only the default integer format. Custom format support may be
+added in a future release: `vcs_automerge_feature` (merge task),
+`release_notes` (task), and flows that reference
+`project_config.repo_branch.startswith(project_config.project__git__prefix_feature)`.
+
 (auto-merging)=
 
 ## Auto Merging

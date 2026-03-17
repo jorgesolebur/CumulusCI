@@ -9,6 +9,7 @@ from cumulusci.utils.git import (
     parse_repo_url,
     split_repo_url,
 )
+from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
 
 
 def test_is_release_branch():
@@ -32,6 +33,64 @@ def test_get_release_identifier():
 
 def test_construct_release_branch_name():
     assert construct_release_branch_name("feature/", "230") == "feature/230"
+
+
+class TestGitWithFormatConfig:
+    """Tests for format_config parameter (custom release branch formats)."""
+
+    def test_is_release_branch__sequential_with_prefix(self):
+        fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
+        assert is_release_branch("feature/rel-230", "feature/", fmt) is True
+        assert is_release_branch("feature/rel-230__test", "feature/", fmt) is False
+        assert is_release_branch("feature/230", "feature/", fmt) is False
+
+    def test_is_release_branch_or_child__sequential_with_prefix(self):
+        fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
+        assert is_release_branch_or_child("feature/rel-230", "feature/", fmt) is True
+        assert (
+            is_release_branch_or_child("feature/rel-230__test", "feature/", fmt) is True
+        )
+
+    def test_is_release_branch_or_child__date_format(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq")
+        assert is_release_branch_or_child("feature/2025-Q1", "feature/", fmt) is True
+        assert (
+            is_release_branch_or_child("feature/2025-Q1__test", "feature/", fmt) is True
+        )
+        assert is_release_branch_or_child("feature/230", "feature/", fmt) is False
+
+    def test_is_release_branch_or_child__fyyyqnsn(self):
+        fmt = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert is_release_branch_or_child("feature/FY26Q3S3", "feature/", fmt) is True
+        assert (
+            is_release_branch_or_child("feature/FY26Q3S3__test", "feature/", fmt)
+            is True
+        )
+
+    def test_get_release_identifier__sequential_with_prefix(self):
+        fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
+        assert get_release_identifier("feature/rel-230", "feature/", fmt) == "rel-230"
+        assert (
+            get_release_identifier("feature/rel-230__test", "feature/", fmt)
+            == "rel-230"
+        )
+
+    def test_get_release_identifier__date_format(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq")
+        assert get_release_identifier("feature/2025-Q1", "feature/", fmt) == "2025-Q1"
+        assert (
+            get_release_identifier("feature/2025-Q1__test", "feature/", fmt)
+            == "2025-Q1"
+        )
+
+    def test_backward_compat__no_format_config(self):
+        """Without format_config, behavior matches original (integer-only)."""
+        assert is_release_branch("feature/230", "feature/") is True
+        assert is_release_branch_or_child("feature/230__test", "feature/") is True
+        assert get_release_identifier("feature/230", "feature/") == "230"
+        assert get_release_identifier("feature/rel-230", "feature/") is None
 
 
 @pytest.mark.parametrize(

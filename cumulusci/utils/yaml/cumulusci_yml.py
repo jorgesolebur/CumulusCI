@@ -107,6 +107,29 @@ class ReleaseNotes(CCIDictModel):
     ]
 
 
+class ReleaseBranchFormat(CCIDictModel):
+    """Configuration for custom release branch identifier formats."""
+
+    type: Optional[str] = None  # sequential | date
+    prefix: str = ""
+    pattern: Optional[
+        str
+    ] = None  # yyyy, yyyy-mm, yyyy-mm-dd, yyyy-Qq, yyyy-SPRINTn, FYyyQqSn, etc.
+    max_sprints_per_quarter: int = 6  # For FYyyQqSn only, defaults to 6
+
+    @validator("max_sprints_per_quarter")
+    def validate_max_sprints(cls, v, values):
+        if values.get("type") == "date":
+            if values.get("pattern") is None:
+                raise ValueError("pattern is required for date formats")
+
+            if not (1 <= v <= 10) and "q" in values.get("pattern"):
+                raise ValueError(
+                    f"max_sprints_per_quarter must be 1-10 for FYyyQqSn, got {v}"
+                )
+        return v
+
+
 class Git(CCIDictModel):
     repo_url: str = None
     default_branch: str = None
@@ -116,6 +139,7 @@ class Git(CCIDictModel):
     push_prefix_sandbox: str = None
     push_prefix_production: str = None
     release_notes: ReleaseNotes = None
+    release_branch_format: Optional[ReleaseBranchFormat] = None
     two_gp_context: str = Field(None, alias="2gp_context")
     unlocked_context: Optional[str] = None
 
