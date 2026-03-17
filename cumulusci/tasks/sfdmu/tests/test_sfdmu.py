@@ -1142,3 +1142,108 @@ class TestSfdmuTask:
 
             # Verify that _process_csv_exports was still called
             task._process_csv_exports.assert_called_once()
+
+    def test_transforms_option_exists(self):
+        """Test that transforms option is properly defined in task_options."""
+        assert "transforms" in SfdmuTask.task_options
+        assert (
+            "Apply source transforms"
+            in SfdmuTask.task_options["transforms"]["description"]
+        )
+
+    def test_transforms_parsed_correctly(self):
+        """Test that transforms option is parsed correctly when provided."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            export_json_path = os.path.join(temp_dir, "export.json")
+            with open(export_json_path, "w") as f:
+                f.write('{"test": "data"}')
+
+            from cumulusci.core.source_transforms.transforms import (
+                CleanMetaXMLTransform,
+            )
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "qa",
+                    "path": temp_dir,
+                    "transforms": ["clean_meta_xml"],
+                },
+            )
+
+            assert len(task.transforms) == 1
+            assert isinstance(task.transforms[0], CleanMetaXMLTransform)
+
+    def test_transforms_invalid_raises_error(self):
+        """Test that invalid transform spec raises TaskOptionsError."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            export_json_path = os.path.join(temp_dir, "export.json")
+            with open(export_json_path, "w") as f:
+                f.write('{"test": "data"}')
+
+            with pytest.raises(Exception):  # TaskOptionsError
+                create_task(
+                    SfdmuTask,
+                    {
+                        "source": "dev",
+                        "target": "qa",
+                        "path": temp_dir,
+                        "transforms": [{"transform": "invalid_transform"}],
+                    },
+                )
+
+    @mock.patch("cumulusci.tasks.sfdmu.sfdmu.determine_managed_mode")
+    def test_inject_namespace_tokens_applies_transforms_before_namespace(
+        self, mock_determine_managed
+    ):
+        """Test that user transforms are applied before namespace injection."""
+        mock_determine_managed.return_value = True
+
+        with tempfile.TemporaryDirectory() as execute_dir:
+            # Create test file - FindReplace will change ORIGINAL to REPLACED
+            test_json = os.path.join(execute_dir, "test.json")
+            with open(test_json, "w") as f:
+                f.write(
+                    '{"field": "ORIGINAL", "query": "%%%NAMESPACE%%%CustomObject__c"}'
+                )
+
+            export_json_path = os.path.join(execute_dir, "export.json")
+            with open(export_json_path, "w") as f:
+                f.write('{"test": "data"}')
+
+            task = create_task(
+                SfdmuTask,
+                {
+                    "source": "dev",
+                    "target": "qa",
+                    "path": execute_dir,
+                    "transforms": [
+                        {
+                            "transform": "find_replace",
+                            "options": {
+                                "patterns": [
+                                    {"find": "ORIGINAL", "replace": "REPLACED"}
+                                ]
+                            },
+                        }
+                    ],
+                },
+            )
+            task.project_config.project__package__namespace = "testns"
+
+            mock_org_config = mock.Mock()
+            mock_org_config.namespace = "testns"
+
+            task._inject_namespace_tokens(execute_dir, None, mock_org_config)
+
+            # Verify transform was applied (ORIGINAL -> REPLACED)
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "REPLACED" in content
+                assert "ORIGINAL" not in content
+            # Verify namespace injection was also applied
+            with open(test_json, "r") as f:
+                content = f.read()
+                assert "testns__CustomObject__c" in content
+                assert "%%%NAMESPACE%%%" not in content
