@@ -253,6 +253,10 @@ class SfdmuTask(BaseSalesforceTask):
                         )
 
         finally:
+            try:
+                zf.close()
+            except ValueError:  # Attempt to close a closed ZF (on Windows)
+                pass
             # Clean up temporary zipfile
             if os.path.exists(temp_zip_path):
                 os.unlink(temp_zip_path)
