@@ -112,9 +112,9 @@ def parse_format_config(
 
     prefix = config.project__git__release_branch_format__prefix or ""
     pattern = config.project__git__release_branch_format__pattern
-    max_sprints = config.project__git__release_branch_format__max_sprints_per_quarter
-    if max_sprints is None:
-        max_sprints = 6
+    max_sprints = (
+        config.project__git__release_branch_format__max_sprints_per_quarter or 6
+    )
 
     return ReleaseBranchFormat(
         type=type_val,
@@ -132,17 +132,18 @@ def is_valid_release_identifier(
         # Default: integer only
         return identifier.isdigit()
 
+    prefix = format_config.prefix or ""
+
+    if not identifier.startswith(prefix):
+        return False
+
+    suffix = identifier[len(prefix) :] if prefix else identifier
+
     match format_config.type:
         case "sequential":
-            prefix = format_config.prefix
-
-            if not identifier.startswith(prefix):
-                return False
-
-            suffix = identifier[len(prefix) :]
             return suffix.isdigit()
         case "date":
-            return _validate_date_identifier(identifier, format_config)
+            return _validate_date_identifier(suffix, format_config)
         case _:
             return False
 
@@ -189,6 +190,7 @@ def get_release_identifier(
         return None
 
     suffix = branch_name[len(prefix) :]
+
     parts = suffix.split("__")
     identifier = parts[0]
     if format_config is None:
@@ -196,6 +198,11 @@ def get_release_identifier(
             return identifier
         return None
     if is_valid_release_identifier(identifier, format_config):
+        identifier = (
+            identifier[len(format_config.prefix) :]
+            if format_config.prefix
+            else identifier
+        )
         return identifier
     return None
 

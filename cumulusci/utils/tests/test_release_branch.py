@@ -314,11 +314,8 @@ class TestGetReleaseIdentifier:
 
     def test_sequential__with_prefix(self):
         fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
-        assert get_release_identifier("feature/rel-230", "feature/", fmt) == "rel-230"
-        assert (
-            get_release_identifier("feature/rel-230__test", "feature/", fmt)
-            == "rel-230"
-        )
+        assert get_release_identifier("feature/rel-230", "feature/", fmt) == "230"
+        assert get_release_identifier("feature/rel-230__test", "feature/", fmt) == "230"
 
     def test_date_yyyy_q1(self):
         fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq")
