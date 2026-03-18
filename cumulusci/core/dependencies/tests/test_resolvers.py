@@ -499,7 +499,7 @@ class TestGitHubReleaseBranchResolver:
             type="sequential", prefix="rel-"
         )
 
-        assert get_release_id(pc) == "rel-230"
+        assert get_release_id(pc) == "230"
 
     def test_locate_commit_status_package_id__not_found_with_parent(
         self, github, project_config

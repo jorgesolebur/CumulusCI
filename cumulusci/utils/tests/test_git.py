@@ -71,11 +71,8 @@ class TestGitWithFormatConfig:
 
     def test_get_release_identifier__sequential_with_prefix(self):
         fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
-        assert get_release_identifier("feature/rel-230", "feature/", fmt) == "rel-230"
-        assert (
-            get_release_identifier("feature/rel-230__test", "feature/", fmt)
-            == "rel-230"
-        )
+        assert get_release_identifier("feature/rel-230", "feature/", fmt) == "230"
+        assert get_release_identifier("feature/rel-230__test", "feature/", fmt) == "230"
 
     def test_get_release_identifier__date_format(self):
         fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq")

@@ -74,7 +74,7 @@ jobs:
                   version: "0.8.4"
                   enable-cache: true
             - name: Install dependencies
-              run: uv sync -p ${{ matrix.python-version }}
+              run: uv sync -p ${{ matrix.python-version }} --no-binary-package annoy
             - name: Install Salesforce CLI
               run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
@@ -105,7 +105,7 @@ jobs:
                   version: "0.8.4"
                   enable-cache: true
             - name: Install dependencies
-              run: uv sync --all-extras -p ${{ matrix.python-version }}
+              run: uv sync --all-extras -p ${{ matrix.python-version }} --no-binary-package annoy
             - name: Install Salesforce CLI
               run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
