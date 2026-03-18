@@ -2,6 +2,22 @@
 
 <!-- latest-start -->
 
+## v5.0.60 (2026-03-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/pm 2779 by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#200](https://github.com/jorgesolebur/CumulusCI/pull/200)
+* Use env to set the node options. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#203](https://github.com/jorgesolebur/CumulusCI/pull/203)
+* Add transform option to sfdmu task by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#202](https://github.com/jorgesolebur/CumulusCI/pull/202)
+* Fix bugs for custom release format. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#206](https://github.com/jorgesolebur/CumulusCI/pull/206)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.59...v5.0.60
+
+
+<!-- latest-stop -->
+
 ## v5.0.59 (2026-03-12)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +28,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.58...v5.0.59
 
-
-<!-- latest-stop -->
 
 ## v5.0.58 (2026-03-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
