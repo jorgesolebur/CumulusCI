@@ -28,12 +28,14 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
         with patch(
             "cumulusci.tasks.utility.env_management.get_repo_from_url"
-        ) as get_repo_mock:
+        ) as get_repo_mock, patch.object(
+            VcsRemoteBranch, "get_release_branch"
+        ) as get_release_branch_mock:
             repo_mock = Mock()
             branch_mock = Mock()
             branch_mock.name = "feature/branch-1"
-            repo_mock.branch.return_value = branch_mock
             get_repo_mock.return_value = repo_mock
+            get_release_branch_mock.return_value = branch_mock
 
             task = VcsRemoteBranch(project_config, task_config)
             task()
@@ -41,7 +43,9 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 task.return_values["url"], "https://github.com/TestOwner/TestRepo"
             )
             self.assertEqual(task.return_values["branch"], "feature/branch-1")
-            repo_mock.branch.assert_called_once_with("feature/branch-1")
+            get_release_branch_mock.assert_called_once_with(
+                repo_mock, "feature/branch-1"
+            )
 
     def test_run_task_branch_not_exist(self):
         project_config = create_project_config()
@@ -57,11 +61,13 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
         with patch(
             "cumulusci.tasks.utility.env_management.get_repo_from_url"
-        ) as get_repo_mock:
+        ) as get_repo_mock, patch.object(
+            VcsRemoteBranch, "get_release_branch"
+        ) as get_release_branch_mock:
             repo_mock = Mock()
-            repo_mock.branch.side_effect = Exception("Branch not found")
             repo_mock.default_branch = "main"
             get_repo_mock.return_value = repo_mock
+            get_release_branch_mock.side_effect = Exception("Branch not found")
 
             task = VcsRemoteBranch(project_config, task_config)
             task()
@@ -69,7 +75,86 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 task.return_values["url"], "https://github.com/TestOwner/TestRepo"
             )
             self.assertEqual(task.return_values["branch"], "main")
-            repo_mock.branch.assert_called_once_with("feature/branch-1")
+            get_release_branch_mock.assert_called_once_with(
+                repo_mock, "feature/branch-1"
+            )
+
+    @patch("cumulusci.tasks.utility.env_management.parse_format_config")
+    @patch("cumulusci.tasks.utility.env_management.get_release_id")
+    @patch("cumulusci.tasks.utility.env_management.find_repo_feature_prefix")
+    @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
+    @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
+    def test_get_release_branch_release_branch_uses_matching_remote_branch(
+        self,
+        is_release_branch_or_child,
+        construct_release_branch_name,
+        find_repo_feature_prefix,
+        get_release_id,
+        parse_format_config,
+    ):
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "feature/branch-1"
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        parse_format_config.return_value = {"prefix_release": "release"}
+        is_release_branch_or_child.return_value = True
+        get_release_id.return_value = "1.2"
+        find_repo_feature_prefix.return_value = "feature/"
+        construct_release_branch_name.return_value = "feature/release/1.2"
+        repo_mock = Mock()
+        branch_mock = Mock()
+        repo_mock.branch.return_value = branch_mock
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(repo_mock, "feature/branch-1")
+        self.assertEqual(result, branch_mock)
+        repo_mock.branch.assert_called_once_with("feature/release/1.2")
+
+    @patch("cumulusci.tasks.utility.env_management.parse_format_config")
+    @patch("cumulusci.tasks.utility.env_management.get_release_id")
+    @patch("cumulusci.tasks.utility.env_management.find_repo_feature_prefix")
+    @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
+    @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
+    def test_get_release_branch_falls_back_to_local_branch_when_release_lookup_fails(
+        self,
+        is_release_branch_or_child,
+        construct_release_branch_name,
+        find_repo_feature_prefix,
+        get_release_id,
+        parse_format_config,
+    ):
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "feature/branch-1"
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        parse_format_config.return_value = {"prefix_release": "release"}
+        is_release_branch_or_child.return_value = True
+        get_release_id.return_value = "1.2"
+        find_repo_feature_prefix.return_value = "feature/"
+        construct_release_branch_name.return_value = "feature/release/1.2"
+        repo_mock = Mock()
+        local_branch_mock = Mock()
+        repo_mock.branch.side_effect = [Exception("release missing"), local_branch_mock]
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(repo_mock, "feature/branch-1")
+        self.assertEqual(result, local_branch_mock)
+        self.assertEqual(
+            repo_mock.branch.call_args_list[0].args[0], "feature/release/1.2"
+        )
+        self.assertEqual(repo_mock.branch.call_args_list[1].args[0], "feature/branch-1")
 
 
 class TestEnvManagement(unittest.TestCase):
