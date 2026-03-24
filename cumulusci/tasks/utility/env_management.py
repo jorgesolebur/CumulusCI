@@ -8,9 +8,15 @@ from typing import Any, List, Optional
 from pydantic.v1 import BaseModel, validator
 
 from cumulusci.core.config import BaseProjectConfig, OrgConfig, TaskConfig
+from cumulusci.core.dependencies.resolvers import get_release_id
 from cumulusci.core.tasks import BaseTask
+from cumulusci.utils.git import (
+    construct_release_branch_name,
+    is_release_branch_or_child,
+)
 from cumulusci.utils.options import CCIOptions, Field
-from cumulusci.vcs.bootstrap import get_repo_from_url
+from cumulusci.utils.release_branch import parse_format_config
+from cumulusci.vcs.bootstrap import get_repo_from_url  # , find_repo_feature_prefix
 
 
 class EnvManagementOption(CCIOptions):
@@ -172,7 +178,7 @@ class VcsRemoteBranch(BaseTask):
         repo = get_repo_from_url(self.project_config, self.return_values["url"])
 
         try:
-            branch = repo.branch(local_branch)
+            branch = self.get_release_branch(repo, local_branch)
             self.logger.info(
                 f"Branch {local_branch} found in repository {self.return_values['url']}."
             )
@@ -184,3 +190,33 @@ class VcsRemoteBranch(BaseTask):
             self.return_values["branch"] = repo.default_branch
 
         return self.return_values
+
+    def get_release_branch(self, repo, local_branch: str):
+        format_config = parse_format_config(self.project_config)
+
+        # Remote project may not be a CCI project.
+        remote_branch_prefix = (
+            self.project_config.project__git__prefix_feature or "feature/"
+        )
+        # try:
+        #     remote_branch_prefix = find_repo_feature_prefix(repo)
+        # except Exception:
+        #     remote_branch_prefix = self.project_config.project__git__prefix_feature or "feature/"
+
+        try:
+            if is_release_branch_or_child(
+                local_branch,
+                self.project_config.project__git__prefix_feature,
+                format_config,
+            ):
+                release_id = get_release_id(self.project_config)
+
+                remote_matching_branch = construct_release_branch_name(
+                    remote_branch_prefix, release_id, format_config
+                )
+                return repo.branch(remote_matching_branch)
+        except Exception as e:
+            self.logger.warning(
+                f"Release branch {local_branch} not found in repository {repo.clone_url}: {e}"
+            )
+        return repo.branch(local_branch)
