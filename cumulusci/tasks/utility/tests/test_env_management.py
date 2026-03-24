@@ -81,14 +81,12 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
     @patch("cumulusci.tasks.utility.env_management.parse_format_config")
     @patch("cumulusci.tasks.utility.env_management.get_release_id")
-    @patch("cumulusci.tasks.utility.env_management.find_repo_feature_prefix")
     @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
     @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
     def test_get_release_branch_release_branch_uses_matching_remote_branch(
         self,
         is_release_branch_or_child,
         construct_release_branch_name,
-        find_repo_feature_prefix,
         get_release_id,
         parse_format_config,
     ):
@@ -105,7 +103,6 @@ class TestVcsRemoteBranch(unittest.TestCase):
         parse_format_config.return_value = {"prefix_release": "release"}
         is_release_branch_or_child.return_value = True
         get_release_id.return_value = "1.2"
-        find_repo_feature_prefix.return_value = "feature/"
         construct_release_branch_name.return_value = "feature/release/1.2"
         repo_mock = Mock()
         branch_mock = Mock()
@@ -118,14 +115,12 @@ class TestVcsRemoteBranch(unittest.TestCase):
 
     @patch("cumulusci.tasks.utility.env_management.parse_format_config")
     @patch("cumulusci.tasks.utility.env_management.get_release_id")
-    @patch("cumulusci.tasks.utility.env_management.find_repo_feature_prefix")
     @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
     @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
     def test_get_release_branch_falls_back_to_local_branch_when_release_lookup_fails(
         self,
         is_release_branch_or_child,
         construct_release_branch_name,
-        find_repo_feature_prefix,
         get_release_id,
         parse_format_config,
     ):
@@ -142,7 +137,6 @@ class TestVcsRemoteBranch(unittest.TestCase):
         parse_format_config.return_value = {"prefix_release": "release"}
         is_release_branch_or_child.return_value = True
         get_release_id.return_value = "1.2"
-        find_repo_feature_prefix.return_value = "feature/"
         construct_release_branch_name.return_value = "feature/release/1.2"
         repo_mock = Mock()
         local_branch_mock = Mock()

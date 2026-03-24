@@ -16,7 +16,7 @@ from cumulusci.utils.git import (
 )
 from cumulusci.utils.options import CCIOptions, Field
 from cumulusci.utils.release_branch import parse_format_config
-from cumulusci.vcs.bootstrap import find_repo_feature_prefix, get_repo_from_url
+from cumulusci.vcs.bootstrap import get_repo_from_url  # , find_repo_feature_prefix
 
 
 class EnvManagementOption(CCIOptions):
@@ -193,6 +193,16 @@ class VcsRemoteBranch(BaseTask):
 
     def get_release_branch(self, repo, local_branch: str):
         format_config = parse_format_config(self.project_config)
+
+        # Remote project may not be a CCI project.
+        remote_branch_prefix = (
+            self.project_config.project__git__prefix_feature or "feature/"
+        )
+        # try:
+        #     remote_branch_prefix = find_repo_feature_prefix(repo)
+        # except Exception:
+        #     remote_branch_prefix = self.project_config.project__git__prefix_feature or "feature/"
+
         try:
             if is_release_branch_or_child(
                 local_branch,
@@ -200,7 +210,7 @@ class VcsRemoteBranch(BaseTask):
                 format_config,
             ):
                 release_id = get_release_id(self.project_config)
-                remote_branch_prefix = find_repo_feature_prefix(repo)
+
                 remote_matching_branch = construct_release_branch_name(
                     remote_branch_prefix, release_id, format_config
                 )
