@@ -446,6 +446,10 @@
                 "unlocked_context": {
                     "title": "Unlocked Context",
                     "type": "string"
+                },
+                "settings": {
+                    "title": "Settings",
+                    "type": "object"
                 }
             },
             "additionalProperties": false

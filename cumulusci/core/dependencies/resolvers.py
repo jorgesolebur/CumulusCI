@@ -282,6 +282,21 @@ class AbstractVcsCommitStatusPackageResolver(AbstractResolver, ABC):
     def is_valid_repo_context(self, context: BaseProjectConfig) -> bool:
         return bool(context.repo_branch and context.project__git__prefix_feature)
 
+    def handle_missing_branch_metadata(
+        self, branch: AbstractBranch, context: BaseProjectConfig
+    ) -> None:
+        """
+        Optional hook: Override in child classes to add custom
+        logic when a branch lacks a version/commit metadata.
+        """
+        # Default behavior: Just a debug log
+        if self.name in (context.project__git__settings__stop_on_missing_version or []):
+            raise DependencyResolutionError(
+                f"No version found for commit status on {branch.name}."
+            )
+
+        context.logger.debug(f"No metadata for {branch.name}.")
+
     @abstractmethod
     def get_repo(
         self, context: BaseProjectConfig, url: Optional[AnyUrl]
@@ -330,6 +345,8 @@ class AbstractVcsCommitStatusPackageResolver(AbstractResolver, ABC):
                 return commit.sha, PackageVersionIdDependency(
                     version_id=version_id, package_name=package_name
                 )
+
+            self.handle_missing_branch_metadata(branch, context)
 
         context.logger.warn(
             f"{self.name} did not locate package package version on {repo.clone_url}."

@@ -1677,6 +1677,8 @@ project:
                     6:
                         class_path: cumulusci.tasks.release_notes.parser.InstallLinkParser
                         title: Installation Info
+        settings:
+            stop_on_missing_version: [] # In commit status resolvers, if the branch is found, but no version/commit metadata is found, the build will halt.
     test:
         name_match: "%_TEST%"
     dependency_resolutions:
