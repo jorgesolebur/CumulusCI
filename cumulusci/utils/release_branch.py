@@ -112,9 +112,7 @@ def parse_format_config(
 
     prefix = config.project__git__release_branch_format__prefix or ""
     pattern = config.project__git__release_branch_format__pattern
-    max_sprints = (
-        config.project__git__release_branch_format__max_sprints_per_quarter or 6
-    )
+    max_sprints = config.project__git__release_branch_format__max_sprints_per_quarter
 
     return ReleaseBranchFormat(
         type=type_val,
@@ -247,6 +245,7 @@ def get_previous_identifier(
 def _previous_decrement_with_carry(
     groups: dict,
     pattern: str,
+    max_sprints_per_quarter: int = 0,
 ) -> str:
     """Decrement identifier by looping in reverse order of _NAMED_GROUPS with carry.
 
@@ -259,6 +258,8 @@ def _previous_decrement_with_carry(
 
     # Bounds per group: (min, max)
     bounds = {g: b for g, _, b in _PATTERN_TOKENS if g in pattern_order}
+    if max_sprints_per_quarter > 0:
+        bounds["n"] = (1, max_sprints_per_quarter)
 
     values = {}
     for group_name, group_value in groups.items():
@@ -304,4 +305,8 @@ def _previous_date_identifier(
     if not m:
         raise ValueError(f"Invalid {pattern} identifier: {identifier}")
 
-    return _previous_decrement_with_carry(m.groupdict(), pattern)
+    return _previous_decrement_with_carry(
+        m.groupdict(),
+        pattern,
+        format_config.max_sprints_per_quarter if "q" in pattern else 0,
+    )

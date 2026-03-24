@@ -8,15 +8,15 @@ from typing import Any, List, Optional
 from pydantic.v1 import BaseModel, validator
 
 from cumulusci.core.config import BaseProjectConfig, OrgConfig, TaskConfig
-from cumulusci.core.dependencies.resolvers import get_release_id
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils.git import (
     construct_release_branch_name,
+    get_release_identifier,
     is_release_branch_or_child,
 )
 from cumulusci.utils.options import CCIOptions, Field
 from cumulusci.utils.release_branch import parse_format_config
-from cumulusci.vcs.bootstrap import get_repo_from_url  # , find_repo_feature_prefix
+from cumulusci.vcs.bootstrap import get_repo_from_url
 
 
 class EnvManagementOption(CCIOptions):
@@ -198,10 +198,6 @@ class VcsRemoteBranch(BaseTask):
         remote_branch_prefix = (
             self.project_config.project__git__prefix_feature or "feature/"
         )
-        # try:
-        #     remote_branch_prefix = find_repo_feature_prefix(repo)
-        # except Exception:
-        #     remote_branch_prefix = self.project_config.project__git__prefix_feature or "feature/"
 
         try:
             if is_release_branch_or_child(
@@ -209,7 +205,11 @@ class VcsRemoteBranch(BaseTask):
                 self.project_config.project__git__prefix_feature,
                 format_config,
             ):
-                release_id = get_release_id(self.project_config)
+                release_id = get_release_identifier(
+                    local_branch,
+                    remote_branch_prefix,
+                    format_config,
+                )
 
                 remote_matching_branch = construct_release_branch_name(
                     remote_branch_prefix, release_id, format_config

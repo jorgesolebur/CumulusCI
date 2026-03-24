@@ -207,7 +207,7 @@ class TestParseFormatConfig:
         config.project__git__release_branch_format__max_sprints_per_quarter = None
         fmt = parse_format_config(config)
         assert fmt is not None
-        assert fmt.max_sprints_per_quarter == 6
+        assert fmt.max_sprints_per_quarter is None
 
     def test_parse_format_config__prefix_none_uses_empty(self):
         """Config without prefix gets default empty string."""
@@ -425,7 +425,7 @@ class TestGetPreviousIdentifier:
         fmt = ReleaseBranchFormat(
             type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
         )
-        assert get_previous_identifier("FY26Q3S1", 1, fmt) == "FY26Q3S0"
+        assert get_previous_identifier("FY26Q3S1", 1, fmt) == "FY26Q2S4"
 
     def test_date_invalid_identifier_raises(self):
         fmt = ReleaseBranchFormat(type="date", pattern="yyyy-Qq")

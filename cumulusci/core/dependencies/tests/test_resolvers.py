@@ -720,7 +720,7 @@ class TestGitHubPreviousReleaseBranchCommitStatusResolver:
         assert resolver.can_resolve(dep, project_config)
         # FY26Q3S1 -> previous is FY26Q3S0 (i=1); feature/FY26Q3S0 has the package
         assert resolver.resolve(dep, project_config) == (
-            "parent_sha_FY26Q3S0",
+            "parent_sha_FY26Q2S4",
             PackageVersionIdDependency(
                 version_id="04t000000000013", package_name="CumulusCI-2GP-Test"
             ),
