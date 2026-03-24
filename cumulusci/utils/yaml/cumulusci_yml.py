@@ -142,6 +142,7 @@ class Git(CCIDictModel):
     release_branch_format: Optional[ReleaseBranchFormat] = None
     two_gp_context: str = Field(None, alias="2gp_context")
     unlocked_context: Optional[str] = None
+    settings: Optional[Dict[str, Any]] = None
 
 
 class Plan(CCIDictModel):  # MetaDeploy plans

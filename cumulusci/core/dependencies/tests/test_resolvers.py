@@ -552,6 +552,7 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
         project_config.project__git__release_branch_format__type = None
+        project_config.project__git__settings__stop_on_missing_version = []
 
         resolver = GitHubReleaseBranchCommitStatusResolver()
         dep = GitHubDynamicDependency(
@@ -812,6 +813,7 @@ class TestGitHubExactMatch2GPResolver:
 
         project_config.repo_branch = "feature/232"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__settings__stop_on_missing_version = []
 
         resolver = GitHubExactMatch2GPResolver()
         dep = GitHubDynamicDependency(
@@ -820,6 +822,27 @@ class TestGitHubExactMatch2GPResolver:
 
         assert resolver.can_resolve(dep, project_config)
         assert resolver.resolve(dep, project_config) == (None, None)
+
+    def test_commit_status_not_found_and_stop_on_missing_version(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/232"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__settings__stop_on_missing_version = [
+            "GitHub Exact-Match Commit Status Resolver"
+        ]
+
+        resolver = GitHubExactMatch2GPResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPMissingRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        with pytest.raises(DependencyResolutionError) as exc:
+            resolver.resolve(dep, project_config)
+        assert "No version found for commit status on feature/232." in str(exc)
 
 
 class TestGitHubDefaultBranch2GPResolver:
@@ -851,6 +874,7 @@ class TestGitHubDefaultBranch2GPResolver:
 
         project_config.repo_branch = "feature/299"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__settings__stop_on_missing_version = []
 
         resolver = GitHubDefaultBranch2GPResolver()
         dep = GitHubDynamicDependency(
