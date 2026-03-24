@@ -13,6 +13,7 @@ from cumulusci.utils.release_branch import (
     is_valid_release_identifier,
     parse_format_config,
     pattern_to_regex,
+    sort_release_identifiers,
 )
 from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
 
@@ -442,6 +443,54 @@ class TestGetPreviousIdentifier:
         fmt = ReleaseBranchFormat(type="date", prefix="", pattern=None)
         with pytest.raises(ValueError, match="Unknown format type"):
             get_previous_identifier("2025", 1, fmt)
+
+
+class TestSortReleaseIdentifiers:
+    def test_default_numeric(self):
+        assert sort_release_identifiers(["300", "230", "88"]) == ["88", "230", "300"]
+
+    def test_sequential_with_prefix(self):
+        fmt = ReleaseBranchFormat(type="sequential", prefix="rel-")
+        assert sort_release_identifiers(["rel-12", "rel-3", "rel-10"], fmt) == [
+            "rel-3",
+            "rel-10",
+            "rel-12",
+        ]
+
+    def test_date_yyyy_mm(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="yyyy-mm")
+        assert sort_release_identifiers(["2026-04", "2026-01", "2025-12"], fmt) == [
+            "2025-12",
+            "2026-01",
+            "2026-04",
+        ]
+
+    def test_date_fyyyqnsn(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="FYyyQqSn")
+        assert sort_release_identifiers(
+            ["FY26Q3S5", "FY25Q3S5", "FY26Q3S4", "FY26Q2S6"], fmt
+        ) == [
+            "FY25Q3S5",
+            "FY26Q2S6",
+            "FY26Q3S4",
+            "FY26Q3S5",
+        ]
+
+    def test_date_fyyyqnsn_with_prefix(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="yyQqSn", prefix="FY")
+        assert sort_release_identifiers(
+            ["FY26Q3S5", "FY25Q3S5", "FY26Q3S4", "FY26Q2S6"], fmt
+        ) == [
+            "FY25Q3S5",
+            "FY26Q2S6",
+            "FY26Q3S4",
+            "FY26Q3S5",
+        ]
+
+    def test_literal_only_pattern_raises(self):
+        fmt = ReleaseBranchFormat(type="date", pattern="release")
+        with pytest.raises(ValueError, match="no sortable tokens"):
+            sort_release_identifiers(["release"], fmt)
 
 
 class TestConstructReleaseBranchName:
