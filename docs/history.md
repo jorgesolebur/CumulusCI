@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.0.61 (2026-03-24)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add settings to handle halt on missing version by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#208](https://github.com/jorgesolebur/CumulusCI/pull/208)
+* Fix env management with release branches. by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#210](https://github.com/jorgesolebur/CumulusCI/pull/210)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.60...v5.0.61
+
+
+<!-- latest-stop -->
+
 ## v5.0.60 (2026-03-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -15,8 +29,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.59...v5.0.60
 
-
-<!-- latest-stop -->
 
 ## v5.0.59 (2026-03-12)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
