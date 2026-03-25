@@ -1071,7 +1071,7 @@ class TestMergeBranch(MockUtilBase):
         task._init_task()
 
         repo_branches = list(task.repo.branches())
-        assert task._get_next_release(repo_branches) == 88
+        assert task._get_next_release(repo_branches) == "88"
 
     @responses.activate
     def test_is_future_release_branch(self):
@@ -1092,23 +1092,143 @@ class TestMergeBranch(MockUtilBase):
         task._init_task()
 
         repo_branches = list(task.repo.branches())
-        assert task._get_next_release(repo_branches) == 8
+        assert task._get_next_release(repo_branches) == "8"
 
-        assert not task._is_future_release_branch("f", 8)
-        assert not task._is_future_release_branch("feature", 8)
-        assert not task._is_future_release_branch("feature/", 8)
-        assert not task._is_future_release_branch("feature/_", 8)
-        assert not task._is_future_release_branch("feature/0", 8)
-        assert not task._is_future_release_branch("feature/O", 8)
-        assert not task._is_future_release_branch("feature/7", 8)
-        assert not task._is_future_release_branch("feature/8", 8)
-        assert not task._is_future_release_branch("feature/9_", 8)
+        assert not task._is_future_release_branch("f", "8")
+        assert not task._is_future_release_branch("feature", "8")
+        assert not task._is_future_release_branch("feature/", "8")
+        assert not task._is_future_release_branch("feature/_", "8")
+        assert not task._is_future_release_branch("feature/0", "8")
+        assert not task._is_future_release_branch("feature/O", "8")
+        assert not task._is_future_release_branch("feature/7", "8")
+        assert not task._is_future_release_branch("feature/8", "8")
+        assert not task._is_future_release_branch("feature/9_", "8")
 
-        assert task._is_future_release_branch("feature/9", 8)
-        assert task._is_future_release_branch("feature/75", 8)
-        assert task._is_future_release_branch("feature/123", 8)
-        assert task._is_future_release_branch("feature/4567", 8)
-        assert task._is_future_release_branch("feature/10000", 8)
+        assert task._is_future_release_branch("feature/9", "8")
+        assert task._is_future_release_branch("feature/75", "8")
+        assert task._is_future_release_branch("feature/123", "8")
+        assert task._is_future_release_branch("feature/4567", "8")
+        assert task._is_future_release_branch("feature/10000", "8")
+
+    @responses.activate
+    def test_merge_to_future_release_branches_date_format(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "yyyy-mm",
+        }
+        self._setup_mocks(
+            [
+                "main",
+                "feature/2026-01",
+                "feature/2026-02",
+                "feature/2026-04",
+                "feature/work-item",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "feature/2026-01",
+                    "branch_prefix": "feature/",
+                    "update_future_releases": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+        assert ["feature/2026-02", "feature/2026-04"] == actual_branches
+
+    @responses.activate
+    def test_merge_to_future_release_branches_fy_pattern(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "FYyyQqSn",
+        }
+        self._setup_mocks(
+            [
+                "main",
+                "feature/FY26Q3S4",
+                "feature/FY26Q3S5",
+                "feature/FY26Q4S1",
+                "feature/work-item",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "feature/FY26Q3S4",
+                    "branch_prefix": "feature/",
+                    "update_future_releases": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+        assert ["feature/FY26Q3S5", "feature/FY26Q4S1"] == actual_branches
+
+    @responses.activate
+    def test_main_skip_future_releases_sequential_with_prefix(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "sequential",
+            "prefix": "rel-",
+        }
+        self._setup_mocks(
+            [
+                "main",
+                "feature/rel-230",
+                "feature/rel-232",
+                "feature/work-item",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "main",
+                    "branch_prefix": "feature/",
+                    "skip_future_releases": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+        assert ["feature/rel-230", "feature/work-item"] == actual_branches
+
+    @responses.activate
+    def test_unorderable_release_pattern_logs_warning_and_skips_future_updates(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "release",
+        }
+        self._setup_mocks(
+            [
+                "feature/release",
+                "feature/release__child",
+                "feature/work-item",
+            ]
+        )
+
+        with LogCapture() as log:
+            task = self._create_task(
+                task_config={
+                    "options": {
+                        "source_branch": "feature/release",
+                        "branch_prefix": "feature/",
+                        "update_future_releases": True,
+                    }
+                }
+            )
+            task()
+            log_lines = self._get_log_lines(log)
+            assert (
+                "WARNING",
+                "Disabling release-order based branch selection: Pattern release has no sortable tokens.",
+            ) in log_lines
 
 
 def log_header():

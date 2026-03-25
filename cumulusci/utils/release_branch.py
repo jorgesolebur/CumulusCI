@@ -13,7 +13,7 @@ names and are not replaced.
 
 import re
 from functools import lru_cache
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
 
@@ -112,9 +112,7 @@ def parse_format_config(
 
     prefix = config.project__git__release_branch_format__prefix or ""
     pattern = config.project__git__release_branch_format__pattern
-    max_sprints = (
-        config.project__git__release_branch_format__max_sprints_per_quarter or 6
-    )
+    max_sprints = config.project__git__release_branch_format__max_sprints_per_quarter
 
     return ReleaseBranchFormat(
         type=type_val,
@@ -244,9 +242,73 @@ def get_previous_identifier(
     raise ValueError(f"Unknown format type: {format_config.type}")
 
 
+def _release_identifier_sort_key(
+    identifier: str, format_config: Optional[ReleaseBranchFormat] = None
+) -> Tuple[int, ...]:
+    """Build a sortable tuple for release identifiers.
+
+    Raises:
+        ValueError: if identifier cannot be ordered for the given format.
+    """
+    if format_config is None:
+        if not identifier.isdigit():
+            raise ValueError(
+                f"Cannot order non-numeric identifier without format: {identifier}"
+            )
+        return (int(identifier),)
+
+    raw = identifier
+    prefix = format_config.prefix or ""
+    if prefix and raw.startswith(prefix):
+        raw = raw[len(prefix) :]
+
+    if format_config.type == "sequential":
+        if not raw.isdigit():
+            raise ValueError(
+                f"Cannot order non-numeric sequential identifier: {identifier}"
+            )
+        return (int(raw),)
+
+    if format_config.type == "date" and format_config.pattern:
+        regex, order = pattern_to_regex(format_config.pattern)
+        if not order:
+            raise ValueError(f"Pattern {format_config.pattern} has no sortable tokens.")
+        m = regex.match(raw)
+        if not m:
+            raise ValueError(
+                f"Identifier {identifier} does not match pattern {format_config.pattern}"
+            )
+        groups = m.groupdict()
+        key = []
+        for token in order:
+            value = groups.get(token)
+            if value is None:
+                raise ValueError(
+                    f"Missing token {token} in identifier {identifier} for sorting."
+                )
+            numeric = int(value)
+            # Treat 2-digit years as 2000-based for ordering consistency.
+            if token in {"yy", "yyyy"} and len(value) == 2:
+                numeric += 2000
+            key.append(numeric)
+        return tuple(key)
+
+    raise ValueError(f"Unknown format type: {format_config.type}")
+
+
+def sort_release_identifiers(
+    identifiers: List[str], format_config: Optional[ReleaseBranchFormat] = None
+) -> List[str]:
+    """Sort release identifiers in ascending order for configured format."""
+    return sorted(
+        identifiers, key=lambda item: _release_identifier_sort_key(item, format_config)
+    )
+
+
 def _previous_decrement_with_carry(
     groups: dict,
     pattern: str,
+    max_sprints_per_quarter: int = 0,
 ) -> str:
     """Decrement identifier by looping in reverse order of _NAMED_GROUPS with carry.
 
@@ -259,6 +321,8 @@ def _previous_decrement_with_carry(
 
     # Bounds per group: (min, max)
     bounds = {g: b for g, _, b in _PATTERN_TOKENS if g in pattern_order}
+    if max_sprints_per_quarter > 0:
+        bounds["n"] = (1, max_sprints_per_quarter)
 
     values = {}
     for group_name, group_value in groups.items():
@@ -304,4 +368,8 @@ def _previous_date_identifier(
     if not m:
         raise ValueError(f"Invalid {pattern} identifier: {identifier}")
 
-    return _previous_decrement_with_carry(m.groupdict(), pattern)
+    return _previous_decrement_with_carry(
+        m.groupdict(),
+        pattern,
+        format_config.max_sprints_per_quarter if "q" in pattern else 0,
+    )

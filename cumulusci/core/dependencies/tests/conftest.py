@@ -326,6 +326,27 @@ def github():
                     )
                 ),
             ),
+            # "feature/FY26Q2S4_sha": mock.Mock(
+            #     sha="feature/FY26Q2S4_sha",
+            #     parents=[{"sha": "parent_sha_FY26Q2S4"}],
+            #     status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            # ),
+            # "parent_sha_FY26Q2S4": mock.Mock(
+            #     sha="parent_sha_FY26Q2S4",
+            #     parents=[],
+            #     status=mock.Mock(
+            #         return_value=mock.Mock(
+            #             statuses=[
+            #                 mock.Mock(
+            #                     state="success",
+            #                     context="Nonstandard Package Status",
+            #                     description="version_id: 04t000000000014",
+            #                 )
+            #             ]
+            #         )
+            #     ),
+            # ),
+            # FY26Q3S1 -> previous is FY26Q2S4 (date format decrements by 1 only)
             "feature/FY26Q2S4_sha": mock.Mock(
                 sha="feature/FY26Q2S4_sha",
                 parents=[{"sha": "parent_sha_FY26Q2S4"}],
@@ -333,27 +354,6 @@ def github():
             ),
             "parent_sha_FY26Q2S4": mock.Mock(
                 sha="parent_sha_FY26Q2S4",
-                parents=[],
-                status=mock.Mock(
-                    return_value=mock.Mock(
-                        statuses=[
-                            mock.Mock(
-                                state="success",
-                                context="Nonstandard Package Status",
-                                description="version_id: 04t000000000014",
-                            )
-                        ]
-                    )
-                ),
-            ),
-            # FY26Q3S1 -> previous is FY26Q3S0 (date format decrements by 1 only)
-            "feature/FY26Q3S0_sha": mock.Mock(
-                sha="feature/FY26Q3S0_sha",
-                parents=[{"sha": "parent_sha_FY26Q3S0"}],
-                status=mock.Mock(return_value=mock.Mock(statuses=[])),
-            ),
-            "parent_sha_FY26Q3S0": mock.Mock(
-                sha="parent_sha_FY26Q3S0",
                 parents=[],
                 status=mock.Mock(
                     return_value=mock.Mock(

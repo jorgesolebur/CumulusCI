@@ -1,6 +1,11 @@
 from cumulusci.core.utils import process_bool_arg
 from cumulusci.tasks.base_source_control_task import BaseSourceControlTask
 from cumulusci.utils.git import is_release_branch
+from cumulusci.utils.release_branch import (
+    get_release_identifier,
+    parse_format_config,
+    sort_release_identifiers,
+)
 from cumulusci.vcs.models import AbstractBranch, AbstractRepoCommit
 
 
@@ -62,6 +67,9 @@ class MergeBranch(BaseSourceControlTask):
             self.options["create_pull_request_on_conflict"] = process_bool_arg(
                 self.options.get("create_pull_request_on_conflict")
             )
+
+        self.format_config = parse_format_config(self.project_config)
+        self._release_ordering_warning_emitted = False
 
     def _init_task(self):
         super()._init_task()
@@ -187,15 +195,26 @@ class MergeBranch(BaseSourceControlTask):
         return to_merge
 
     def _get_next_release(self, repo_branches):
-        """Returns the integer that corresponds to the lowest release number found on all release branches.
+        """Returns the lowest ordered release identifier found on release branches.
         NOTE: We assume that once a release branch is merged that it will be deleted.
         """
-        release_nums = [
+        release_identifiers = [
             self._get_release_number(branch.name)
             for branch in repo_branches
             if self._is_release_branch(branch.name)
         ]
-        next_release = sorted(release_nums)[0] if release_nums else None
+        release_identifiers = [
+            identifier for identifier in release_identifiers if identifier
+        ]
+        if not release_identifiers:
+            return None
+        try:
+            next_release = sort_release_identifiers(
+                release_identifiers, self.format_config
+            )[0]
+        except ValueError as exc:
+            self._warn_release_ordering_disabled(exc)
+            next_release = None
         return next_release
 
     def _update_future_releases(self, next_release):
@@ -214,6 +233,7 @@ class MergeBranch(BaseSourceControlTask):
         if (
             self.options["update_future_releases"]
             and self._is_release_branch(self.options["source_branch"])
+            and next_release is not None
             and next_release == self._get_release_number(self.options["source_branch"])
         ):
             update_future_releases = True
@@ -221,14 +241,20 @@ class MergeBranch(BaseSourceControlTask):
 
     def _is_release_branch(self, branch_name):
         """A release branch begins with the given prefix"""
-        return is_release_branch(branch_name, self.options["branch_prefix"])
+        return is_release_branch(
+            branch_name, self.options["branch_prefix"], self.format_config
+        )
 
-    def _get_release_number(self, branch_name) -> int:
-        """Get the release number from a release branch name.
+    def _get_release_number(self, branch_name):
+        """Get release identifier from a release branch name.
 
         Assumes we already know it is a release branch.
         """
-        return int(branch_name.split(self.options["branch_prefix"])[1])
+        return get_release_identifier(
+            branch_name,
+            self.options["branch_prefix"],
+            self.format_config,
+        )
 
     def _merge(self, branch_name, source, commit):
         """Attempt to merge a commit from source to branch with branch_name"""
@@ -286,13 +312,30 @@ class MergeBranch(BaseSourceControlTask):
         )
 
     def _is_future_release_branch(self, branch_name, next_release):
+        branch_release = self._get_release_number(branch_name)
+        if (
+            not self._is_release_branch(branch_name)
+            or branch_name == self.options["source_branch"]
+            or next_release is None
+            or not branch_release
+        ):
+            return False
+        try:
+            ordered = sort_release_identifiers(
+                [next_release, branch_release], self.format_config
+            )
+        except ValueError as exc:
+            self._warn_release_ordering_disabled(exc)
+            return False
         return (
-            self._is_release_branch(branch_name)
-            and branch_name != self.options["source_branch"]
-            and self._get_release_num(branch_name) > next_release
+            ordered[0] == next_release
+            and ordered[1] == branch_release
+            and branch_release != next_release
         )
 
-    def _get_release_num(self, release_branch_name):
-        """Given a release branch, returns an integer that
-        corresponds to the release number for that branch"""
-        return int(release_branch_name.split(self.options["branch_prefix"])[1])
+    def _warn_release_ordering_disabled(self, exc):
+        if not self._release_ordering_warning_emitted:
+            self.logger.warning(
+                f"Disabling release-order based branch selection: {exc}"
+            )
+            self._release_ordering_warning_emitted = True
