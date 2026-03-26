@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.63 (2026-03-26)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix branch resolution for VcsRemote by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#214](https://github.com/jorgesolebur/CumulusCI/pull/214)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.62...v5.0.63
+
+
+<!-- latest-stop -->
+
 ## v5.0.62 (2026-03-25)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.61...v5.0.62
 
-
-<!-- latest-stop -->
 
 ## v5.0.61 (2026-03-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
