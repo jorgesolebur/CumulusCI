@@ -179,13 +179,10 @@ class VcsRemoteBranch(BaseTask):
 
         try:
             branch = self.get_release_branch(repo, local_branch)
-            self.logger.info(
-                f"Branch {local_branch} found in repository {self.return_values['url']}."
-            )
             self.return_values["branch"] = branch.name
-        except Exception:
+        except Exception as e:
             self.logger.warning(
-                f"Branch {local_branch} not found in repository {self.return_values['url']}. Using default branch {repo.default_branch}"
+                f"Branch not found in repository {self.return_values['url']} : {e}. Using default branch {repo.default_branch}"
             )
             self.return_values["branch"] = repo.default_branch
 
@@ -200,6 +197,12 @@ class VcsRemoteBranch(BaseTask):
         )
 
         try:
+            return repo.branch(local_branch)
+        except Exception as e:
+            self.logger.warning(
+                f"Branch {local_branch} not found in repository {repo.clone_url}: {e}"
+            )
+
             if is_release_branch_or_child(
                 local_branch,
                 self.project_config.project__git__prefix_feature,
@@ -214,9 +217,8 @@ class VcsRemoteBranch(BaseTask):
                 remote_matching_branch = construct_release_branch_name(
                     remote_branch_prefix, release_id, format_config
                 )
+                self.logger.info(
+                    f"Checking if Release branch {remote_matching_branch} exists in repository {repo.clone_url}"
+                )
                 return repo.branch(remote_matching_branch)
-        except Exception as e:
-            self.logger.warning(
-                f"Release branch {local_branch} not found in repository {repo.clone_url}: {e}"
-            )
-        return repo.branch(local_branch)
+            raise e
