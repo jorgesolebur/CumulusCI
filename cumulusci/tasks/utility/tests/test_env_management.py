@@ -79,17 +79,7 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 repo_mock, "feature/branch-1"
             )
 
-    @patch("cumulusci.tasks.utility.env_management.parse_format_config")
-    @patch("cumulusci.tasks.utility.env_management.get_release_identifier")
-    @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
-    @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
-    def test_get_release_branch_release_branch_uses_matching_remote_branch(
-        self,
-        is_release_branch_or_child,
-        construct_release_branch_name,
-        get_release_identifier,
-        parse_format_config,
-    ):
+    def test_get_release_branch_release_branch_uses_matching_remote_branch(self):
         project_config = create_project_config()
         project_config.repo_info["branch"] = "feature/branch-1"
         task_config = TaskConfig(
@@ -100,18 +90,15 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 }
             }
         )
-        parse_format_config.return_value = {"prefix_release": "release"}
-        is_release_branch_or_child.return_value = True
-        get_release_identifier.return_value = "1.2"
-        construct_release_branch_name.return_value = "feature/release/1.2"
         repo_mock = Mock()
         branch_mock = Mock()
+        branch_mock.name = "feature/branch-1"
         repo_mock.branch.return_value = branch_mock
 
         task = VcsRemoteBranch(project_config, task_config)
         result = task.get_release_branch(repo_mock, "feature/branch-1")
-        self.assertEqual(result, branch_mock)
-        repo_mock.branch.assert_called_once_with("feature/release/1.2")
+        self.assertEqual(result.name, "feature/branch-1")
+        repo_mock.branch.assert_called_once_with("feature/branch-1")
 
     @patch("cumulusci.tasks.utility.env_management.parse_format_config")
     @patch("cumulusci.tasks.utility.env_management.get_release_identifier")
@@ -145,10 +132,10 @@ class TestVcsRemoteBranch(unittest.TestCase):
         task = VcsRemoteBranch(project_config, task_config)
         result = task.get_release_branch(repo_mock, "feature/branch-1")
         self.assertEqual(result, local_branch_mock)
+        self.assertEqual(repo_mock.branch.call_args_list[0].args[0], "feature/branch-1")
         self.assertEqual(
-            repo_mock.branch.call_args_list[0].args[0], "feature/release/1.2"
+            repo_mock.branch.call_args_list[1].args[0], "feature/release/1.2"
         )
-        self.assertEqual(repo_mock.branch.call_args_list[1].args[0], "feature/branch-1")
 
 
 class TestEnvManagement(unittest.TestCase):
