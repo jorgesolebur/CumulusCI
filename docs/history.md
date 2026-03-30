@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.64 (2026-03-30)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add loadenv support for all CCI commands by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#216](https://github.com/jorgesolebur/CumulusCI/pull/216)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.63...v5.0.64
+
+
+<!-- latest-stop -->
+
 ## v5.0.63 (2026-03-26)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.62...v5.0.63
 
-
-<!-- latest-stop -->
 
 ## v5.0.62 (2026-03-25)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
