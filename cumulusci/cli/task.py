@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import click
-from dotenv import load_dotenv
 from rich.console import Console
 from rst2ansi import rst2ansi
 
@@ -127,10 +126,6 @@ class RunTaskCommand(click.MultiCommand):
             "help": "Drops into the Python debugger at task completion.",
             "is_flag": True,
         },
-        "loadenv": {
-            "help": "Loads environment variables from the .env file.",
-            "is_flag": True,
-        },
     }
 
     def list_commands(self, ctx):
@@ -162,13 +157,6 @@ class RunTaskCommand(click.MultiCommand):
             # Set click.no_prompt to disable all prompts in non-interactive mode
             if kwargs.get("no_prompt", False):
                 click.no_prompt = True
-
-            # Load environment variables FIRST, before any task processing
-            if kwargs.get("loadenv", None) and runtime.project_config is not None:
-                # Load .env file from the project root directory
-                env_path = Path(runtime.project_config.repo_root) / ".env"
-                if env_path and env_path.exists():
-                    load_dotenv(dotenv_path=env_path)
 
             org, org_config = runtime.get_org(
                 kwargs.pop("org", None), fail_if_missing=False

@@ -3,11 +3,13 @@ import io
 import json
 import tempfile
 from pathlib import Path
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import click
 import pytest
 
+from cumulusci.cli import cci as cci_module
 from cumulusci.cli.runtime import CliRuntime
 from cumulusci.core.config import BaseProjectConfig
 from cumulusci.core.exceptions import CumulusCIUsageError
@@ -158,10 +160,10 @@ def test_format_help(runtime):
 
 def test_get_default_command_options():
     opts = task.RunTaskCommand()._get_default_command_options(is_salesforce_task=False)
-    assert len(opts) == 5
+    assert len(opts) == 4  # no-prompt, debug, debug-before, debug-after
 
     opts = task.RunTaskCommand()._get_default_command_options(is_salesforce_task=True)
-    assert len(opts) == 6
+    assert len(opts) == 5  # +1 for org
     assert any([o.name == "org" for o in opts])
 
 
@@ -298,89 +300,143 @@ class DummyDerivedTask(DummyTask):
         click.echo(f"<{self.__class__}>\n\tcolor: {self.options['color']}")
 
 
-@patch("cumulusci.cli.task.load_dotenv")
-def test_task_run__loadenv_with_project_root(load_dotenv, runtime):
-    """Test that loadenv loads .env file from project root when project exists."""
-    DummyTask._run_task = Mock()
-
-    # Create a temporary directory for the test
+@mock.patch("cumulusci.cli.cci.tee_stdout_stderr")
+@mock.patch("cumulusci.cli.cci.get_tempfile_logger")
+@mock.patch("cumulusci.cli.cci.init_logger")
+@mock.patch("cumulusci.cli.cci.check_latest_plugins")
+@mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
+@mock.patch("cumulusci.cli.cci.load_dotenv")
+@mock.patch("cumulusci.cli.cci.CliRuntime")
+@mock.patch("cumulusci.cli.cci.cli")
+def test_task_run__loadenv_with_project_root(
+    cli,
+    CliRuntime,
+    load_dotenv,
+    set_windows_encoding,
+    check_latest_version,
+    check_latest_plugins,
+    init_logger,
+    get_tempfile_logger,
+    tee,
+):
+    """Test that --loadenv loads .env file from project root at cci.py level."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        runtime.project_config._repo_info = {"root": temp_dir}
-
-        # Create the .env file so it exists
         env_path = Path(temp_dir) / ".env"
         env_path.write_text("TEST_VAR=test_value\n")
 
-        multi_cmd = task.RunTaskCommand()
-        with click.Context(multi_cmd, obj=runtime) as ctx:
-            cmd = multi_cmd.get_command(ctx, "dummy-task")
-            cmd.callback(runtime, "dummy-task", color="blue", loadenv=True)
+        mock_runtime = mock.Mock()
+        mock_runtime.project_config.repo_root = temp_dir
+        CliRuntime.return_value = mock_runtime
+        get_tempfile_logger.return_value = mock.Mock(), "tempfile.log"
 
-        # Verify load_dotenv was called with the correct path
+        cci_module.main(["cci", "--loadenv", "task", "run", "dummy-task"])
+
         expected_path = Path(temp_dir) / ".env"
         load_dotenv.assert_called_once_with(dotenv_path=expected_path)
-        DummyTask._run_task.assert_called_once()
 
 
-@patch("cumulusci.cli.task.load_dotenv")
-def test_task_run__loadenv_false(load_dotenv, runtime):
-    """Test that loadenv does not call load_dotenv when loadenv=False."""
-    DummyTask._run_task = Mock()
+@mock.patch("cumulusci.cli.cci.tee_stdout_stderr")
+@mock.patch("cumulusci.cli.cci.get_tempfile_logger")
+@mock.patch("cumulusci.cli.cci.init_logger")
+@mock.patch("cumulusci.cli.cci.check_latest_plugins")
+@mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
+@mock.patch("cumulusci.cli.cci.load_dotenv")
+@mock.patch("cumulusci.cli.cci.CliRuntime")
+@mock.patch("cumulusci.cli.cci.cli")
+def test_task_run__loadenv_false(
+    cli,
+    CliRuntime,
+    load_dotenv,
+    set_windows_encoding,
+    check_latest_version,
+    check_latest_plugins,
+    init_logger,
+    get_tempfile_logger,
+    tee,
+):
+    """Test that load_dotenv is not called when --loadenv flag is absent."""
+    mock_runtime = mock.Mock()
+    CliRuntime.return_value = mock_runtime
+    get_tempfile_logger.return_value = mock.Mock(), "tempfile.log"
 
-    multi_cmd = task.RunTaskCommand()
-    with click.Context(multi_cmd, obj=runtime) as ctx:
-        cmd = multi_cmd.get_command(ctx, "dummy-task")
-        cmd.callback(runtime, "dummy-task", color="blue", loadenv=False)
+    cci_module.main(["cci", "task", "run", "dummy-task"])
 
-    # Verify load_dotenv was not called
     load_dotenv.assert_not_called()
-    DummyTask._run_task.assert_called_once()
 
 
-@patch("cumulusci.cli.task.load_dotenv")
-def test_task_run__loadenv_not_provided(load_dotenv, runtime):
-    """Test that loadenv does not call load_dotenv when loadenv is not provided."""
-    DummyTask._run_task = Mock()
+@mock.patch("cumulusci.cli.cci.tee_stdout_stderr")
+@mock.patch("cumulusci.cli.cci.get_tempfile_logger")
+@mock.patch("cumulusci.cli.cci.init_logger")
+@mock.patch("cumulusci.cli.cci.check_latest_plugins")
+@mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
+@mock.patch("cumulusci.cli.cci.load_dotenv")
+@mock.patch("cumulusci.cli.cci.CliRuntime")
+@mock.patch("cumulusci.cli.cci.cli")
+def test_task_run__loadenv_not_provided(
+    cli,
+    CliRuntime,
+    load_dotenv,
+    set_windows_encoding,
+    check_latest_version,
+    check_latest_plugins,
+    init_logger,
+    get_tempfile_logger,
+    tee,
+):
+    """Test that load_dotenv is not called when --loadenv flag is not provided."""
+    mock_runtime = mock.Mock()
+    CliRuntime.return_value = mock_runtime
+    get_tempfile_logger.return_value = mock.Mock(), "tempfile.log"
 
-    multi_cmd = task.RunTaskCommand()
-    with click.Context(multi_cmd, obj=runtime) as ctx:
-        cmd = multi_cmd.get_command(ctx, "dummy-task")
-        cmd.callback(runtime, "dummy-task", color="blue")
+    cci_module.main(["cci", "task", "run", "dummy-task"])
 
-    # Verify load_dotenv was not called
     load_dotenv.assert_not_called()
-    DummyTask._run_task.assert_called_once()
 
 
-@patch("cumulusci.cli.task.load_dotenv")
-def test_task_run__loadenv_none_value(load_dotenv, runtime):
-    """Test that loadenv does not call load_dotenv when loadenv=None."""
-    DummyTask._run_task = Mock()
+@mock.patch("cumulusci.cli.cci.tee_stdout_stderr")
+@mock.patch("cumulusci.cli.cci.get_tempfile_logger")
+@mock.patch("cumulusci.cli.cci.init_logger")
+@mock.patch("cumulusci.cli.cci.check_latest_plugins")
+@mock.patch("cumulusci.cli.cci.check_latest_version")
+@mock.patch("cumulusci.cli.cci._set_windows_console_encoding")
+@mock.patch("cumulusci.cli.cci.load_dotenv")
+@mock.patch("cumulusci.cli.cci.CliRuntime")
+@mock.patch("cumulusci.cli.cci.cli")
+def test_task_run__loadenv_none_value(
+    cli,
+    CliRuntime,
+    load_dotenv,
+    set_windows_encoding,
+    check_latest_version,
+    check_latest_plugins,
+    init_logger,
+    get_tempfile_logger,
+    tee,
+):
+    """Test that load_dotenv is not called when project_config is None."""
+    mock_runtime = mock.Mock()
+    mock_runtime.project_config = None
+    CliRuntime.return_value = mock_runtime
+    get_tempfile_logger.return_value = mock.Mock(), "tempfile.log"
 
-    multi_cmd = task.RunTaskCommand()
-    with click.Context(multi_cmd, obj=runtime) as ctx:
-        cmd = multi_cmd.get_command(ctx, "dummy-task")
-        cmd.callback(runtime, "dummy-task", color="blue", loadenv=None)
+    cci_module.main(["cci", "--loadenv", "task", "run", "dummy-task"])
 
-    # Verify load_dotenv was not called
     load_dotenv.assert_not_called()
-    DummyTask._run_task.assert_called_once()
 
 
-def test_get_default_command_options_includes_loadenv():
-    """Test that the loadenv option is included in default command options."""
+def test_get_default_command_options_does_not_include_loadenv():
+    """Test that loadenv is not in task default options - it was moved to cci.py level."""
     opts = task.RunTaskCommand()._get_default_command_options(is_salesforce_task=False)
 
-    # Should have 5 global options including loadenv
-    assert len(opts) == 5
+    assert len(opts) == 4  # no-prompt, debug, debug-before, debug-after
 
-    # Find the loadenv option
     loadenv_opt = None
     for opt in opts:
         if hasattr(opt, "name") and opt.name == "loadenv":
             loadenv_opt = opt
             break
 
-    assert loadenv_opt is not None
-    assert loadenv_opt.is_flag is True
-    assert "Loads environment variables from the .env file" in loadenv_opt.help
+    assert loadenv_opt is None
