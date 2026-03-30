@@ -6,10 +6,12 @@ import runpy
 import signal
 import sys
 import traceback
+from pathlib import Path
 
 import click
 import requests
 import rich
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.markup import escape
 
@@ -184,6 +186,15 @@ def main(args=None):
             should_show_stacktraces = runtime.universal_config.cli__show_stacktraces
 
             init_logger(debug=debug)
+
+            if "--loadenv" in args:
+                # Pre-Load environment variables from .env file if it exists
+                args.remove("--loadenv")
+                if runtime.project_config is not None:
+                    env_path = Path(runtime.project_config.repo_root) / ".env"
+                    if env_path and env_path.exists():
+                        load_dotenv(dotenv_path=env_path)
+
             # Hand CLI processing over to click, but handle exceptions
             try:
                 cli(args[1:], standalone_mode=False, obj=runtime)
