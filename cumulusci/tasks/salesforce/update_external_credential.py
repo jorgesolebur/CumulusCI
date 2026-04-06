@@ -54,10 +54,51 @@ class ExternalCredential(HttpHeader):
         None,
         description="Client id. [default to None]",
     )
+    username: str = Field(
+        None,
+        description="Username for Basic auth. [default to None]",
+    )
+    password: str = Field(
+        None,
+        description="Password for Basic auth. [default to None]",
+    )
     auth_protocol: str = Field(
         "OAuth",
         description="Authentication protocol. [default to OAuth]",
     )
+
+    @root_validator
+    def validate_auth_fields(cls, values):
+        auth_protocol = values.get("auth_protocol")
+        client_id = values.get("client_id")
+        client_secret = values.get("client_secret")
+        username = values.get("username")
+        password = values.get("password")
+
+        oauth_protocols = {"OAuth", "OAuth2"}
+        is_oauth = auth_protocol in oauth_protocols
+        is_basic = auth_protocol == "Basic"
+
+        if is_oauth and (username is not None or password is not None):
+            raise ValueError(
+                "username/password can only be provided when auth_protocol is Basic."
+            )
+        if is_basic and (client_id is not None or client_secret is not None):
+            raise ValueError(
+                "client_id/client_secret can only be provided for OAuth/OAuth2 protocols."
+            )
+
+        if client_id is None and client_secret is not None:
+            raise ValueError("client_id must be provided when client_secret is set.")
+        if client_secret is None and client_id is not None:
+            raise ValueError("client_secret must be provided when client_id is set.")
+
+        if username is None and password is not None:
+            raise ValueError("username must be provided when password is set.")
+        if password is None and username is not None:
+            raise ValueError("password must be provided when username is set.")
+
+        return values
 
 
 class ExternalCredentialParameter(CCIOptions):
@@ -246,12 +287,31 @@ class ExternalCredentialParameter(CCIOptions):
         }
 
     def get_credential_parameter(self):
-        if self.named_principal is None or (
+        if self.named_principal is None:
+            return None
+
+        if self.named_principal.auth_protocol == "Basic":
+            if (
+                self.named_principal.username is None
+                and self.named_principal.password is None
+            ):
+                return None
+            return {
+                "username": {
+                    "encrypted": False,
+                    "value": self.named_principal.username,
+                },
+                "password": {
+                    "encrypted": True,
+                    "value": self.named_principal.password,
+                },
+            }
+
+        if (
             self.named_principal.client_secret is None
             and self.named_principal.client_id is None
         ):
             return None
-
         return {
             "clientId": {"encrypted": False, "value": self.named_principal.client_id},
             "clientSecret": {
@@ -286,10 +346,18 @@ class TransformExternalCredentialParameter(ExternalCredentialParameter):
         if value is None:
             return None
 
-        value["clientSecret"]["value"] = os.getenv(value["clientSecret"]["value"])
-        value["clientId"]["value"] = os.getenv(
-            value["clientId"]["value"], value["clientId"]["value"]
-        )
+        if "clientSecret" in value:
+            value["clientSecret"]["value"] = os.getenv(value["clientSecret"]["value"])
+        if "clientId" in value:
+            value["clientId"]["value"] = os.getenv(
+                value["clientId"]["value"], value["clientId"]["value"]
+            )
+        if "password" in value:
+            value["password"]["value"] = os.getenv(value["password"]["value"])
+        if "username" in value:
+            value["username"]["value"] = os.getenv(
+                value["username"]["value"], value["username"]["value"]
+            )
 
         return value
 
@@ -594,9 +662,9 @@ class UpdateExternalCredential(BaseSalesforceApiTask):
         for param in (
             self.parsed_options.parameters + self.parsed_options.transform_parameters
         ):
-            if param.named_principal is None or (
-                param.named_principal.client_secret is None
-                and param.named_principal.client_id is None
+            if (
+                param.named_principal is None
+                or param.get_credential_parameter() is None
             ):
                 continue
 

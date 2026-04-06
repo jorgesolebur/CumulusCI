@@ -89,6 +89,49 @@ class TestExternalCredential:
         assert cred.client_secret == "secret456"
         assert cred.auth_protocol == "OAuth2"
 
+    def test_external_credential_with_basic(self):
+        """Test external credential with Basic auth fields"""
+        cred = ExternalCredential(
+            name="basic-cred",
+            value="test-value",
+            username="my-user",
+            password="my-password",
+            auth_protocol="Basic",
+        )
+        assert cred.name == "basic-cred"
+        assert cred.value == "test-value"
+        assert cred.username == "my-user"
+        assert cred.password == "my-password"
+        assert cred.auth_protocol == "Basic"
+
+    def test_external_credential_validation_rejects_basic_with_oauth_fields(self):
+        """Test Basic auth does not allow OAuth fields"""
+        with pytest.raises(
+            ValueError,
+            match="client_id/client_secret can only be provided for OAuth/OAuth2 protocols",
+        ):
+            ExternalCredential(
+                name="bad-basic",
+                value="test-value",
+                auth_protocol="Basic",
+                client_id="client123",
+                client_secret="secret456",
+            )
+
+    def test_external_credential_validation_rejects_oauth_with_basic_fields(self):
+        """Test OAuth auth does not allow Basic fields"""
+        with pytest.raises(
+            ValueError,
+            match="username/password can only be provided when auth_protocol is Basic",
+        ):
+            ExternalCredential(
+                name="bad-oauth",
+                value="test-value",
+                auth_protocol="OAuth",
+                username="my-user",
+                password="my-password",
+            )
+
 
 class TestExternalCredentialParameter:
     """Test ExternalCredentialParameter model"""
@@ -196,6 +239,22 @@ class TestExternalCredentialParameter:
         assert result["clientId"]["encrypted"] is False
         assert result["clientSecret"]["encrypted"] is True
 
+    def test_get_credential_parameter_basic(self):
+        """Test get_credential_parameter method for Basic auth"""
+        named_principal = ExternalCredential(
+            name="MyPrincipal",
+            value="test",
+            username="basic-user",
+            password="basic-password",
+            auth_protocol="Basic",
+        )
+        param = ExternalCredentialParameter(named_principal=named_principal)
+        result = param.get_credential_parameter()
+        assert result["username"]["value"] == "basic-user"
+        assert result["password"]["value"] == "basic-password"
+        assert result["username"]["encrypted"] is False
+        assert result["password"]["encrypted"] is True
+
     def test_get_credential(self):
         """Test get_credential method"""
         named_principal = ExternalCredential(
@@ -256,6 +315,45 @@ class TestTransformExternalCredentialParameter:
             )
             result = param.get_credential_parameter()
             assert result["clientSecret"]["value"] == "secret123"
+
+    def test_transform_basic_credential_parameter_from_env(self):
+        """Test Basic credential transformation from environment variables"""
+        with mock.patch.dict(
+            os.environ,
+            {"BASIC_USERNAME": "env-user", "BASIC_PASSWORD": "env-password"},
+        ):
+            named_principal = ExternalCredential(
+                name="MyPrincipal",
+                value="test",
+                username="BASIC_USERNAME",
+                password="BASIC_PASSWORD",
+                auth_protocol="Basic",
+            )
+            param = TransformExternalCredentialParameter(
+                named_principal=named_principal
+            )
+            result = param.get_credential_parameter()
+            assert result["username"]["value"] == "env-user"
+            assert result["password"]["value"] == "env-password"
+
+    def test_transform_basic_username_fallback_when_env_missing(self):
+        """Test Basic username falls back to literal value when env missing"""
+        named_principal = ExternalCredential(
+            name="MyPrincipal",
+            value="test",
+            username="literal-user",
+            password="BASIC_PASSWORD",
+            auth_protocol="Basic",
+        )
+        with mock.patch.dict(
+            os.environ, {"BASIC_PASSWORD": "env-password"}, clear=True
+        ):
+            param = TransformExternalCredentialParameter(
+                named_principal=named_principal
+            )
+            result = param.get_credential_parameter()
+            assert result["username"]["value"] == "literal-user"
+            assert result["password"]["value"] == "env-password"
 
 
 class TestUpdateExternalCredential:
