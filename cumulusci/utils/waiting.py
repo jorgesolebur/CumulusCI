@@ -28,15 +28,14 @@ def retry(
             logger.warning(f"Retrying ({retries} attempts remaining)")
 
 
-def poll(action: Callable):
+def poll(action: Callable, interval: int = 1, increment_interval: int = 3):
     """poll for a result in a loop"""
     count = 0
-    interval = 1
     while True:
         count += 1
         complete = action()
         if complete:
             break
         time.sleep(interval)
-        if count % 3 == 0:
-            interval += 1
+        if count % increment_interval == 0:
+            interval += interval
