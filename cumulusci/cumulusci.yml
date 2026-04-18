@@ -801,6 +801,11 @@ tasks:
         description: Consolidate unpackaged metadata from multiple sources into a single directory
         class_path: cumulusci.tasks.utility.copyContents.ConsolidateUnpackagedMetadata
         group: Utilities
+    list_modified_files:
+        description: List the modified files in the current branch
+        class_path: cumulusci.vcs.utils.list_modified_files.ListModifiedFiles
+        group: Utilities
+        is_global: True
     download_extract:
         description: Downloads files and folders from a VCS repository.
         class_path: cumulusci.tasks.vcs.download_extract.DownloadExtract
