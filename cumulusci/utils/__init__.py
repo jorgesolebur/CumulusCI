@@ -293,6 +293,12 @@ def inject_namespace(
         (namespace + "__") if ((managed) or (namespaced_org)) and namespace else ""
     )
 
+    # Handle new tokens %%%MANAGED_OR_NAMESPACE_DOT%%%
+    managed_or_namespace_dot_token = "%%%MANAGED_OR_NAMESPACE_DOT%%%"
+    managed_or_namespace_dot = (
+        (namespace + ".") if ((managed) or (namespaced_org)) and namespace else ""
+    )
+
     orig_name = name
     prev_content = content
     content = content.replace(namespace_token, namespace_prefix)
@@ -365,6 +371,14 @@ def inject_namespace(
     if logger and content != prev_content:
         logger.info(
             f'  {name}: Replaced {managed_or_namespaced_org_token} with "{managed_or_namespaced_org}"'
+        )
+
+    # Replace new managed_or_namespace_dot token in content
+    prev_content = content
+    content = content.replace(managed_or_namespace_dot_token, managed_or_namespace_dot)
+    if logger and content != prev_content:
+        logger.info(
+            f'  {name}: Replaced {managed_or_namespace_dot_token} with "{managed_or_namespace_dot}"'
         )
 
     # Replace namespace token in file name
