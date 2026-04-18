@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.66 (2026-04-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add new CCI token to MANAGED_OR_NAMESPACE_DOT by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#220](https://github.com/jorgesolebur/CumulusCI/pull/220)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.65...v5.0.66
+
+
+<!-- latest-stop -->
+
 ## v5.0.65 (2026-04-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.64...v5.0.65
 
-
-<!-- latest-stop -->
 
 ## v5.0.64 (2026-03-30)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
