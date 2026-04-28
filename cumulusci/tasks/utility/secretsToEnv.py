@@ -29,6 +29,10 @@ class SecretsToEnv(BaseTask):
             ...,
             description="List of secret keys to retrieve be it with a list of keys or a mapping of key to secret name.",
         )
+        transform_secrets: Union[ListOfStringsOption, MappingOption] = Field(
+            [],
+            description="List of secret keys to transform from environment variables be it with a list of keys or a mapping of key to environment variable name. The %%%key%%% will be replaced with the secret key from environment variables.",
+        )
 
     parsed_options: Options
 
@@ -42,9 +46,8 @@ class SecretsToEnv(BaseTask):
         self.env_values = dotenv_values(self.parsed_options.env_path)
 
     def _init_secrets(self):
-        if (
-            isinstance(self.parsed_options.secrets, list)
-            and self.parsed_options.secrets
+        if self.parsed_options.secrets and isinstance(
+            self.parsed_options.secrets, list
         ):
             try:
                 self.secrets = MappingOption.from_str(
@@ -58,6 +61,27 @@ class SecretsToEnv(BaseTask):
             self.secrets = self.parsed_options.secrets
         else:
             self.secrets = {}
+
+        if self.parsed_options.transform_secrets and isinstance(
+            self.parsed_options.transform_secrets, list
+        ):
+            try:
+                transform_secrets = MappingOption.from_str(
+                    ",".join(self.parsed_options.secrets)
+                )
+            except Exception:
+                transform_secrets = {
+                    secret: secret for secret in self.parsed_options.transform_secrets
+                }
+        elif isinstance(self.parsed_options.transform_secrets, dict):
+            transform_secrets = self.parsed_options.transform_secrets
+        else:
+            transform_secrets = {}
+
+        for secret_key, secret_value in transform_secrets.items():
+            self.secrets[os.getenv(secret_key, secret_key)] = os.getenv(
+                secret_value, secret_value
+            )
 
     def _run_task(self):
 

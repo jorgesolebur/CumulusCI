@@ -199,6 +199,131 @@ class TestSecretsToEnvInitialization:
         # Should not set secrets attribute if list is empty
         assert task.secrets == {}
 
+    @mock.patch.dict(
+        os.environ,
+        {
+            "ENV_OUTPUT_KEY": "OUTPUT_KEY",
+            "ENV_SOURCE_SECRET": "source_secret_name",
+        },
+        clear=False,
+    )
+    def test_init_secrets_with_transform_secrets_list_mapping(self):
+        """Test _init_secrets resolves transform_secrets list and env-variable indirection."""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "env_path": ".env",
+                    "secrets": ["BASE_SECRET", "ENV_OUTPUT_KEY:ENV_SOURCE_SECRET"],
+                    "transform_secrets": ["ENV_OUTPUT_KEY:ENV_SOURCE_SECRET"],
+                }
+            }
+        )
+
+        task = SecretsToEnv(
+            project_config=mock.Mock(),
+            task_config=task_config,
+            org_config=None,
+        )
+
+        with mock.patch(
+            "cumulusci.tasks.utility.secretsToEnv.MappingOption.from_str",
+            side_effect=[
+                {
+                    "BASE_SECRET": "BASE_SECRET",
+                    "ENV_OUTPUT_KEY": "ENV_SOURCE_SECRET",
+                },
+                {"ENV_OUTPUT_KEY": "ENV_SOURCE_SECRET"},
+            ],
+        ):
+            task._init_secrets()
+
+        assert task.secrets["BASE_SECRET"] == "BASE_SECRET"
+        assert task.secrets["OUTPUT_KEY"] == "source_secret_name"
+
+    @mock.patch.dict(
+        os.environ,
+        {"TF_KEY_ENV": "RESOLVED_KEY", "TF_VALUE_ENV": "RESOLVED_SECRET"},
+        clear=False,
+    )
+    def test_init_secrets_with_transform_secrets_list_fallback(self):
+        """Test _init_secrets fallback for transform_secrets list without mapping syntax."""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "env_path": ".env",
+                    "secrets": ["API_KEY"],
+                    "transform_secrets": ["TF_KEY_ENV", "TF_VALUE_ENV"],
+                }
+            }
+        )
+
+        task = SecretsToEnv(
+            project_config=mock.Mock(),
+            task_config=task_config,
+            org_config=None,
+        )
+
+        with mock.patch(
+            "cumulusci.tasks.utility.secretsToEnv.MappingOption.from_str",
+            side_effect=Exception("force fallback"),
+        ):
+            task._init_secrets()
+
+        assert task.secrets["RESOLVED_KEY"] == "RESOLVED_KEY"
+        assert task.secrets["RESOLVED_SECRET"] == "RESOLVED_SECRET"
+
+    @mock.patch.dict(
+        os.environ,
+        {"TRANSFORM_TARGET_ENV": "TARGET_KEY", "TRANSFORM_SOURCE_ENV": "SOURCE_SECRET"},
+        clear=False,
+    )
+    def test_init_secrets_with_transform_secrets_mapping(self):
+        """Test _init_secrets with transform_secrets as a dict mapping."""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "env_path": ".env",
+                    "secrets": ["API_KEY"],
+                    "transform_secrets": {
+                        "TRANSFORM_TARGET_ENV": "TRANSFORM_SOURCE_ENV",
+                    },
+                }
+            }
+        )
+
+        task = SecretsToEnv(
+            project_config=mock.Mock(),
+            task_config=task_config,
+            org_config=None,
+        )
+
+        task._init_secrets()
+
+        assert task.secrets["TARGET_KEY"] == "SOURCE_SECRET"
+
+    def test_init_secrets_with_string_transform_secrets(self):
+        """Test _init_secrets handles string transform_secrets parsed as a single-item list."""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "env_path": ".env",
+                    "secrets": ["API_KEY"],
+                    "transform_secrets": "NOT_A_COLLECTION",
+                }
+            }
+        )
+
+        task = SecretsToEnv(
+            project_config=mock.Mock(),
+            task_config=task_config,
+            org_config=None,
+        )
+
+        task._init_secrets()
+
+        assert task.secrets["API_KEY"] == "API_KEY"
+        assert task.secrets["NOT_A_COLLECTION"] == "NOT_A_COLLECTION"
+
 
 class TestSecretsToEnvGetCredential:
     """Test cases for _get_credential method."""
