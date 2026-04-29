@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.67 (2026-04-29)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Update resolver fail for exact same branch by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#222](https://github.com/jorgesolebur/CumulusCI/pull/222)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.66...v5.0.67
+
+
+<!-- latest-stop -->
+
 ## v5.0.66 (2026-04-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.65...v5.0.66
 
-
-<!-- latest-stop -->
 
 ## v5.0.65 (2026-04-06)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
