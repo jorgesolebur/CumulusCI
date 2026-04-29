@@ -14,8 +14,12 @@ from logging import Logger
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
+from cumulusci.core.dependencies.dependencies import PackageVersionIdDependency
+from cumulusci.core.dependencies.resolvers import get_static_dependencies
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils.options import CCIOptions, Field
+from cumulusci.utils.yaml.cumulusci_yml import VCSSourceModel
+from cumulusci.vcs.vcs_source import VCSSource
 
 IGNORE_FILES = [".gitkeep", ".DS_Store"]
 
@@ -180,6 +184,7 @@ def consolidate_metadata(
     metadata_path: Union[str, List[str], Dict[str, Union[str, List[str]]]],
     base_path: str = None,
     logger: Optional[Logger] = None,
+    temp_dir: str = None,
 ) -> Tuple[str, int]:
     """
     Consolidate metadata from various sources into a temporary directory.
@@ -218,7 +223,10 @@ def consolidate_metadata(
         base_path = os.getcwd()
 
     # Create a temporary directory to consolidate all metadata
-    temp_dir = tempfile.mkdtemp(prefix="metadata_consolidate_")
+    clean_tmp_dir = False
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp(prefix="metadata_consolidate_")
+        clean_tmp_dir = True
 
     try:
         if isinstance(metadata_path, str):
@@ -307,7 +315,8 @@ def consolidate_metadata(
 
     except Exception:
         # Clean up temp directory on error
-        clean_temp_directory(temp_dir)
+        if clean_tmp_dir:
+            clean_temp_directory(temp_dir)
         raise
 
 
@@ -359,13 +368,24 @@ class ConsolidateUnpackagedMetadata(BaseTask):
     The consolidated directory path is returned in `return_values['path']`.
     """
 
+    dependencies: List = None
+
     class Options(CCIOptions):
         base_path: str = Field(
             None,
-            description="Base path for resolving relative paths. Defaults to repo_root.",
+            description="Base path for resolving relative paths. Defaults to the repository root.",
         )
         keep_temp: bool = Field(
-            False, description="Keep temporary directory after execution."
+            False,
+            description="Keep temporary directory after execution. Defaults to False.",
+        )
+        resolution_strategy: str = Field(
+            "production",
+            description="The name of a sequence of resolution_strategy to apply to unpackaged metadata dependencies. Defaults to 'production'.",
+        )
+        print_tree: bool = Field(
+            True,
+            description="Print the directory tree after consolidation. Defaults to True.",
         )
 
     parsed_options: Options
@@ -385,18 +405,78 @@ class ConsolidateUnpackagedMetadata(BaseTask):
         # Determine base path
         base_path = self.parsed_options.base_path
         if base_path is None:
-            base_path = self.project_config.repo_root
+            base_path = self.project_config.repo_root or os.getcwd()
 
         self.logger.info(f"Consolidating unpackaged metadata from: {metadata_path}")
         self.logger.info(f"Using base path: {base_path}")
 
         # Consolidate metadata
-        consolidated_path, _ = consolidate_metadata(
-            metadata_path, base_path, logger=self.logger
-        )
-        print_directory_tree(consolidated_path, logger=self.logger)
+        consolidated_path, file_count = self._consolidate_with_dependencies(base_path)
+
+        if self.parsed_options.print_tree:
+            print_directory_tree(consolidated_path, logger=self.logger)
+
+        self.return_values = {
+            "file_count": file_count,
+        }
 
         if not self.parsed_options.keep_temp:
             clean_temp_directory(consolidated_path)
+        else:
+            self.return_values["path"] = consolidated_path
 
-        return consolidated_path
+    def _consolidate_with_dependencies(self, base_path: str):
+        dependencies = self.dependencies or get_static_dependencies(
+            self.project_config,
+            resolution_strategy=self.parsed_options.resolution_strategy,
+        )
+
+        metadata_path = self.project_config.project__package__unpackaged_metadata_path
+
+        metadata_temp_dir = tempfile.mkdtemp(prefix="metadata_consolidate_")
+        file_count = 0
+
+        # get all the unpackaged metadata from the dependency packages
+        for dep in dependencies:
+            if (
+                not isinstance(dep, PackageVersionIdDependency)
+                or not hasattr(dep, "source_info")
+                or not dep.source_info
+            ):
+                continue
+
+            # Download the VCSSource from the repo_info url and commit.
+            try:
+                vcs_source_model = VCSSourceModel(
+                    vcs=dep.source_info["vcs"],
+                    url=dep.source_info["url"],
+                    commit=dep.source_info["commit"],
+                )
+
+                vcs_source = VCSSource.create(self.project_config, vcs_source_model)
+                remote_project_config = vcs_source.fetch()
+
+                _, remote_file_count = consolidate_metadata(
+                    metadata_path,
+                    remote_project_config.repo_root,
+                    logger=self.logger,
+                    temp_dir=metadata_temp_dir,
+                )
+
+                if remote_file_count < 1:
+                    continue
+
+                file_count += remote_file_count
+
+            except Exception as e:
+                self.logger.error(
+                    f"Error consolidating metadata with dependency {dep}: {e}"
+                )
+                continue
+
+        _, pkg_file_count = consolidate_metadata(
+            metadata_path, base_path, logger=self.logger, temp_dir=metadata_temp_dir
+        )
+        file_count += pkg_file_count
+
+        return metadata_temp_dir, file_count

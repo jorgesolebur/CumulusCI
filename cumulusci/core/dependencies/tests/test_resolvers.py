@@ -152,6 +152,11 @@ version_id: 04t000000000000""",
                 version_id="04t000000000000",
                 version_number="1.0",
                 package_name="CumulusCI-Test-Dep",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/CumulusCI-Test-Dep",
+                    "commit": "tag_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -182,6 +187,11 @@ version_id: 04t000000000000""",
                 version_id="04t000000000000",
                 version_number="1.0",
                 package_name="CumulusCI-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/UnmanagedRepo",
+                    "commit": "tag_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -295,6 +305,11 @@ version_id: 04t000000000000""",
                 version_id="04t000000000000",
                 version_number="1.0",
                 package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "tag_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -325,6 +340,11 @@ version_id: 04t000000000000""",
                 version_id="04t000000000000",
                 version_number="1.0",
                 package_name="CumulusCI-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/UnmanagedRepo",
+                    "commit": "tag_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -416,6 +436,7 @@ class TestGitHubReleaseBranchResolver:
 
         pc.repo_info["branch"] = "feature/232__test"
         pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = None
 
         assert ConcreteGitHubReleaseBranchResolver().is_valid_repo_context(pc)
 
@@ -443,6 +464,7 @@ class TestGitHubReleaseBranchResolver:
 
         pc.repo_info["branch"] = "feature/232__test"
         pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = None
 
         gh = ConcreteGitHubReleaseBranchResolver()
 
@@ -457,6 +479,7 @@ class TestGitHubReleaseBranchResolver:
         pc = BaseProjectConfig(UniversalConfig())
         pc.repo_info["branch"] = "feature/232__test"
         pc.project__git["prefix_feature"] = "feature/"
+        pc.project__git["release_branch_format"] = None
 
         assert get_release_id(pc) == "232"
 
@@ -544,7 +567,13 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         assert resolver.resolve(dep, project_config) == (
             "parent_sha",
             PackageVersionIdDependency(
-                version_id="04t000000000000", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000000",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "parent_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -647,7 +676,13 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         assert resolver.resolve(dep, project_config) == (
             "parent_sha_2025-03",
             PackageVersionIdDependency(
-                version_id="04t000000000010", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000010",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "parent_sha_2025-03",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -672,7 +707,13 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         assert resolver.resolve(dep, project_config) == (
             "parent_sha_FY26Q3S3",
             PackageVersionIdDependency(
-                version_id="04t000000000011", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000011",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "parent_sha_FY26Q3S3",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -700,7 +741,13 @@ class TestGitHubPreviousReleaseBranchCommitStatusResolver:
         assert resolver.resolve(dep, project_config) == (
             "parent_sha_2024-Q4",
             PackageVersionIdDependency(
-                version_id="04t000000000012", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000012",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "parent_sha_2024-Q4",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -726,7 +773,13 @@ class TestGitHubPreviousReleaseBranchCommitStatusResolver:
         assert resolver.resolve(dep, project_config) == (
             "parent_sha_FY26Q2S4",
             PackageVersionIdDependency(
-                version_id="04t000000000013", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000013",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "parent_sha_FY26Q2S4",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -749,7 +802,13 @@ class TestGitHubExactMatch2GPResolver:
         assert resolver.resolve(dep, project_config) == (
             "feature/232__test_sha",
             PackageVersionIdDependency(
-                version_id="04t000000000001", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000001",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "feature/232__test_sha",
+                    "vcs": "github",
+                },
             ),
         )
 
@@ -870,7 +929,13 @@ class TestGitHubDefaultBranch2GPResolver:
         assert resolver.resolve(dep, project_config) == (
             "main_sha",
             PackageVersionIdDependency(
-                version_id="04t000000000005", package_name="CumulusCI-2GP-Test"
+                version_id="04t000000000005",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "main_sha",
+                    "vcs": "github",
+                },
             ),
         )
 

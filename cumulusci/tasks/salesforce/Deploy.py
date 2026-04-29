@@ -5,6 +5,7 @@ from defusedxml.minidom import parseString
 from pydantic.v1 import ValidationError
 
 from cumulusci.cli.ui import CliTable
+from cumulusci.core.config import TaskConfig
 from cumulusci.core.dependencies.utils import TaskContext
 from cumulusci.core.exceptions import TaskOptionsError
 from cumulusci.core.sfdx import convert_sfdx_source
@@ -25,8 +26,8 @@ from cumulusci.tasks.salesforce.BaseSalesforceMetadataApiTask import (
     BaseSalesforceMetadataApiTask,
 )
 from cumulusci.tasks.utility.copyContents import (
+    ConsolidateUnpackagedMetadata,
     clean_temp_directory,
-    consolidate_metadata,
 )
 from cumulusci.utils.xml import metadata_tree
 
@@ -252,6 +253,9 @@ class DeployUnpackagedMetadata(Deploy):
 
     unpackaged_metadata_options = Deploy.task_options.copy()
     unpackaged_metadata_options.pop("path")
+    unpackaged_metadata_options["resolution_strategy"] = {
+        "description": "The name of a sequence of resolution_strategy (from project__dependency_resolutions) to apply to unpackaged metadata dependencies. Defaults to 'production'."
+    }
     task_options = {**unpackaged_metadata_options}
 
     def _init_options(self, kwargs):
@@ -259,16 +263,34 @@ class DeployUnpackagedMetadata(Deploy):
             return
 
         super(DeployUnpackagedMetadata, self)._init_options(kwargs)
-        final_metadata_path, file_count = consolidate_metadata(
-            self.project_config.project__package__unpackaged_metadata_path,
-            self.project_config.repo_root,
-        )
+        final_metadata_path, file_count = self._consolidate_metadata()
         if file_count == 0:
             self.logger.warning(
                 "No files found in the unpackaged metadata path. Skipping metadata deployment task."
             )
             return
         self.options["path"] = final_metadata_path
+        self.options["resolution_strategy"] = (
+            self.options.get("resolution_strategy") or "production"
+        )
+
+    def _consolidate_metadata(self):
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "base_path": self.project_config.repo_root,
+                    "resolution_strategy": self.options["resolution_strategy"],
+                    "keep_temp": True,
+                }
+            }
+        )
+        task = ConsolidateUnpackagedMetadata(
+            self.project_config, task_config, self.org_config
+        )
+        task()
+        metadata_temp_dir = task.return_values["path"]
+        file_count = task.return_values["file_count"]
+        return metadata_temp_dir, file_count
 
     def _run_task(self):
         if self.project_config.project__package__unpackaged_metadata_path is None:

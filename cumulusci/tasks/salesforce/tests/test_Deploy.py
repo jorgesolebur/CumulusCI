@@ -485,13 +485,15 @@ class TestDeployUnpackagedMetadata:
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     def test_init_options_sets_path_from_consolidate_metadata(
-        self, mock_consolidate, mock_org_config
+        self, mock_consolidate_task_cls, mock_org_config
     ):
         """Test that _init_options sets path using consolidate_metadata."""
         with temporary_dir() as path:
-            mock_consolidate.return_value = (path, 1)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": path, "file_count": 1}
+            mock_consolidate_task_cls.return_value = mock_task
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
                 universal_config,
@@ -502,25 +504,27 @@ class TestDeployUnpackagedMetadata:
 
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True},
+                {"unmanaged": True, "resolution_strategy": "production"},
                 project_config=project_config,
             )
 
-            mock_consolidate.assert_called_once_with("unpackaged/pre", path)
+            mock_task.assert_called_once()
             assert task.options["path"] == path
 
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     def test_init_options_calls_consolidate_metadata_with_correct_params(
-        self, mock_consolidate, mock_org_config
+        self, mock_consolidate_task_cls, mock_org_config
     ):
         """Test that consolidate_metadata is called with correct parameters."""
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = (consolidated_path, 5)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": consolidated_path, "file_count": 5}
+            mock_consolidate_task_cls.return_value = mock_task
 
             repo_root = "/repo/root"
             universal_config = UniversalConfig()
@@ -533,27 +537,32 @@ class TestDeployUnpackagedMetadata:
 
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True},
+                {"unmanaged": True, "resolution_strategy": "production"},
                 project_config=project_config,
             )
 
-            mock_consolidate.assert_called_once_with("unpackaged/pre", repo_root)
+            call_args = mock_consolidate_task_cls.call_args[0]
+            assert call_args[0] is project_config
+            assert call_args[1].options["base_path"] == repo_root
+            assert call_args[1].options["keep_temp"] is True
             assert task.options["path"] == consolidated_path
 
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.salesforce.Deploy.clean_temp_directory")
     def test_run_task_calls_parent_and_cleans_up(
-        self, mock_clean_temp, mock_consolidate, mock_org_config
+        self, mock_clean_temp, mock_consolidate_task_cls, mock_org_config
     ):
         """Test that _run_task calls parent's _run_task and cleans up."""
         with temporary_dir() as path:
             touch("package.xml")
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = (consolidated_path, 3)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": consolidated_path, "file_count": 3}
+            mock_consolidate_task_cls.return_value = mock_task
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -565,7 +574,7 @@ class TestDeployUnpackagedMetadata:
 
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True},
+                {"unmanaged": True, "resolution_strategy": "production"},
                 project_config=project_config,
             )
 
@@ -579,16 +588,18 @@ class TestDeployUnpackagedMetadata:
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.salesforce.Deploy.clean_temp_directory")
     def test_run_task_cleans_up_on_exception(
-        self, mock_clean_temp, mock_consolidate, mock_org_config
+        self, mock_clean_temp, mock_consolidate_task_cls, mock_org_config
     ):
         """Test that cleanup happens even when parent's _run_task raises exception."""
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = (consolidated_path, 2)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": consolidated_path, "file_count": 2}
+            mock_consolidate_task_cls.return_value = mock_task
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -600,7 +611,7 @@ class TestDeployUnpackagedMetadata:
 
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True},
+                {"unmanaged": True, "resolution_strategy": "production"},
                 project_config=project_config,
             )
 
@@ -616,15 +627,17 @@ class TestDeployUnpackagedMetadata:
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     def test_init_options_inherits_parent_options(
-        self, mock_consolidate, mock_org_config
+        self, mock_consolidate_task_cls, mock_org_config
     ):
         """Test that _init_options properly calls parent's _init_options."""
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = (consolidated_path, 4)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": consolidated_path, "file_count": 4}
+            mock_consolidate_task_cls.return_value = mock_task
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -638,6 +651,7 @@ class TestDeployUnpackagedMetadata:
                 DeployUnpackagedMetadata,
                 {
                     "unmanaged": True,
+                    "resolution_strategy": "production",
                     "check_only": True,
                     "test_level": "RunLocalTests",
                 },
@@ -653,16 +667,18 @@ class TestDeployUnpackagedMetadata:
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
     @pytest.mark.parametrize("rest_deploy", [True, False])
     def test_inherits_rest_deploy_option(
-        self, mock_consolidate, mock_org_config, rest_deploy
+        self, mock_consolidate_task_cls, mock_org_config, rest_deploy
     ):
         """Test that rest_deploy option is properly inherited from parent."""
         with temporary_dir() as path:
             consolidated_path = os.path.join(path, "consolidated")
             os.makedirs(consolidated_path)
-            mock_consolidate.return_value = (consolidated_path, 6)
+            mock_task = mock.Mock()
+            mock_task.return_values = {"path": consolidated_path, "file_count": 6}
+            mock_consolidate_task_cls.return_value = mock_task
 
             universal_config = UniversalConfig()
             project_config = BaseProjectConfig(
@@ -674,7 +690,11 @@ class TestDeployUnpackagedMetadata:
 
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True, "rest_deploy": rest_deploy},
+                {
+                    "unmanaged": True,
+                    "rest_deploy": rest_deploy,
+                    "resolution_strategy": "production",
+                },
                 project_config=project_config,
             )
 
@@ -683,8 +703,10 @@ class TestDeployUnpackagedMetadata:
     @mock.patch(
         "cumulusci.core.config.org_config.OrgConfig.installed_packages", return_value=[]
     )
-    @mock.patch("cumulusci.tasks.salesforce.Deploy.consolidate_metadata")
-    def test_no_unpackaged_metadata_path(self, mock_consolidate, mock_org_config):
+    @mock.patch("cumulusci.tasks.salesforce.Deploy.ConsolidateUnpackagedMetadata")
+    def test_no_unpackaged_metadata_path(
+        self, mock_consolidate_task_cls, mock_org_config
+    ):
         """Test that when unpackaged_metadata_path is None, consolidate_metadata is not called and path is not set."""
         with temporary_dir() as path:
             universal_config = UniversalConfig()
@@ -702,7 +724,7 @@ class TestDeployUnpackagedMetadata:
             )
 
             # Verify consolidate_metadata was not called
-            mock_consolidate.assert_not_called()
+            mock_consolidate_task_cls.assert_not_called()
             # When unpackaged_metadata_path is None, _init_options returns early
             # so parent's _init_options is not called and options may not be initialized
             # or path is not set if options exists
@@ -714,7 +736,10 @@ class TestDeployUnpackagedMetadata:
     )
     def test_consolidate_metadata_integration(self, mock_org_config):
         """Integration test that actually calls consolidate_metadata without mocking."""
-        with temporary_dir() as path:
+        with mock.patch(
+            "cumulusci.tasks.utility.copyContents.get_static_dependencies",
+            return_value=[],
+        ), temporary_dir() as path:
             # Create a realistic metadata structure
             metadata_dir = os.path.join(path, "unpackaged", "pre")
             os.makedirs(metadata_dir)
@@ -762,7 +787,7 @@ class TestDeployUnpackagedMetadata:
             # Create task without mocking consolidate_metadata
             task = create_task(
                 DeployUnpackagedMetadata,
-                {"unmanaged": True},
+                {"unmanaged": True, "resolution_strategy": "production"},
                 project_config=project_config,
             )
 

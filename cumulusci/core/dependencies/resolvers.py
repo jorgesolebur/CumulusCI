@@ -166,6 +166,11 @@ class AbstractTagResolver(AbstractResolver):
                         version_number=release.name,
                         package_name=package_name,
                     )
+                    package_dep.source_info = {
+                        "url": repo.clone_url,
+                        "commit": ref,
+                        "vcs": dep.vcs,
+                    }
                 else:
                     package_dep = PackageNamespaceVersionDependency(
                         namespace=namespace,
@@ -236,6 +241,11 @@ class AbstractReleaseTagResolver(AbstractResolver):
                         version_number=release.name,
                         package_name=package_name,
                     )
+                    package_dep.source_info = {
+                        "url": repo.clone_url,
+                        "commit": ref,
+                        "vcs": dep.vcs,
+                    }
                 else:
                     package_dep = PackageNamespaceVersionDependency(
                         namespace=namespace,
@@ -343,9 +353,18 @@ class AbstractVcsCommitStatusPackageResolver(AbstractResolver, ABC):
                 package_config = get_remote_project_config(repo, commit.sha)
                 package_name, _ = get_package_data(package_config)
 
-                return commit.sha, PackageVersionIdDependency(
-                    version_id=version_id, package_name=package_name
+                package_dep = PackageVersionIdDependency(
+                    version_id=version_id,
+                    package_name=package_name,
                 )
+
+                package_dep.source_info = {
+                    "url": repo.clone_url,
+                    "commit": commit.sha,
+                    "vcs": dep.vcs,
+                }
+
+                return commit.sha, package_dep
 
             self.handle_missing_branch_metadata(branch, context)
 
