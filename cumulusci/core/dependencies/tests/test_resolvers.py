@@ -37,7 +37,11 @@ from cumulusci.core.dependencies.resolvers import (
     get_resolver_stack,
     get_static_dependencies,
 )
-from cumulusci.core.exceptions import CumulusCIException, DependencyResolutionError
+from cumulusci.core.exceptions import (
+    CumulusCIException,
+    DependencyMissingVersion,
+    DependencyResolutionError,
+)
 from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
 from cumulusci.vcs.bootstrap import locate_commit_status_package_id
 
@@ -840,9 +844,12 @@ class TestGitHubExactMatch2GPResolver:
         )
 
         assert resolver.can_resolve(dep, project_config)
-        with pytest.raises(DependencyResolutionError) as exc:
+        with pytest.raises(DependencyMissingVersion) as exc:
             resolver.resolve(dep, project_config)
-        assert "No version found for commit status on feature/232." in str(exc)
+        assert (
+            "GitHub Exact-Match Commit Status Resolver did not locate package package version for https://github.com/SFDO-Tooling/TwoGPMissingRepo on feature/232 with commit feature/232_sha."
+            in str(exc)
+        )
 
 
 class TestGitHubDefaultBranch2GPResolver:

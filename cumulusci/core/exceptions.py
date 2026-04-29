@@ -86,6 +86,12 @@ class DependencyParseError(CumulusCIException):
     pass
 
 
+class DependencyMissingVersion(CumulusCIException):
+    """Raised when CumulusCI cannot find a version for a dependency."""
+
+    pass
+
+
 class ConfigError(CumulusCIException):
     """Raised when a configuration enounters an error"""
 

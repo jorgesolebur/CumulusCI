@@ -24,6 +24,7 @@ from cumulusci.core.dependencies.dependencies import (
 )
 from cumulusci.core.exceptions import (
     CumulusCIException,
+    DependencyMissingVersion,
     DependencyResolutionError,
     VcsNotFoundError,
 )
@@ -291,8 +292,8 @@ class AbstractVcsCommitStatusPackageResolver(AbstractResolver, ABC):
         """
         # Default behavior: Just a debug log
         if self.name in (context.project__git__settings__stop_on_missing_version or []):
-            raise DependencyResolutionError(
-                f"No version found for commit status on {branch.name}."
+            raise DependencyMissingVersion(
+                f"{self.name} did not locate package package version for {branch.repo.clone_url} on {branch.name} with commit {branch.commit.sha}."
             )
 
         context.logger.debug(f"No metadata for {branch.name}.")
