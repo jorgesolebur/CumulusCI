@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Union
 from pydantic.v1 import BaseModel, validator
 from simple_salesforce.exceptions import SalesforceMalformedRequest
 
+from cumulusci.core.config import TaskConfig
 from cumulusci.core.config.util import get_devhub_config
 from cumulusci.core.dependencies.base import (
     UnmanagedDependency,
@@ -39,8 +40,8 @@ from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
 from cumulusci.tasks.salesforce.BaseSalesforceApiTask import BaseSalesforceApiTask
 from cumulusci.tasks.salesforce.org_settings import build_settings_package
 from cumulusci.tasks.utility.copyContents import (
+    ConsolidateUnpackagedMetadata,
     clean_temp_directory,
-    consolidate_metadata,
 )
 from cumulusci.utils.salesforce.soql import (
     format_subscriber_package_version_where_clause,
@@ -273,6 +274,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             base_url="tooling",
         )
         self.context = TaskContext(self.org_config, self.project_config, self.logger)
+        self._all_dependencies = None
 
     def _run_task(self):
         """Creates a new 2GP package version.
@@ -528,11 +530,6 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                             "packageMetadataPermissionSetLicenseNames"
                         ] = [s.strip() for s in psl]
 
-            if package_config.unpackaged_metadata_path:
-                self._get_unpackaged_metadata_path(
-                    package_config.unpackaged_metadata_path, version_info
-                )
-
             # Add org shape
             with open(self.org_config.config_file, "r") as f:
                 scratch_org_def = json.load(f)
@@ -582,6 +579,10 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             version_info.writestr(
                 "package2-descriptor.json", json.dumps(package_descriptor)
             )
+
+            if package_config.unpackaged_metadata_path:
+                self._get_unpackaged_metadata_path(version_info)
+
         finally:
             version_info.close()
         version_info = base64.b64encode(version_bytes.getvalue()).decode("utf-8")
@@ -724,6 +725,8 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             self.project_config,
             resolution_strategy=self.options.get("resolution_strategy") or "production",
         )
+
+        self._all_dependencies = dependencies.copy()
 
         # If any dependencies are expressed as a 1gp namespace + version,
         # we need to convert those to 04t package version ids,
@@ -933,20 +936,35 @@ class CreatePackageVersion(BaseSalesforceApiTask):
 
     def _get_unpackaged_metadata_path(
         self,
-        metadata_path: Union[str, List[str], Dict[str, Union[str, List[str]]]],
         version_info: zipfile.ZipFile,
     ) -> zipfile.ZipFile:
 
-        final_metadata_path, file_count = consolidate_metadata(
-            metadata_path, self.project_config.repo_root, logger=self.logger
+        if not self._all_dependencies:
+            return version_info
+
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "base_path": self.project_config.repo_root,
+                    "resolution_strategy": self.options["resolution_strategy"],
+                    "keep_temp": True,
+                }
+            }
         )
+        task = ConsolidateUnpackagedMetadata(
+            self.project_config, task_config, self.org_config
+        )
+        task.dependencies = self._all_dependencies
+        task()
+        metadata_temp_dir = task.return_values["path"]
+        file_count = task.return_values["file_count"]
 
         if file_count == 0:
             return version_info
 
         # Use the consolidated temp directory with convert_sfdx_source
         with convert_sfdx_source(
-            final_metadata_path, "unpackaged-metadata-package", self.logger
+            metadata_temp_dir, "unpackaged-metadata-package", self.logger
         ) as src_path:
             unpackaged_metadata_zip_builder = MetadataPackageZipBuilder(
                 path=src_path,
@@ -959,6 +977,6 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 unpackaged_metadata_zip_builder.as_bytes(),
             )
 
-        clean_temp_directory(final_metadata_path)
+        clean_temp_directory(metadata_temp_dir)
 
         return version_info

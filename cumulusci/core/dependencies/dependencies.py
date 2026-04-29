@@ -96,6 +96,7 @@ class PackageVersionIdDependency(base_dependency.BasePackageVersionDependency):
     version_number: Optional[str] = None
 
     password_env_name: Optional[str] = None
+    source_info: Optional[dict] = None
 
     @property
     def package(self):

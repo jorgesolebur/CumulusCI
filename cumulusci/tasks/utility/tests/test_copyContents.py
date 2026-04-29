@@ -726,6 +726,11 @@ class TestConsolidateUnpackagedMetadataTask:
         """Set up test fixtures."""
         self.temp_repo_root = tempfile.mkdtemp()
         self.universal_config = UniversalConfig()
+        self.static_deps_patcher = mock.patch(
+            "cumulusci.tasks.utility.copyContents.get_static_dependencies",
+            return_value=[],
+        )
+        self.static_deps_patcher.start()
         self.project_config = BaseProjectConfig(
             self.universal_config,
             config={"noyaml": True, "project": {"package": {}}},
@@ -734,6 +739,7 @@ class TestConsolidateUnpackagedMetadataTask:
 
     def teardown_method(self):
         """Clean up test fixtures."""
+        self.static_deps_patcher.stop()
         if os.path.exists(self.temp_repo_root):
             shutil.rmtree(self.temp_repo_root)
 
@@ -753,9 +759,7 @@ class TestConsolidateUnpackagedMetadataTask:
         task = ConsolidateUnpackagedMetadata(self.project_config, task_config, None)
 
         task()
-
-        # Task stores result in task.result (from _run_task return value)
-        result_path = task.result
+        result_path = task.return_values["path"]
 
         assert result_path is not None
         assert isinstance(result_path, str)
@@ -784,7 +788,7 @@ class TestConsolidateUnpackagedMetadataTask:
 
         task()
 
-        result_path = task.result
+        result_path = task.return_values["path"]
         assert result_path is not None
         assert os.path.exists(os.path.join(result_path, "file1.txt"))
         assert os.path.exists(os.path.join(result_path, "file2.txt"))
@@ -808,7 +812,7 @@ class TestConsolidateUnpackagedMetadataTask:
 
         task()
 
-        result_path = task.result
+        result_path = task.return_values["path"]
         assert result_path is not None
         assert os.path.exists(os.path.join(result_path, "test.txt"))
         clean_temp_directory(result_path)
@@ -847,9 +851,10 @@ class TestConsolidateUnpackagedMetadataTask:
 
             task()
 
-            assert task.result is not None
-            assert os.path.exists(os.path.join(task.result, "file.txt"))
-            clean_temp_directory(task.result)
+            result_path = task.return_values["path"]
+            assert result_path is not None
+            assert os.path.exists(os.path.join(result_path, "file.txt"))
+            clean_temp_directory(result_path)
         finally:
             shutil.rmtree(custom_base)
 
@@ -870,10 +875,11 @@ class TestConsolidateUnpackagedMetadataTask:
 
         task()
 
-        assert task.result is not None
+        result_path = task.return_values["path"]
+        assert result_path is not None
         # Directory should still exist since keep_temp=True
-        assert os.path.exists(task.result)
-        clean_temp_directory(task.result)
+        assert os.path.exists(result_path)
+        clean_temp_directory(result_path)
 
     def test_task_logs_consolidation_info(self):
         """Test that task logs consolidation information."""
@@ -1409,6 +1415,47 @@ class TestConsolidateMetadataEdgeCases:
             assert file_count == 0
             assert result is not None
 
+    def test_consolidate_dict_with_nonexistent_pattern_logs_warning(self):
+        """Test consolidating with missing pattern logs warning and continues."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.makedirs(source_dir)
+
+            logger = mock.Mock()
+            result, file_count = consolidate_metadata(
+                {"source": "nonexistent.txt"}, tmpdir, logger=logger
+            )
+
+            assert file_count == 0
+            assert result is not None
+            logger.warning.assert_called_once()
+            clean_temp_directory(result)
+
+    def test_consolidate_dict_with_nonexistent_list_patterns_logs_warning(self):
+        """Test consolidating with missing patterns list logs warning and continues."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.makedirs(source_dir)
+
+            logger = mock.Mock()
+            result, file_count = consolidate_metadata(
+                {"source": ["missing-1.txt", "missing-2.txt"]}, tmpdir, logger=logger
+            )
+
+            assert file_count == 0
+            assert result is not None
+            assert logger.warning.call_count == 2
+            clean_temp_directory(result)
+
+    def test_consolidate_dict_with_invalid_pattern_type_raises(self):
+        """Test consolidating with invalid dict pattern value type."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = os.path.join(tmpdir, "source")
+            os.makedirs(source_dir)
+
+            with pytest.raises(ValueError, match="Invalid file pattern type"):
+                consolidate_metadata.__wrapped__({"source": 123}, tmpdir)
+
     def test_consolidate_with_base_path_none(self):
         """Test consolidate with base_path explicitly None."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1436,6 +1483,11 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
         """Set up test fixtures."""
         self.temp_repo_root = tempfile.mkdtemp()
         self.universal_config = UniversalConfig()
+        self.static_deps_patcher = mock.patch(
+            "cumulusci.tasks.utility.copyContents.get_static_dependencies",
+            return_value=[],
+        )
+        self.static_deps_patcher.start()
         self.project_config = BaseProjectConfig(
             self.universal_config,
             config={"noyaml": True, "project": {"package": {}}},
@@ -1444,6 +1496,7 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
 
     def teardown_method(self):
         """Clean up test fixtures."""
+        self.static_deps_patcher.stop()
         if os.path.exists(self.temp_repo_root):
             shutil.rmtree(self.temp_repo_root)
 
@@ -1464,11 +1517,10 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
 
         task()
 
-        # Task stores result in task.result
-        assert isinstance(task.result, str)
-        assert os.path.exists(task.result)
+        assert isinstance(task.return_values["path"], str)
+        assert os.path.exists(task.return_values["path"])
         # With keep_temp=True, directory should still exist
-        clean_temp_directory(task.result)
+        clean_temp_directory(task.return_values["path"])
 
     def test_task_with_error_during_consolidation(self):
         """Test task behavior when consolidation raises error."""
@@ -1497,12 +1549,13 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
         task_config = TaskConfig({"options": {"keep_temp": False}})
         task = ConsolidateUnpackagedMetadata(self.project_config, task_config, None)
 
-        task()
+        with mock.patch(
+            "cumulusci.tasks.utility.copyContents.clean_temp_directory"
+        ) as mock_clean_temp:
+            task()
+            mock_clean_temp.assert_called_once()
 
-        # Directory should be cleaned up (but result still contains the path)
-        result_path = task.result
-        assert result_path is not None
-        assert not os.path.exists(result_path)
+        assert "path" not in task.return_values
 
     def test_task_with_dict_metadata_path_wildcard(self):
         """Test task with dict metadata path using wildcard."""
@@ -1522,7 +1575,7 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
 
         task()
 
-        result_path = task.result
+        result_path = task.return_values["path"]
         assert result_path is not None
         assert os.path.exists(os.path.join(result_path, "src", "file.txt"))
         clean_temp_directory(result_path)
@@ -1556,7 +1609,7 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
 
         task()
 
-        result_path = task.result
+        result_path = task.return_values["path"]
         assert result_path is not None
         assert os.path.exists(os.path.join(result_path, "file1.txt"))
         assert os.path.exists(os.path.join(result_path, "file2.txt"))
@@ -1575,7 +1628,7 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
             "unpackaged_metadata_path": "unpackaged/pre"
         }
 
-        task_config = TaskConfig({})
+        task_config = TaskConfig({"options": {"keep_temp": True}})
         task = ConsolidateUnpackagedMetadata(self.project_config, task_config, None)
 
         with mock.patch.object(task.logger, "info") as mock_info:
@@ -1586,6 +1639,7 @@ class TestConsolidateUnpackagedMetadataTaskEdgeCases:
             # Should have tree structure calls (containing tree characters)
             tree_calls = [msg for msg in call_args if "├──" in msg or "└──" in msg]
             assert len(tree_calls) > 0
+            clean_temp_directory(task.return_values["path"])
 
 
 class TestWindowsLinuxCompatibilityExtended:

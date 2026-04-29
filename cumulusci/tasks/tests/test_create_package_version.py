@@ -1277,7 +1277,7 @@ class TestCreatePackageVersionNewFeatures:
             )
 
     @responses.activate
-    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
     @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
@@ -1286,15 +1286,22 @@ class TestCreatePackageVersionNewFeatures:
         mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
-        mock_consolidate,
+        mock_consolidate_task_cls,
         task,
     ):
         """Test _get_unpackaged_metadata_path with string path"""
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path, 1
+        mock_task = mock.Mock()
+        mock_task.return_values = {"path": temp_path, "file_count": 1}
+        mock_consolidate_task_cls.return_value = mock_task
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+        task._all_dependencies = [mock.Mock()]
+        task.options["resolution_strategy"] = "production"
+        task.project_config.project__package__unpackaged_metadata_path = (
+            "unpackaged/pre"
+        )
 
         mock_builder_instance = mock.Mock()
         mock_builder_instance.as_bytes.return_value = b"testzipbytes"
@@ -1303,12 +1310,10 @@ class TestCreatePackageVersionNewFeatures:
         version_bytes = io.BytesIO()
         version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
 
-        result = task._get_unpackaged_metadata_path("unpackaged/pre", version_info)
+        result = task._get_unpackaged_metadata_path(version_info)
 
         assert result == version_info
-        mock_consolidate.assert_called_once_with(
-            "unpackaged/pre", task.project_config.repo_root, logger=task.logger
-        )
+        mock_task.assert_called_once()
         mock_convert_sfdx.assert_called_once()
         mock_zip_builder.assert_called_once()
         mock_builder_instance.as_bytes.assert_called_once()
@@ -1320,7 +1325,7 @@ class TestCreatePackageVersionNewFeatures:
         version_info.close()
 
     @responses.activate
-    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
     @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
@@ -1329,15 +1334,23 @@ class TestCreatePackageVersionNewFeatures:
         mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
-        mock_consolidate,
+        mock_consolidate_task_cls,
         task,
     ):
         """Test _get_unpackaged_metadata_path with list of paths"""
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path, 1
+        mock_task = mock.Mock()
+        mock_task.return_values = {"path": temp_path, "file_count": 1}
+        mock_consolidate_task_cls.return_value = mock_task
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+        task._all_dependencies = [mock.Mock()]
+        task.options["resolution_strategy"] = "production"
+        task.project_config.project__package__unpackaged_metadata_path = [
+            "unpackaged/pre",
+            "unpackaged/post",
+        ]
 
         mock_builder_instance = mock.Mock()
         mock_builder_instance.as_bytes.return_value = b"testzipbytes"
@@ -1346,17 +1359,15 @@ class TestCreatePackageVersionNewFeatures:
         version_bytes = io.BytesIO()
         version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
 
-        metadata_paths = ["unpackaged/pre", "unpackaged/post"]
-        result = task._get_unpackaged_metadata_path(metadata_paths, version_info)
+        result = task._get_unpackaged_metadata_path(version_info)
 
         assert result == version_info
-        mock_consolidate.assert_called_once_with(
-            metadata_paths, task.project_config.repo_root, logger=task.logger
-        )
+        mock_task.assert_called_once()
+        mock_clean_temp.assert_called_once_with(temp_path)
         version_info.close()
 
     @responses.activate
-    @mock.patch("cumulusci.tasks.create_package_version.consolidate_metadata")
+    @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
     @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
@@ -1365,15 +1376,23 @@ class TestCreatePackageVersionNewFeatures:
         mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
-        mock_consolidate,
+        mock_consolidate_task_cls,
         task,
     ):
         """Test _get_unpackaged_metadata_path with dict format"""
         import tempfile
 
         temp_path = tempfile.mkdtemp()
-        mock_consolidate.return_value = temp_path, 1
+        mock_task = mock.Mock()
+        mock_task.return_values = {"path": temp_path, "file_count": 1}
+        mock_consolidate_task_cls.return_value = mock_task
         mock_convert_sfdx.return_value.__enter__.return_value = temp_path
+        task._all_dependencies = [mock.Mock()]
+        task.options["resolution_strategy"] = "production"
+        task.project_config.project__package__unpackaged_metadata_path = {
+            "unpackaged/pre": "*.*",
+            "unpackaged/post": "test.xml",
+        }
 
         mock_builder_instance = mock.Mock()
         mock_builder_instance.as_bytes.return_value = b"testzipbytes"
@@ -1382,13 +1401,11 @@ class TestCreatePackageVersionNewFeatures:
         version_bytes = io.BytesIO()
         version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
 
-        metadata_paths = {"unpackaged/pre": "*.*", "unpackaged/post": "test.xml"}
-        result = task._get_unpackaged_metadata_path(metadata_paths, version_info)
+        result = task._get_unpackaged_metadata_path(version_info)
 
         assert result == version_info
-        mock_consolidate.assert_called_once_with(
-            metadata_paths, task.project_config.repo_root, logger=task.logger
-        )
+        mock_task.assert_called_once()
+        mock_clean_temp.assert_called_once_with(temp_path)
         version_info.close()
 
     @responses.activate
@@ -1442,7 +1459,7 @@ class TestCreatePackageVersionNewFeatures:
                 skip_validation=True,
             )
 
-            mock_unpackaged.assert_called_once_with("unpackaged/pre", mock.ANY)
+            mock_unpackaged.assert_called_once_with(mock.ANY)
             version_info.close()
 
     @responses.activate
