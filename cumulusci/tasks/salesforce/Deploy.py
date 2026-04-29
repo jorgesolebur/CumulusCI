@@ -270,6 +270,9 @@ class DeployUnpackagedMetadata(Deploy):
             )
             return
         self.options["path"] = final_metadata_path
+        self.options["resolution_strategy"] = (
+            self.options.get("resolution_strategy") or "production"
+        )
 
     def _consolidate_metadata(self):
         task_config = TaskConfig(
