@@ -278,6 +278,14 @@ class BaseVcsDynamicDependency(DynamicDependency, ABC):
 
     vcs: str = ""  # Need to validate presence of this pydantic field in subclasses
     _repo: Optional[AbstractRepo] = PrivateAttr(default=None)
+    _is_vcs_source: bool = PrivateAttr(default=False)
+
+    @property
+    def is_vcs_source(self):
+        return self._is_vcs_source
+
+    def toggle_vcs_source(self):
+        self._is_vcs_source = not self._is_vcs_source
 
     @property
     @abstractmethod
@@ -290,8 +298,6 @@ class BaseVcsDynamicDependency(DynamicDependency, ABC):
 
     @property
     def repo(self):
-        # if not self._repo:
-        #     raise ValueError("VCS DynamicDependency has no repo set")
         return self._repo
 
     def set_repo(self, value: AbstractRepo):

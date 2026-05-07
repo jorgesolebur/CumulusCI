@@ -222,6 +222,7 @@ class VCSSource(ABC):
             # Use resolution strategies to find the right commit.
             dep = dynamic_dependency_cls(url=self.spec.url)
             dep.set_repo(self.repo)
+            dep.toggle_vcs_source()
 
             resolve_dependency(
                 dep,
