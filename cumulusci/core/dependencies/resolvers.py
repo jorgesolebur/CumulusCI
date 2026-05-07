@@ -366,6 +366,9 @@ class AbstractVcsCommitStatusPackageResolver(AbstractResolver, ABC):
 
                 return commit.sha, package_dep
 
+            if dep.is_vcs_source:
+                return branch.commit.sha, None
+
             self.handle_missing_branch_metadata(branch, context)
 
         context.logger.warn(

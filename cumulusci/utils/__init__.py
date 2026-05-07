@@ -335,6 +335,16 @@ def inject_namespace(
                 f'  {name}: Replaced {namespaced_org_file_token} with "{namespaced_org}"'
             )
 
+        # Also replace ___MANAGED_OR_NAMESPACED_ORG___ tokens in package.xml
+        prev_content = content
+        content = content.replace(
+            managed_or_namespaced_org_file_token, managed_or_namespaced_org
+        )
+        if logger and content != prev_content:
+            logger.info(
+                f'  {name}: Replaced {managed_or_namespaced_org_file_token} with "{managed_or_namespaced_org}"'
+            )
+
     prev_content = content
     content = content.replace(namespaced_org_token, namespaced_org)
     if logger and content != prev_content:
