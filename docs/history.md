@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.69 (2026-05-07)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add option to set VCSSource resolution context by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#226](https://github.com/jorgesolebur/CumulusCI/pull/226)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.68...v5.0.69
+
+
+<!-- latest-stop -->
+
 ## v5.0.68 (2026-04-29)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.67...v5.0.68
 
-
-<!-- latest-stop -->
 
 ## v5.0.67 (2026-04-29)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
