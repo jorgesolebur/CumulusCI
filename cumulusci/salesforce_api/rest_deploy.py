@@ -33,6 +33,7 @@ class RestDeploy:
         self.test_level = test_level
         self.package_zip = package_zip
         self.run_tests = run_tests or []
+        self.task.logger.info(f"Using REST Deploy API version: {self.api_version}")
 
     def __call__(self):
         self._boundary = str(uuid.uuid4())
