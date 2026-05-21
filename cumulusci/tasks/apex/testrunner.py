@@ -1069,8 +1069,8 @@ class RunApexTests(BaseSalesforceApiTask):
             with io.open(junit_output, mode="w", encoding="utf-8") as f:
                 f.write('<testsuite tests="{}">\n'.format(len(test_results)))
                 for result in test_results:
-                    s = '  <testcase classname="{}" name="{}"'.format(
-                        result["ClassName"], result["Method"]
+                    s = '  <testcase classname="{}" name="{}.{}"'.format(
+                        result["ClassName"], result["ClassName"], result["Method"]
                     )
                     if (
                         "Stats" in result
