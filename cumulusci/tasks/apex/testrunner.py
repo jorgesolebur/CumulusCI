@@ -904,6 +904,7 @@ class RunApexTests(BaseSalesforceApiTask):
     def _check_code_coverage(self):
         self.logger.info("Checking code coverage.")
         class_level_coverage_failures = {}
+        class_level_coverage_failure_results = []
 
         # Query for Class level code coverage using the aggregate
         if (
@@ -960,8 +961,19 @@ class RunApexTests(BaseSalesforceApiTask):
         ):
             if class_level_coverage_failures:
                 for class_name, coverage_info in class_level_coverage_failures.items():
-                    errors.append(
-                        f"{class_name}'s code coverage of {coverage_info['actual']}% is below required level of {coverage_info['required']}%."
+                    error_message = f"{class_name}'s code coverage of {coverage_info['actual']}% is below required level of {coverage_info['required']}%."
+                    errors.append(error_message)
+                    class_level_coverage_failure_results.append(
+                        {
+                            "Children": None,
+                            "ClassName": decode_to_unicode(class_name),
+                            "Method": "CodeCoverage",
+                            "Message": decode_to_unicode(error_message),
+                            "Outcome": "Fail",
+                            "StackTrace": "Not Applicable",
+                            "Stats": None,
+                            "TestTimestamp": None,
+                        }
                     )
             else:
                 # Build a message about what requirements were met
@@ -989,6 +1001,8 @@ class RunApexTests(BaseSalesforceApiTask):
             self.logger.info(
                 f"Organization-wide code coverage of {coverage}% meets expectations."
             )
+
+        self._write_output(class_level_coverage_failure_results)
 
         if errors:
             error_message = "\n".join(errors)
