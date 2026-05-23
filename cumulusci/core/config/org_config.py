@@ -365,9 +365,10 @@ class OrgConfig(BaseConfig):
                 version_info = VersionInfo(spv["Id"], StrictVersion(version))
                 namespace = sp["NamespacePrefix"]
                 package_name = sp.get("Name", None)
-                _installed_packages[namespace].append(version_info)
-                namespace_version = f"{namespace}@{version}"
-                _installed_packages[namespace_version].append(version_info)
+                if namespace:
+                    _installed_packages[namespace].append(version_info)
+                    namespace_version = f"{namespace}@{version}"
+                    _installed_packages[namespace_version].append(version_info)
                 _installed_packages[sp["Id"]].append(version_info)
                 # Add package name as a key for specific package detection
                 if package_name:
