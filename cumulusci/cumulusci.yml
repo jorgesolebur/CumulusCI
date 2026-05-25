@@ -1684,6 +1684,9 @@ project:
                         title: Installation Info
         settings:
             stop_on_missing_version: [] # In commit status resolvers, if the branch is found, but no version/commit metadata is found, the build will halt.
+            stop_on_owd_sharing_model_mismatch: True # If False, the build will not halt if the internal and external sharing model are not the same when one of them is controlled by parent.
+            default_owd_sharing_model_when_controlled_by_parent: Private # The default sharing model to use when the internal and external sharing model are not the same when one of them is controlled by parent.
+
     test:
         name_match: "%_TEST%"
     dependency_resolutions:

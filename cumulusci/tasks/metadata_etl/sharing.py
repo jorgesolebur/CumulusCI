@@ -84,17 +84,62 @@ class SetOrgWideDefaults(MetadataSingleEntityTransformTask, BaseSalesforceApiTas
         desired_internal_model = self.owds[api_name].get("internal_sharing_model")
         desired_external_model = self.owds[api_name].get("external_sharing_model")
 
+        external_model = metadata.find("externalSharingModel")
         if desired_external_model:
-            external_model = metadata.find("externalSharingModel")
             if not external_model:
                 external_model = metadata.append("externalSharingModel")
             external_model.text = desired_external_model
 
+        internal_model = metadata.find("sharingModel")
         if desired_internal_model:
-            internal_model = metadata.find("sharingModel")
             if not internal_model:
                 internal_model = metadata.append("sharingModel")
             internal_model.text = desired_internal_model
+
+        # ControlledByParent constraint: if either model is ControlledByParent, both must be.
+        if external_model and internal_model:
+            ext_is_cbp = external_model.text == "ControlledByParent"
+            int_is_cbp = internal_model.text == "ControlledByParent"
+
+            if ext_is_cbp != int_is_cbp:
+                if (
+                    self.project_config.project__git__settings__stop_on_owd_sharing_model_mismatch
+                ):
+                    # Both (or neither) values were user-supplied and they conflict.
+                    raise CumulusCIException(
+                        f"The internal and external access must be the same when one of them is "
+                        f"ControlledByParent. {api_name} has internal model {internal_model.text} "
+                        f"and external model {external_model.text}"
+                    )
+
+                user_provided_only_internal = (
+                    desired_internal_model is not None
+                    and desired_external_model is None
+                )
+                user_provided_only_external = (
+                    desired_external_model is not None
+                    and desired_internal_model is None
+                )
+                default_model = (
+                    self.project_config.project__git__settings__default_owd_sharing_model_when_controlled_by_parent
+                )
+
+                if user_provided_only_internal:
+                    if int_is_cbp:
+                        # User set internal=ControlledByParent; align external to match.
+                        external_model.text = internal_model.text
+                    else:
+                        # User set internal to a non-CBP value; external (from metadata)
+                        # is ControlledByParent and must change to the project default.
+                        external_model.text = default_model
+                elif user_provided_only_external:
+                    if ext_is_cbp:
+                        # User set external=ControlledByParent; align internal to match.
+                        internal_model.text = external_model.text
+                    else:
+                        # User set external to a non-CBP value; internal (from metadata)
+                        # is ControlledByParent and must change to the project default.
+                        internal_model.text = default_model
 
         # Remove duplicate elements before returning
         self._remove_duplicate_elements(metadata)
