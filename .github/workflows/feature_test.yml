@@ -58,7 +58,7 @@ jobs:
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
-            max-parallel: 3
+            max-parallel: 2
             matrix:
                 os: [macos-latest, ubuntu-latest, windows-latest]
                 python-version: ["3.11", "3.12", "3.13"]
@@ -82,7 +82,7 @@ jobs:
             - name: Run Pytest
               run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
               env:
-                  NODE_OPTIONS: "--max-old-space-size=2048"
+                  NODE_OPTIONS: "--max-old-space-size=4096"
 
     unit_tests_opt_deps:
         name: "Unit tests with optional dependencies: ${{ matrix.os }}-${{ matrix.python-version }}"
@@ -113,7 +113,7 @@ jobs:
             - name: Run Pytest
               run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
               env:
-                  NODE_OPTIONS: "--max-old-space-size=2048"
+                  NODE_OPTIONS: "--max-old-space-size=4096"
 
     robot_api:
         name: "Robot: No browser"
@@ -151,7 +151,7 @@ jobs:
                     -o suites cumulusci/robotframework/tests \
                     -o include no-browser
               env:
-                  NODE_OPTIONS: "--max-old-space-size=2048"
+                  NODE_OPTIONS: "--max-old-space-size=4096"
             - name: Delete scratch org
               if: always()
               run: |
