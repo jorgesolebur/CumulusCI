@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.72 (2026-05-25)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/fix npd deployment by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#232](https://github.com/jorgesolebur/CumulusCI/pull/232)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.71...v5.0.72
+
+
+<!-- latest-stop -->
+
 ## v5.0.71 (2026-05-21)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.70...v5.0.71
 
-
-<!-- latest-stop -->
 
 ## v5.0.70 (2026-05-20)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
