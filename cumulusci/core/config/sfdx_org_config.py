@@ -12,6 +12,14 @@ from cumulusci.utils import get_git_config
 
 nl = "\n"  # fstrings can't contain backslashes
 
+# SF CLI >= 2.x hides secrets in `sf org display` output
+_REDACTED_MARKER = "[REDACTED]"
+
+
+def _is_redacted(value) -> bool:
+    """Return True when SF CLI has replaced a secret with a redaction notice."""
+    return isinstance(value, str) and _REDACTED_MARKER in value
+
 
 class SfdxOrgConfig(OrgConfig):
     """Org config which loads from sfdx keychain"""
@@ -75,19 +83,24 @@ class SfdxOrgConfig(OrgConfig):
                     "Failed to parse json from output.\n  "
                     f"Exception: {e.__class__.__name__}\n  Output: {''.join(stdout_list)}"
                 )
-            org_id = (
-                org_info["result"].get("id")
-                or org_info["result"]["accessToken"].split("!")[0]
-            )
+        # SF CLI >= 2.x redacts secrets in org display; fetch them separately
+        access_token = org_info["result"]["accessToken"]
+        if _is_redacted(access_token):
+            access_token = self._fetch_access_token_from_cli(username)
+
+        org_id = org_info["result"].get("id") or access_token.split("!")[0]
 
         sfdx_info = {
             "instance_url": org_info["result"]["instanceUrl"],
-            "access_token": org_info["result"]["accessToken"],
+            "access_token": access_token,
             "org_id": org_id,
             "username": org_info["result"]["username"],
         }
-        if org_info["result"].get("password"):
-            sfdx_info["password"] = org_info["result"]["password"]
+        password = org_info["result"].get("password")
+        if _is_redacted(password):
+            password = self._fetch_user_password_from_cli(username)
+        if password:
+            sfdx_info["password"] = password
         self._sfdx_info = sfdx_info
         self._sfdx_info_date = datetime.datetime.now(datetime.timezone.utc)
         self.config.update(sfdx_info)
@@ -205,7 +218,42 @@ class SfdxOrgConfig(OrgConfig):
             )
         else:
             info = json.loads(p.stdout_text.read())
-            return info["result"]["accessToken"]
+            access_token = info["result"]["accessToken"]
+            if _is_redacted(access_token):
+                access_token = self._fetch_access_token_from_cli(username)
+            return access_token
+
+    def _fetch_access_token_from_cli(self, username: str) -> str:
+        """Fetch the access token via 'sf org auth show-access-token'.
+
+        Required for SF CLI >= 2.x which redacts secrets in 'sf org display'.
+        """
+        p = sfdx("org auth show-access-token --json", username)
+        stdout_list = [line.strip() for line in p.stdout_text]
+        if p.returncode:
+            stderr_list = [line.strip() for line in p.stderr_text]
+            raise SfdxOrgException(
+                f"Failed to retrieve access token for {username}\n"
+                f"stderr: {nl.join(stderr_list)}\nstdout: {nl.join(stdout_list)}"
+            )
+        info = json.loads("".join(stdout_list))
+        return info["result"]["accessToken"]
+
+    def _fetch_user_password_from_cli(self, username: str) -> str:
+        """Fetch the user password via 'sf org auth show-user-password'.
+
+        Required for SF CLI >= 2.x which redacts secrets in 'sf org display'.
+        """
+        p = sfdx("org auth show-user-password --json", username)
+        stdout_list = [line.strip() for line in p.stdout_text]
+        if p.returncode:
+            stderr_list = [line.strip() for line in p.stderr_text]
+            raise SfdxOrgException(
+                f"Failed to retrieve user password for {username}\n"
+                f"stderr: {nl.join(stderr_list)}\nstdout: {nl.join(stdout_list)}"
+            )
+        info = json.loads("".join(stdout_list))
+        return info["result"]["password"]
 
     def force_refresh_oauth_token(self):
         # Call org display and parse output to get instance_url and

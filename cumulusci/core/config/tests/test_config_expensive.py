@@ -16,6 +16,7 @@ from cumulusci.core.config import (
     SfdxOrgConfig,
     UniversalConfig,
 )
+from cumulusci.core.config.sfdx_org_config import _REDACTED_MARKER, _is_redacted
 from cumulusci.core.exceptions import (
     NotInProject,
     ProjectConfigNotFound,
@@ -783,6 +784,277 @@ class TestScratchOrgConfig:
         config = ScratchOrgConfig({}, "test", mock_keychain)
 
         assert config._choose_devhub_username() is None
+
+
+class TestIsRedacted:
+    """Tests for the _is_redacted() helper and _REDACTED_MARKER constant."""
+
+    def test_is_redacted_with_full_redaction_message(self):
+        assert (
+            _is_redacted("[REDACTED] Use 'sf org auth show-access-token' to view")
+            is True
+        )
+
+    def test_is_redacted_with_marker_only(self):
+        assert _is_redacted(_REDACTED_MARKER) is True
+
+    def test_is_redacted_with_plain_access_token(self):
+        assert _is_redacted("00Dorgid!realtoken") is False
+
+    def test_is_redacted_with_none(self):
+        assert _is_redacted(None) is False
+
+    def test_is_redacted_with_empty_string(self):
+        assert _is_redacted("") is False
+
+    def test_is_redacted_with_non_string(self):
+        assert _is_redacted(42) is False
+
+    def test_redacted_marker_value(self):
+        assert _REDACTED_MARKER == "[REDACTED]"
+
+
+@mock.patch("sarge.Command")
+class TestSfdxOrgConfigRedacted:
+    """Tests covering SF CLI >= 2.x secret-redaction behaviour in SfdxOrgConfig."""
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _make_cmd_mock(json_bytes: bytes, returncode: int = 0):
+        """Return a sarge.Command mock whose stdout/stderr are BytesIO objects."""
+        return mock.Mock(
+            stdout=io.BytesIO(json_bytes),
+            stderr=io.BytesIO(b""),
+            returncode=returncode,
+        )
+
+    @staticmethod
+    def _make_error_mock(stderr_bytes: bytes = b"error detail"):
+        return mock.Mock(
+            stdout=io.BytesIO(b"some output"),
+            stderr=io.BytesIO(stderr_bytes),
+            returncode=1,
+        )
+
+    # ------------------------------------------------------------------
+    # sfdx_info – redacted access token
+    # ------------------------------------------------------------------
+
+    def test_sfdx_info_redacted_access_token_id_present(self, Command):
+        """When accessToken is redacted, the real token is fetched separately.
+        org_id is taken from the 'id' field when present."""
+        display_result = b"""{
+            "result": {
+                "id": "00DTEST000000ORG",
+                "instanceUrl": "https://test.salesforce.com",
+                "accessToken": "[REDACTED] Use 'sf org auth show-access-token' to view",
+                "username": "test@example.com",
+                "createdDate": "2026-06-01T00:00:00Z",
+                "expirationDate": "2026-06-08"
+            }
+        }"""
+        auth_result = b'{"result": {"accessToken": "00DTEST000000ORG!realtoken"}}'
+
+        Command.side_effect = [
+            self._make_cmd_mock(display_result),
+            self._make_cmd_mock(auth_result),
+        ]
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        info = config.sfdx_info
+
+        assert info["access_token"] == "00DTEST000000ORG!realtoken"
+        assert info["org_id"] == "00DTEST000000ORG"
+        assert info["instance_url"] == "https://test.salesforce.com"
+        assert info["username"] == "test@example.com"
+
+    def test_sfdx_info_redacted_access_token_no_id_field(self, Command):
+        """When 'id' is absent, org_id is derived by splitting the fetched token."""
+        display_result = b"""{
+            "result": {
+                "instanceUrl": "https://test.salesforce.com",
+                "accessToken": "[REDACTED] Use 'sf org auth show-access-token' to view",
+                "username": "test@example.com"
+            }
+        }"""
+        auth_result = b'{"result": {"accessToken": "00Dorgid!realtoken"}}'
+
+        Command.side_effect = [
+            self._make_cmd_mock(display_result),
+            self._make_cmd_mock(auth_result),
+        ]
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        info = config.sfdx_info
+
+        assert info["access_token"] == "00Dorgid!realtoken"
+        assert info["org_id"] == "00Dorgid"
+
+    # ------------------------------------------------------------------
+    # sfdx_info – redacted password
+    # ------------------------------------------------------------------
+
+    def test_sfdx_info_redacted_password(self, Command):
+        """When password is redacted, the real password is fetched separately."""
+        display_result = b"""{
+            "result": {
+                "id": "00DTEST000000ORG",
+                "instanceUrl": "https://test.salesforce.com",
+                "accessToken": "access!token",
+                "username": "test@example.com",
+                "password": "[REDACTED] Use 'sf org auth show-user-password' to view"
+            }
+        }"""
+        pwd_result = b'{"result": {"password": "mypassword123"}}'
+
+        Command.side_effect = [
+            self._make_cmd_mock(display_result),
+            self._make_cmd_mock(pwd_result),
+        ]
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        info = config.sfdx_info
+
+        assert info["access_token"] == "access!token"
+        assert info["password"] == "mypassword123"
+
+    # ------------------------------------------------------------------
+    # sfdx_info – both secrets redacted (full SF CLI >= 2.x response)
+    # ------------------------------------------------------------------
+
+    def test_sfdx_info_both_redacted(self, Command):
+        """Full SF CLI >= 2.x scenario: both accessToken and password are redacted."""
+        display_result = b"""{
+            "result": {
+                "id": "00DTEST000000ORG",
+                "instanceUrl": "https://test.salesforce.com",
+                "accessToken": "[REDACTED] Use 'sf org auth show-access-token' to view",
+                "username": "test@example.com",
+                "password": "[REDACTED] Use 'sf org auth show-user-password' to view",
+                "createdDate": "2026-06-01T00:00:00Z",
+                "expirationDate": "2026-06-08"
+            },
+            "warnings": ["Secrets are now hidden from 'sf org display' command output."]
+        }"""
+        auth_result = b'{"result": {"accessToken": "00DTEST000000ORG!realtoken"}}'
+        pwd_result = b'{"result": {"password": "secretpass!1"}}'
+
+        Command.side_effect = [
+            self._make_cmd_mock(display_result),
+            self._make_cmd_mock(auth_result),
+            self._make_cmd_mock(pwd_result),
+        ]
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        info = config.sfdx_info
+
+        assert info["access_token"] == "00DTEST000000ORG!realtoken"
+        assert info["org_id"] == "00DTEST000000ORG"
+        assert info["password"] == "secretpass!1"
+        assert info["instance_url"] == "https://test.salesforce.com"
+        assert info["created_date"] == "2026-06-01T00:00:00Z"
+        assert info["expiration_date"] == "2026-06-08"
+        # Verify secrets are also propagated into config
+        assert config.config["access_token"] == "00DTEST000000ORG!realtoken"
+
+    # ------------------------------------------------------------------
+    # _fetch_access_token_from_cli – success and error paths
+    # ------------------------------------------------------------------
+
+    def test_fetch_access_token_from_cli_success(self, Command):
+        auth_result = b'{"result": {"accessToken": "real-access!token"}}'
+        Command.return_value = self._make_cmd_mock(auth_result)
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        token = config._fetch_access_token_from_cli("test@example.com")
+
+        assert token == "real-access!token"
+
+    def test_fetch_access_token_from_cli_error(self, Command):
+        Command.return_value = self._make_error_mock(b"auth command failed")
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        with pytest.raises(
+            SfdxOrgException,
+            match="Failed to retrieve access token for test@example.com",
+        ):
+            config._fetch_access_token_from_cli("test@example.com")
+
+    # ------------------------------------------------------------------
+    # _fetch_user_password_from_cli – success and error paths
+    # ------------------------------------------------------------------
+
+    def test_fetch_user_password_from_cli_success(self, Command):
+        pwd_result = b'{"result": {"password": "secret123"}}'
+        Command.return_value = self._make_cmd_mock(pwd_result)
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        pwd = config._fetch_user_password_from_cli("test@example.com")
+
+        assert pwd == "secret123"
+
+    def test_fetch_user_password_from_cli_error(self, Command):
+        Command.return_value = self._make_error_mock(b"password command failed")
+
+        config = SfdxOrgConfig(
+            {"username": "test@example.com", "created": True}, "test"
+        )
+        with pytest.raises(
+            SfdxOrgException,
+            match="Failed to retrieve user password for test@example.com",
+        ):
+            config._fetch_user_password_from_cli("test@example.com")
+
+    # ------------------------------------------------------------------
+    # get_access_token – redacted token triggers separate CLI call
+    # ------------------------------------------------------------------
+
+    def test_get_access_token_redacted(self, Command):
+        """get_access_token falls back to sf org auth show-access-token when redacted."""
+        sf = mock.Mock()
+        sf.query_all.return_value = {"records": [{"Username": "whatever@example.com"}]}
+
+        # org display returns a redacted token
+        display_response = mock.Mock(returncode=0)
+        display_response.stdout_text.read.return_value = '{"result": {"accessToken": "[REDACTED] Use sf org auth show-access-token"}}'
+
+        # sf org auth show-access-token returns the real token (iterable stdout_text)
+        auth_response = mock.Mock(returncode=0)
+        auth_response.stdout_text = io.StringIO(
+            '{"result": {"accessToken": "real-token-value"}}'
+        )
+
+        sfdx_mock = mock.Mock(side_effect=[display_response, auth_response])
+
+        config = ScratchOrgConfig({}, "test")
+        with mock.patch(
+            "cumulusci.core.config.org_config.OrgConfig.salesforce_client", sf
+        ):
+            with mock.patch("cumulusci.core.config.sfdx_org_config.sfdx", sfdx_mock):
+                access_token = config.get_access_token(alias="dadvisor")
+
+        assert access_token == "real-token-value"
+        assert sfdx_mock.call_count == 2
+        # Second call must be the auth show-access-token command
+        second_call_args = sfdx_mock.call_args_list[1]
+        assert "org auth show-access-token" in second_call_args[0][0]
 
 
 class TestScratchOrgConfigPytest:
