@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.73 (2026-06-02)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* SF auth updates by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#234](https://github.com/jorgesolebur/CumulusCI/pull/234)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.72...v5.0.73
+
+
+<!-- latest-stop -->
+
 ## v5.0.72 (2026-05-25)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.71...v5.0.72
 
-
-<!-- latest-stop -->
 
 ## v5.0.71 (2026-05-21)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
