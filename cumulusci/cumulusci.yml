@@ -810,7 +810,6 @@ tasks:
         description: Downloads files and folders from a VCS repository.
         class_path: cumulusci.tasks.vcs.download_extract.DownloadExtract
         group: VCS
-        is_global: True
     generate_dataset_mapping:
         description: Create a mapping for extracting data from an org.
         class_path: cumulusci.tasks.bulkdata.GenerateMapping

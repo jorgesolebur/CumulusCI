@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -7,7 +8,7 @@ import pytest
 
 from cumulusci.core.config import TaskConfig
 from cumulusci.core.exceptions import CumulusCIException, TaskOptionsError
-from cumulusci.tasks.vcs.download_extract import DownloadExtract
+from cumulusci.tasks.vcs.download_extract import TRACKING_FILE_NAME, DownloadExtract
 from cumulusci.tests.util import create_project_config
 
 
@@ -566,9 +567,8 @@ class TestDownloadExtract:
                 task.repo, subfolder="src", ref="abc123"
             )
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    def test_check_latest_commit__force_true(self, mock_timestamp_file):
-        """Test _check_latest_commit with force=True"""
+    def test_check_latest_commit__force_true(self):
+        """Test _check_latest_commit with force=True always downloads"""
         task_config = TaskConfig(
             {
                 "options": {
@@ -586,13 +586,29 @@ class TestDownloadExtract:
             assert result is True
             mock_init.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
-    def test_check_latest_commit__no_timestamp_file(
-        self, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with no timestamp file"""
-        mock_isfile.return_value = False
+    def test_check_latest_commit__no_tracking_entry(self):
+        """Test _check_latest_commit when no tracking entry exists (fresh run)"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+
+        with mock.patch.object(task, "_load_tracking_entry", return_value={}):
+            with mock.patch.object(task, "_init_repo"):
+                task.commit = "new_commit"
+                result = task._check_latest_commit()
+
+                assert result is True
+
+    @mock.patch("time.time")
+    def test_check_latest_commit__recent_timestamp(self, mock_time):
+        """Test _check_latest_commit skips repo check within 1-hour window"""
+        mock_time.return_value = 1000
 
         task_config = TaskConfig(
             {
@@ -604,70 +620,35 @@ class TestDownloadExtract:
         )
         task = DownloadExtract(self.project_config, task_config)
 
-        with mock.patch.object(task, "_init_repo") as mock_init:
-            task.commit = "new_commit"
-            result = task._check_latest_commit()
-
-            assert result is True
-            mock_init.assert_called_once()
-
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
-    @mock.patch("time.time")
-    def test_check_latest_commit__recent_timestamp(
-        self, mock_time, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with recent timestamp"""
-        mock_isfile.return_value = True
-        mock_time.return_value = 1000
-
-        mock_file = mock.Mock()
-        mock_timestamp_file.return_value.__enter__.return_value = mock_file
-
-        # Mock yaml.safe_load to return recent timestamp
-        with mock.patch("yaml.safe_load") as mock_yaml_load:
-            mock_yaml_load.return_value = {"timestamp": 999, "commit": "abc123"}
-
-            task_config = TaskConfig(
-                {
-                    "options": {
-                        "repo_url": self.repo_url,
-                        "target_directory": "test_dir",
-                    }
-                }
-            )
-            task = DownloadExtract(self.project_config, task_config)
-
+        with mock.patch.object(
+            task,
+            "_load_tracking_entry",
+            return_value={"timestamp": 999, "commit": "abc123"},
+        ):
             result = task._check_latest_commit()
 
             assert result is False
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
     @mock.patch("time.time")
-    def test_check_latest_commit__old_timestamp_same_commit(
-        self, mock_time, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with old timestamp but same commit"""
-        mock_isfile.return_value = True
+    def test_check_latest_commit__old_timestamp_same_commit(self, mock_time):
+        """Test _check_latest_commit with expired window but same commit"""
         mock_time.return_value = 5000
 
-        mock_file = mock.Mock()
-        mock_timestamp_file.return_value.__enter__.return_value = mock_file
-
-        with mock.patch("yaml.safe_load") as mock_yaml_load:
-            mock_yaml_load.return_value = {"timestamp": 1000, "commit": "abc123"}
-
-            task_config = TaskConfig(
-                {
-                    "options": {
-                        "repo_url": self.repo_url,
-                        "target_directory": "test_dir",
-                    }
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
                 }
-            )
-            task = DownloadExtract(self.project_config, task_config)
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
 
+        with mock.patch.object(
+            task,
+            "_load_tracking_entry",
+            return_value={"timestamp": 1000, "commit": "abc123"},
+        ):
             with mock.patch.object(task, "_init_repo") as mock_init:
                 task.commit = "abc123"
                 result = task._check_latest_commit()
@@ -675,32 +656,26 @@ class TestDownloadExtract:
                 assert result is False
                 mock_init.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
     @mock.patch("time.time")
-    def test_check_latest_commit__old_timestamp_different_commit(
-        self, mock_time, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with old timestamp and different commit"""
-        mock_isfile.return_value = True
+    def test_check_latest_commit__old_timestamp_different_commit(self, mock_time):
+        """Test _check_latest_commit with expired window and new commit available"""
         mock_time.return_value = 5000
 
-        mock_file = mock.Mock()
-        mock_timestamp_file.return_value.__enter__.return_value = mock_file
-
-        with mock.patch("yaml.safe_load") as mock_yaml_load:
-            mock_yaml_load.return_value = {"timestamp": 1000, "commit": "old_commit"}
-
-            task_config = TaskConfig(
-                {
-                    "options": {
-                        "repo_url": self.repo_url,
-                        "target_directory": "test_dir",
-                    }
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
                 }
-            )
-            task = DownloadExtract(self.project_config, task_config)
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
 
+        with mock.patch.object(
+            task,
+            "_load_tracking_entry",
+            return_value={"timestamp": 1000, "commit": "old_commit"},
+        ):
             with mock.patch.object(task, "_init_repo") as mock_init:
                 task.commit = "new_commit"
                 result = task._check_latest_commit()
@@ -708,32 +683,24 @@ class TestDownloadExtract:
                 assert result is True
                 mock_init.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
     @mock.patch("time.time")
-    def test_check_latest_commit__missing_timestamp_key(
-        self, mock_time, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with missing timestamp key"""
-        mock_isfile.return_value = True
+    def test_check_latest_commit__missing_timestamp_key(self, mock_time):
+        """Test _check_latest_commit with missing timestamp defaults to 0 (always expired)"""
         mock_time.return_value = 5000
 
-        mock_file = mock.Mock()
-        mock_timestamp_file.return_value.__enter__.return_value = mock_file
-
-        with mock.patch("yaml.safe_load") as mock_yaml_load:
-            mock_yaml_load.return_value = {"commit": "old_commit"}
-
-            task_config = TaskConfig(
-                {
-                    "options": {
-                        "repo_url": self.repo_url,
-                        "target_directory": "test_dir",
-                    }
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
                 }
-            )
-            task = DownloadExtract(self.project_config, task_config)
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
 
+        with mock.patch.object(
+            task, "_load_tracking_entry", return_value={"commit": "old_commit"}
+        ):
             with mock.patch.object(task, "_init_repo") as mock_init:
                 task.commit = "new_commit"
                 result = task._check_latest_commit()
@@ -741,32 +708,24 @@ class TestDownloadExtract:
                 assert result is True
                 mock_init.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("os.path.isfile")
     @mock.patch("time.time")
-    def test_check_latest_commit__missing_commit_key(
-        self, mock_time, mock_isfile, mock_timestamp_file
-    ):
-        """Test _check_latest_commit with missing commit key"""
-        mock_isfile.return_value = True
+    def test_check_latest_commit__missing_commit_key(self, mock_time):
+        """Test _check_latest_commit with missing commit defaults to empty string"""
         mock_time.return_value = 5000
 
-        mock_file = mock.Mock()
-        mock_timestamp_file.return_value.__enter__.return_value = mock_file
-
-        with mock.patch("yaml.safe_load") as mock_yaml_load:
-            mock_yaml_load.return_value = {"timestamp": 1000}
-
-            task_config = TaskConfig(
-                {
-                    "options": {
-                        "repo_url": self.repo_url,
-                        "target_directory": "test_dir",
-                    }
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
                 }
-            )
-            task = DownloadExtract(self.project_config, task_config)
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
 
+        with mock.patch.object(
+            task, "_load_tracking_entry", return_value={"timestamp": 1000}
+        ):
             with mock.patch.object(task, "_init_repo") as mock_init:
                 task.commit = "abc123"
                 result = task._check_latest_commit()
@@ -774,12 +733,8 @@ class TestDownloadExtract:
                 assert result is True
                 mock_init.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("time.time")
-    def test_run_task__skip_no_changes(self, mock_time, mock_timestamp_file):
+    def test_run_task__skip_no_changes(self):
         """Test _run_task skipping download when no changes"""
-        mock_time.return_value = 1000
-
         task_config = TaskConfig(
             {
                 "options": {
@@ -796,12 +751,8 @@ class TestDownloadExtract:
 
                 mock_set_target.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("time.time")
-    def test_run_task__create_target_directory(self, mock_time, mock_timestamp_file):
-        """Test _run_task creating target directory"""
-        mock_time.return_value = 1000
-
+    def test_run_task__create_target_directory(self):
+        """Test _run_task creates the target directory when it does not exist"""
         task_config = TaskConfig(
             {
                 "options": {
@@ -817,24 +768,19 @@ class TestDownloadExtract:
             target_dir = os.path.join(temp_dir, "test_dir")
             task.parsed_options.target_directory = target_dir
 
-            # Ensure the target directory doesn't exist initially
             assert not os.path.exists(target_dir)
 
             with mock.patch.object(task, "_check_latest_commit", return_value=True):
                 with mock.patch.object(task, "_set_target_directory"):
                     with mock.patch.object(task, "_download_repo_and_extract"):
                         with mock.patch.object(task, "_rename_files"):
-                            task()
+                            with mock.patch.object(task, "_save_tracking_entry"):
+                                task()
 
-                            # Check that the target directory was created
-                            assert os.path.exists(target_dir)
+                                assert os.path.exists(target_dir)
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("time.time")
-    def test_run_task__full_run(self, mock_time, mock_timestamp_file):
-        """Test _run_task full execution"""
-        mock_time.return_value = 1000
-
+    def test_run_task__full_run(self):
+        """Test _run_task calls all steps in order and saves tracking entry"""
         task_config = TaskConfig(
             {
                 "options": {
@@ -849,9 +795,6 @@ class TestDownloadExtract:
         with tempfile.TemporaryDirectory() as temp_dir:
             target_dir = os.path.join(temp_dir, "test_dir")
             task.parsed_options.target_directory = target_dir
-
-            mock_file = mock.Mock()
-            mock_timestamp_file.return_value.__enter__.return_value = mock_file
 
             with mock.patch.object(task, "_check_latest_commit", return_value=True):
                 with mock.patch.object(task, "_set_target_directory"):
@@ -859,21 +802,17 @@ class TestDownloadExtract:
                         task, "_download_repo_and_extract"
                     ) as mock_download:
                         with mock.patch.object(task, "_rename_files") as mock_rename:
-                            with mock.patch("yaml.dump") as mock_yaml_dump:
+                            with mock.patch.object(
+                                task, "_save_tracking_entry"
+                            ) as mock_save:
                                 task()
 
                                 mock_download.assert_called_once_with(Path(target_dir))
                                 mock_rename.assert_called_once_with(Path(target_dir))
-                                mock_yaml_dump.assert_called_once_with(
-                                    {"commit": "abc123", "timestamp": 1000}, mock_file
-                                )
+                                mock_save.assert_called_once()
 
-    @mock.patch("cumulusci.tasks.vcs.download_extract.timestamp_file")
-    @mock.patch("time.time")
-    def test_run_task__force_download(self, mock_time, mock_timestamp_file):
-        """Test _run_task with force=True"""
-        mock_time.return_value = 1000
-
+    def test_run_task__force_download(self):
+        """Test _run_task with force=True proceeds regardless of tracking state"""
         task_config = TaskConfig(
             {
                 "options": {
@@ -894,7 +833,208 @@ class TestDownloadExtract:
                 with mock.patch.object(task, "_set_target_directory"):
                     with mock.patch.object(task, "_download_repo_and_extract"):
                         with mock.patch.object(task, "_rename_files"):
-                            task()
+                            with mock.patch.object(task, "_save_tracking_entry"):
+                                task()
 
-                            # Should proceed with download even if no changes
-                            assert task.parsed_options.force is True
+                                assert task.parsed_options.force is True
+
+    # -------------------------------------------------------------------------
+    # Tracking file helpers
+    # -------------------------------------------------------------------------
+
+    def test_get_tracking_file_path(self):
+        """Test _get_tracking_file_path returns path inside project_local_dir"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "test_dir",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.object(
+                type(task.project_config),
+                "project_local_dir",
+                new_callable=mock.PropertyMock,
+                return_value=temp_dir,
+            ):
+                result = task._get_tracking_file_path()
+
+                assert result == Path(temp_dir) / TRACKING_FILE_NAME
+
+    def test_load_tracking_entry__file_not_exists(self):
+        """Test _load_tracking_entry returns empty dict when tracking file is absent"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracking_path = Path(temp_dir) / TRACKING_FILE_NAME
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=tracking_path
+            ):
+                result = task._load_tracking_entry()
+
+                assert result == {}
+
+    def test_load_tracking_entry__entry_exists(self):
+        """Test _load_tracking_entry returns the correct entry for the target directory"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracking_path = Path(temp_dir) / TRACKING_FILE_NAME
+            tracking_path.write_text(
+                json.dumps(
+                    {
+                        "/some/target": {"commit": "abc123", "timestamp": 1000.0},
+                        "/other/target": {"commit": "def456", "timestamp": 2000.0},
+                    }
+                )
+            )
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=tracking_path
+            ):
+                result = task._load_tracking_entry()
+
+                assert result == {"commit": "abc123", "timestamp": 1000.0}
+
+    def test_load_tracking_entry__entry_missing_for_target(self):
+        """Test _load_tracking_entry returns empty dict when file exists but has no entry for target"""
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracking_path = Path(temp_dir) / TRACKING_FILE_NAME
+            tracking_path.write_text(
+                json.dumps({"/other/target": {"commit": "def456", "timestamp": 2000.0}})
+            )
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=tracking_path
+            ):
+                result = task._load_tracking_entry()
+
+                assert result == {}
+
+    @mock.patch("time.time")
+    def test_save_tracking_entry__creates_new_file(self, mock_time):
+        """Test _save_tracking_entry writes a new JSON file when none exists"""
+        mock_time.return_value = 1000.0
+
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+        task.commit = "abc123"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracking_path = Path(temp_dir) / TRACKING_FILE_NAME
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=tracking_path
+            ):
+                task._save_tracking_entry()
+
+                assert tracking_path.exists()
+                data = json.loads(tracking_path.read_text())
+                assert data == {
+                    "/some/target": {"commit": "abc123", "timestamp": 1000.0}
+                }
+
+    @mock.patch("time.time")
+    def test_save_tracking_entry__updates_existing_entry(self, mock_time):
+        """Test _save_tracking_entry updates only the target entry, preserving others"""
+        mock_time.return_value = 2000.0
+
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+        task.commit = "new_commit"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracking_path = Path(temp_dir) / TRACKING_FILE_NAME
+            tracking_path.write_text(
+                json.dumps(
+                    {
+                        "/some/target": {"commit": "old_commit", "timestamp": 500.0},
+                        "/other/target": {"commit": "def456", "timestamp": 500.0},
+                    }
+                )
+            )
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=tracking_path
+            ):
+                task._save_tracking_entry()
+
+                data = json.loads(tracking_path.read_text())
+                assert data["/some/target"] == {
+                    "commit": "new_commit",
+                    "timestamp": 2000.0,
+                }
+                assert data["/other/target"] == {"commit": "def456", "timestamp": 500.0}
+
+    @mock.patch("time.time")
+    def test_save_tracking_entry__creates_parent_dir(self, mock_time):
+        """Test _save_tracking_entry creates parent directories if they do not exist"""
+        mock_time.return_value = 1000.0
+
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "repo_url": self.repo_url,
+                    "target_directory": "/some/target",
+                }
+            }
+        )
+        task = DownloadExtract(self.project_config, task_config)
+        task.parsed_options.target_directory = "/some/target"
+        task.commit = "abc123"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nested_path = Path(temp_dir) / "nested" / "local" / TRACKING_FILE_NAME
+            assert not nested_path.parent.exists()
+
+            with mock.patch.object(
+                task, "_get_tracking_file_path", return_value=nested_path
+            ):
+                task._save_tracking_entry()
+
+                assert nested_path.exists()

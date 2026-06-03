@@ -1,11 +1,9 @@
+import json
 import os
 import time
 from pathlib import Path
 from typing import Dict, Optional
 
-import yaml
-
-from cumulusci.cli.utils import timestamp_file
 from cumulusci.core.exceptions import CumulusCIException, TaskOptionsError
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils import download_extract_vcs_from_repo, filter_namelist
@@ -19,6 +17,8 @@ from cumulusci.utils.options import (
 from cumulusci.vcs.bootstrap import get_repo_from_url
 from cumulusci.vcs.models import AbstractRepo
 from cumulusci.vcs.utils import get_ref_from_options
+
+TRACKING_FILE_NAME = "download_extract.json"
 
 
 class DownloadExtractRenamesOption(CCIOptionType):
@@ -167,9 +167,7 @@ class DownloadExtract(BaseTask):
 
         self._download_repo_and_extract(target)
         self._rename_files(target)
-
-        with timestamp_file(self.parsed_options.target_directory) as f:
-            yaml.dump({"commit": self.commit, "timestamp": time.time()}, f)
+        self._save_tracking_entry()
 
     def _set_ref(self):
         if self.parsed_options.branch:
@@ -225,30 +223,46 @@ class DownloadExtract(BaseTask):
             )
         self.parsed_options.target_directory = target_directory
 
+    def _get_tracking_file_path(self) -> Path:
+        return Path(self.project_config.project_local_dir) / TRACKING_FILE_NAME
+
+    def _load_tracking_entry(self) -> dict:
+        tracking_file = self._get_tracking_file_path()
+        if not tracking_file.exists():
+            return {}
+        with open(tracking_file, "r") as f:
+            data = json.load(f)
+        return data.get(self.parsed_options.target_directory, {})
+
+    def _save_tracking_entry(self):
+        tracking_file = self._get_tracking_file_path()
+        tracking_file.parent.mkdir(parents=True, exist_ok=True)
+
+        data = {}
+        if tracking_file.exists():
+            with open(tracking_file, "r") as f:
+                data = json.load(f)
+
+        data[self.parsed_options.target_directory] = {
+            "commit": self.commit,
+            "timestamp": time.time(),
+        }
+
+        with open(tracking_file, "w") as f:
+            json.dump(data, f, indent=2)
+
     def _check_latest_commit(self):
         """checks for the latest commit in repo, max once per hour"""
         if self.parsed_options.force:
             self._init_repo()
             return True
 
-        check = True
+        entry = self._load_tracking_entry()
+        timestamp = entry.get("timestamp", 0)
+        commit = entry.get("commit", "")
 
-        timestamp = 0
-        commit = ""
-        if os.path.isfile(f"{self.parsed_options.target_directory}/cumulus_timestamp"):
-            with timestamp_file(self.parsed_options.target_directory) as f:
-                loaded_data = yaml.safe_load(f)
-                timestamp = loaded_data.get("timestamp", 0)
-                commit = loaded_data.get("commit", "")
-
-        delta = time.time() - timestamp
-        check = delta > 3600
-
-        if not check:
+        if time.time() - timestamp <= 3600:
             return False
 
         self._init_repo()
-        if self.commit != commit:
-            return True
-
-        return False
+        return self.commit != commit
