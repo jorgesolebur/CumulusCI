@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.74 (2026-06-04)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/enhance download extract, Insert record by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#236](https://github.com/jorgesolebur/CumulusCI/pull/236)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.73...v5.0.74
+
+
+<!-- latest-stop -->
+
 ## v5.0.73 (2026-06-02)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.72...v5.0.73
 
-
-<!-- latest-stop -->
 
 ## v5.0.72 (2026-05-25)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
