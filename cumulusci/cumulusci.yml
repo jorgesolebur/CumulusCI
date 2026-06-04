@@ -907,7 +907,10 @@ tasks:
         class_path: cumulusci.tasks.salesforce.update_external_auth_identity_provider.UpdateExternalAuthIdentityProvider
         description: Update external auth identity provider parameters and credentials
         group: Metadata Transformations
-
+    add_public_group_members:
+        class_path: cumulusci.tasks.salesforce.add_public_group_members.AddPublicGroupMembers
+        group: Salesforce
+        description: Add Public Group Members to one or more public groups
 flows:
     ci_beta:
         group: Continuous Integration
