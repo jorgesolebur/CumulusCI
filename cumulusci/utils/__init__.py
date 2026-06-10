@@ -243,12 +243,53 @@ def inject_namespace(
     namespaced_org=None,
     logger=None,
 ):
-    """Replaces %%%NAMESPACE%%% in file content and ___NAMESPACE___ in file name
-    with either '' if no namespace is provided or 'namespace__' if provided.
+    """Replaces namespace tokens in file content and file names.
 
-    Also handles:
-    - %%%MANAGED_OR_NAMESPACED_ORG%%% and ___MANAGED_OR_NAMESPACED_ORG___ tokens
-      which are replaced with 'namespace__' if managed=True OR namespaced_org=True
+    Token reference (content tokens use %%%TOKEN%%%, filename tokens use ___TOKEN___):
+
+    %%% NAMESPACE %%%
+        → 'namespace__' if managed=True and namespace, else ''
+        Use for: metadata deployed in a managed/subscriber context only.
+
+    %%% NAMESPACE_DOT %%%
+        → 'namespace.' if managed=True and namespace, else ''
+        Use for: dot-separated namespace references (e.g. Apex type names).
+
+    %%% NAMESPACE_COLON %%%
+        → 'namespace:' if managed=True and namespace, else ''
+        Use for: colon-separated references (e.g. LWC import paths).
+
+    %%% NAMESPACE_OR_C %%%
+        → namespace if managed=True and namespace, else 'c'
+        Use for: LWC component references (c-namespace vs namespace-namespace).
+
+    %%% NAMESPACED_ORG %%% / ___ NAMESPACED_ORG ___
+        → 'namespace__' if namespaced_org=True and namespace, else ''
+        Use for: references that should carry the prefix only inside the
+        developer's own namespace org.
+
+    %%% NAMESPACED_ORG_OR_C %%%
+        → namespace if namespaced_org=True, else 'c'
+        Use for: LWC references inside a namespaced dev org.
+
+    %%% NAMESPACED_ORG_COLON %%%
+        → 'namespace:' if namespaced_org=True, else ''
+        Use for: colon-separated references inside a namespaced dev org.
+
+    %%% SUBSCRIBER_NAMESPACE %%% / ___ SUBSCRIBER_NAMESPACE ___
+        → 'namespace__' if the org does NOT own the package namespace
+          (i.e. namespaced_org=False) AND managed=True, else ''
+        Use for: metadata references that need an explicit namespace prefix in
+        subscriber / feature orgs but must omit the prefix in the developer's
+        own namespace org (where the namespace is implicit).
+
+    %%% MANAGED_OR_NAMESPACED_ORG %%% / ___ MANAGED_OR_NAMESPACED_ORG ___
+        → 'namespace__' if managed=True OR namespaced_org=True, else ''
+        Use for: references that need the prefix in any namespaced context.
+
+    %%% MANAGED_OR_NAMESPACE_DOT %%%
+        → 'namespace.' if managed=True OR namespaced_org=True, else ''
+        Dot-separated variant of MANAGED_OR_NAMESPACED_ORG.
     """
 
     # Handle namespace and filename tokens
@@ -270,9 +311,17 @@ def inject_namespace(
     namespaced_org_file_token = "___NAMESPACED_ORG___"
     namespaced_org = (namespace + "__") if namespaced_org and namespace else ""
 
+    # Handle tokens %%%SUBSCRIBER_NAMESPACE%%% and ___SUBSCRIBER_NAMESPACE___
+    # Returns namespace_prefix ('namespace__') only when the target org does NOT own
+    # the package namespace (namespaced_org=False) and the deploy is managed.
+    # Returns '' when the org is namespaced, because the namespace is implicit there.
+    subscriber_namespace_token = "%%%SUBSCRIBER_NAMESPACE%%%"
+    subscriber_namespace_file_token = "___SUBSCRIBER_NAMESPACE___"
+    subscriber_namespace = "" if namespaced_org else namespace_prefix
+
     # Handle tokens %%%NAMESPACED_ORG_COLON%%%
     namespaced_org_colon_token = "%%%NAMESPACED_ORG_COLON%%%"
-    namespaced_org_colon = (namespace + ":") if namespaced_org and namespace else ""
+    namespaced_org_colon = (namespace + ":") if namespaced_org else ""
 
     # Handle tokens %%%NAMESPACE_COLON%%%
     namespace_colon_token = "%%%NAMESPACE_COLON%%%"
@@ -335,6 +384,14 @@ def inject_namespace(
                 f'  {name}: Replaced {namespaced_org_file_token} with "{namespaced_org}"'
             )
 
+        # Also replace ___SUBSCRIBER_NAMESPACE___ tokens in package.xml
+        prev_content = content
+        content = content.replace(subscriber_namespace_file_token, subscriber_namespace)
+        if logger and content != prev_content:
+            logger.info(
+                f'  {name}: Replaced {subscriber_namespace_file_token} with "{subscriber_namespace}"'
+            )
+
         # Also replace ___MANAGED_OR_NAMESPACED_ORG___ tokens in package.xml
         prev_content = content
         content = content.replace(
@@ -350,6 +407,13 @@ def inject_namespace(
     if logger and content != prev_content:
         logger.info(
             f'  {name}: Replaced {namespaced_org_token} with "{namespaced_org}"'
+        )
+
+    prev_content = content
+    content = content.replace(subscriber_namespace_token, subscriber_namespace)
+    if logger and content != prev_content:
+        logger.info(
+            f'  {name}: Replaced {subscriber_namespace_token} with "{subscriber_namespace}"'
         )
 
     prev_content = content
@@ -395,6 +459,7 @@ def inject_namespace(
     name = name.replace(filename_token, namespace_prefix)
     name = name.replace(namespaced_org_file_token, namespaced_org)
     name = name.replace(managed_or_namespaced_org_file_token, managed_or_namespaced_org)
+    name = name.replace(subscriber_namespace_file_token, subscriber_namespace)
     if logger and name != orig_name:
         logger.info(f"  {orig_name}: renamed to {name}")
 
