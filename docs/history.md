@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.76 (2026-06-10)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add new CCI token SUBSCRIBER_NAMESPACE by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#240](https://github.com/jorgesolebur/CumulusCI/pull/240)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.75...v5.0.76
+
+
+<!-- latest-stop -->
+
 ## v5.0.75 (2026-06-05)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.74...v5.0.75
 
-
-<!-- latest-stop -->
 
 ## v5.0.74 (2026-06-04)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
