@@ -549,6 +549,382 @@ Options\n------------------------------------------\n\n
         )
         assert content == "ns__"
 
+    # ------------------------------------------------------------------
+    # %%%SUBSCRIBER_NAMESPACE%%% — 4 org-type combinations
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__subscriber_namespace__feature_org(self):
+        """Case 1 & 3: not namespaced + managed → prefix injected."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%SUBSCRIBER_NAMESPACE%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "ns__Field__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__subscriber_namespace__dev_org_unmanaged(self):
+        """Case 2: namespaced org + unmanaged → '' (namespace is implicit)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%SUBSCRIBER_NAMESPACE%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=True,
+        )
+        assert content == "Field__c"
+
+    def test_inject_namespace__subscriber_namespace__segment_dev_org(self):
+        """Case 4: namespaced org + managed → '' (namespace is still implicit)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%SUBSCRIBER_NAMESPACE%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=True,
+        )
+        assert content == "Field__c"
+
+    def test_inject_namespace__subscriber_namespace__unmanaged_feature_org(self):
+        """Not namespaced + not managed → '' (no managed context, no prefix)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%SUBSCRIBER_NAMESPACE%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=False,
+        )
+        assert content == "Field__c"
+
+    def test_inject_namespace__subscriber_namespace__no_namespace(self):
+        """managed=True but no namespace → '' (nothing to inject)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%SUBSCRIBER_NAMESPACE%%%Field__c",
+            namespace=None,
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "Field__c"
+
+    # ------------------------------------------------------------------
+    # ___SUBSCRIBER_NAMESPACE___ — filename token
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__subscriber_namespace_file_token__feature_org(self):
+        """Filename token replaced with prefix in a non-namespaced managed org."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "___SUBSCRIBER_NAMESPACE___Object__c",
+            "",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert name == "ns__Object__c"
+        logger.info.assert_called()  # rename logged
+
+    def test_inject_namespace__subscriber_namespace_file_token__namespaced_org(self):
+        """Filename token replaced with '' when org owns the namespace."""
+        name, content = utils.inject_namespace(
+            "___SUBSCRIBER_NAMESPACE___Object__c",
+            "",
+            namespace="ns",
+            managed=True,
+            namespaced_org=True,
+        )
+        assert name == "Object__c"
+
+    # ------------------------------------------------------------------
+    # ___SUBSCRIBER_NAMESPACE___ in package.xml content
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__subscriber_namespace_in_package_xml__feature_org(self):
+        """File-token in package.xml expanded with prefix for non-namespaced org."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___SUBSCRIBER_NAMESPACE___Object__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "ns__Object__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__subscriber_namespace_in_package_xml__namespaced_org(
+        self,
+    ):
+        """File-token in package.xml expanded to '' when org owns the namespace."""
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___SUBSCRIBER_NAMESPACE___Object__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=True,
+        )
+        assert content == "Object__c"
+
+    # ------------------------------------------------------------------
+    # ___NAMESPACED_ORG___ — filename and package.xml
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__namespaced_org_file_token__namespaced(self):
+        """___NAMESPACED_ORG___ in filename replaced with prefix when org is namespaced."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "___NAMESPACED_ORG___Object__c",
+            "",
+            namespace="ns",
+            namespaced_org=True,
+            logger=logger,
+        )
+        assert name == "ns__Object__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__namespaced_org_file_token__not_namespaced(self):
+        """___NAMESPACED_ORG___ in filename replaced with '' when org is not namespaced."""
+        name, content = utils.inject_namespace(
+            "___NAMESPACED_ORG___Object__c",
+            "",
+            namespace="ns",
+            namespaced_org=False,
+        )
+        assert name == "Object__c"
+
+    def test_inject_namespace__namespaced_org_in_package_xml(self):
+        """___NAMESPACED_ORG___ file-token in package.xml content."""
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___NAMESPACED_ORG___Object__c",
+            namespace="ns",
+            namespaced_org=True,
+        )
+        assert content == "ns__Object__c"
+
+    # ------------------------------------------------------------------
+    # %%%MANAGED_OR_NAMESPACED_ORG%%% — all four flag combinations
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__managed_or_namespaced_org__managed_only(self):
+        """managed=True, namespaced_org=False → prefix (managed context)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACED_ORG%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "ns__Field__c"
+
+    def test_inject_namespace__managed_or_namespaced_org__namespaced_only(self):
+        """managed=False, namespaced_org=True → prefix (namespaced org context)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACED_ORG%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=True,
+        )
+        assert content == "ns__Field__c"
+
+    def test_inject_namespace__managed_or_namespaced_org__both(self):
+        """managed=True, namespaced_org=True → prefix."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACED_ORG%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=True,
+        )
+        assert content == "ns__Field__c"
+
+    def test_inject_namespace__managed_or_namespaced_org__neither(self):
+        """managed=False, namespaced_org=False → '' (no namespace context)."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACED_ORG%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=False,
+        )
+        assert content == "Field__c"
+
+    # ------------------------------------------------------------------
+    # ___MANAGED_OR_NAMESPACED_ORG___ — filename and package.xml
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__managed_or_namespaced_org_file_token(self):
+        """___MANAGED_OR_NAMESPACED_ORG___ in filename replaced when managed."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "___MANAGED_OR_NAMESPACED_ORG___Object__c",
+            "",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert name == "ns__Object__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__managed_or_namespaced_org_in_package_xml(self):
+        """___MANAGED_OR_NAMESPACED_ORG___ file-token in package.xml content."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___MANAGED_OR_NAMESPACED_ORG___Object__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "ns__Object__c"
+        logger.info.assert_called()
+
+    # ------------------------------------------------------------------
+    # %%%MANAGED_OR_NAMESPACE_DOT%%%
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__managed_or_namespace_dot__managed(self):
+        """managed=True → dot-prefix injected."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACE_DOT%%%ApexClass",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "ns.ApexClass"
+
+    def test_inject_namespace__managed_or_namespace_dot__namespaced_org(self):
+        """namespaced_org=True (regardless of managed) → dot-prefix injected."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACE_DOT%%%ApexClass",
+            namespace="ns",
+            managed=False,
+            namespaced_org=True,
+        )
+        assert content == "ns.ApexClass"
+
+    def test_inject_namespace__managed_or_namespace_dot__neither(self):
+        """Neither managed nor namespaced_org → '' prefix."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACE_DOT%%%ApexClass",
+            namespace="ns",
+            managed=False,
+            namespaced_org=False,
+        )
+        assert content == "ApexClass"
+
+    # ------------------------------------------------------------------
+    # Logger branches for package.xml and managed_or_* tokens
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__package_xml_namespace_token_with_logger(self):
+        """Logger called when ___NAMESPACE___ is replaced in package.xml content."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___NAMESPACE___Object__c",
+            namespace="ns",
+            managed=True,
+            logger=logger,
+        )
+        assert content == "ns__Object__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__namespaced_org_in_package_xml_with_logger(self):
+        """Logger called when ___NAMESPACED_ORG___ is replaced in package.xml content."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "package.xml",
+            "___NAMESPACED_ORG___Object__c",
+            namespace="ns",
+            namespaced_org=True,
+            logger=logger,
+        )
+        assert content == "ns__Object__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__managed_or_namespaced_org_with_logger(self):
+        """Logger called when %%%MANAGED_OR_NAMESPACED_ORG%%% is replaced in content."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACED_ORG%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "ns__Field__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__managed_or_namespace_dot_with_logger(self):
+        """Logger called when %%%MANAGED_OR_NAMESPACE_DOT%%% is replaced in content."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%MANAGED_OR_NAMESPACE_DOT%%%ApexClass",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "ns.ApexClass"
+        logger.info.assert_called()
+
+    # ------------------------------------------------------------------
+    # Custom filename_token and namespace_token overrides
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__custom_filename_token(self):
+        """A custom filename_token is used instead of ___NAMESPACE___."""
+        name, content = utils.inject_namespace(
+            "CUSTOM_TOKENtest",
+            "",
+            namespace="ns",
+            managed=True,
+            filename_token="CUSTOM_TOKEN",
+        )
+        assert name == "ns__test"
+
+    def test_inject_namespace__custom_namespace_token(self):
+        """A custom namespace_token is used instead of %%%NAMESPACE%%%."""
+        name, content = utils.inject_namespace(
+            "test",
+            "CUSTOM_TOKENField__c",
+            namespace="ns",
+            managed=True,
+            namespace_token="CUSTOM_TOKEN",
+        )
+        assert content == "ns__Field__c"
+
+    # ------------------------------------------------------------------
+    # Logger — filename rename logging
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__logger_no_change(self):
+        """Logger is NOT called when content and filename are unchanged."""
+        logger = mock.Mock()
+        utils.inject_namespace(
+            "test",
+            "no tokens here",
+            namespace="ns",
+            managed=True,
+            logger=logger,
+        )
+        logger.info.assert_not_called()
+
     def test_strip_namespace(self):
         logger = mock.Mock()
         name, content = utils.strip_namespace(
