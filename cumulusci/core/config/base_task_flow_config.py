@@ -100,8 +100,8 @@ class BaseTaskFlowConfig(BaseConfig):
             dict,
             merge_config(
                 {
-                    **base_config,
                     "plugins_config": self.config_plugins,
+                    **base_config,
                 }
             ),
         )
