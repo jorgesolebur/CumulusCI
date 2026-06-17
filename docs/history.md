@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.77 (2026-06-17)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Allow plugin config to be overwritten in local config files by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#242](https://github.com/jorgesolebur/CumulusCI/pull/242)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.76...v5.0.77
+
+
+<!-- latest-stop -->
+
 ## v5.0.76 (2026-06-10)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.75...v5.0.76
 
-
-<!-- latest-stop -->
 
 ## v5.0.75 (2026-06-05)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
