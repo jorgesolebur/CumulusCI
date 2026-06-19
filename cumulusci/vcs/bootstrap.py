@@ -147,7 +147,15 @@ def get_service_for_repo_url(
 @functools.lru_cache(50)
 def get_remote_project_config(repo: AbstractRepo, ref: str) -> BaseProjectConfig:
     contents_io = repo.file_contents("cumulusci.yml", ref=ref)
-    return BaseProjectConfig(UniversalConfig(), cci_safe_load(contents_io))
+    project_config = BaseProjectConfig(UniversalConfig(), cci_safe_load(contents_io))
+    project_config.config = project_config.merge_base_config(
+        {
+            "universal_config": project_config.config_universal,
+            "global_config": project_config.config_global,
+            "project_config": project_config.config,
+        }
+    )
+    return project_config
 
 
 def find_repo_feature_prefix(repo: AbstractRepo) -> str:
