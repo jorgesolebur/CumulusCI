@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.78 (2026-06-19)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add univeral and global config to the remote config by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#244](https://github.com/jorgesolebur/CumulusCI/pull/244)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.77...v5.0.78
+
+
+<!-- latest-stop -->
+
 ## v5.0.77 (2026-06-17)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.76...v5.0.77
 
-
-<!-- latest-stop -->
 
 ## v5.0.76 (2026-06-10)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
