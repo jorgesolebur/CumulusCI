@@ -33,15 +33,28 @@ class SfdxOrgConfig(OrgConfig):
             and isinstance(self.keychain.project_config, BaseProjectConfig)
             and self.keychain.project_config.project__name
             and self.config_file
-            and os.path.exists(self.config_file)
         ):
-            with self.keychain.project_config.open_cache("orgs") as org_cache:
-                self.config_file = load_config_file(
-                    self.name,
-                    self.keychain.project_config.project__name,
-                    self.config_file,
-                    str(org_cache.getsyspath()),
-                )
+            # Resolve a relative config_file path to an absolute path using
+            # repo_root so that os.path.exists() and load_config_file() are
+            # CWD-independent.  This matters when CUMULUSCI_REPO_ROOT is set
+            # explicitly (e.g. via CUMULUSCI_AUTO_DETECT + CUMULUSCI_REPO_ROOT
+            # env vars in CI pipelines) and the CWD may not equal repo_root at
+            # the moment _load_config is invoked.  Using the absolute path also
+            # gives load_config_file's lru_cache a deterministic key.
+            config_file = self.config_file
+            if not os.path.isabs(str(config_file)):
+                repo_root = self.keychain.project_config.repo_root
+                if repo_root:
+                    config_file = os.path.join(repo_root, config_file)
+
+            if os.path.exists(config_file):
+                with self.keychain.project_config.open_cache("orgs") as org_cache:
+                    self.config_file = load_config_file(
+                        self.name,
+                        self.keychain.project_config.project__name,
+                        str(config_file),
+                        str(org_cache.getsyspath()),
+                    )
 
     @property
     def sfdx_info(self):
@@ -315,6 +328,8 @@ def load_config_file(
 
             # Join the cache path with the org-specific filename
             cached_file_path = os.path.join(org_cache_path, f"{org_name}.json")
+
+            os.makedirs(org_cache_path, exist_ok=True)
 
             with open(cached_file_path, "w", encoding="utf-8") as f:
                 json.dump(org_def_data, f, indent=2)
