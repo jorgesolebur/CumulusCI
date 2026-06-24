@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.79 (2026-06-24)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Resolve org config file by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#246](https://github.com/jorgesolebur/CumulusCI/pull/246)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.78...v5.0.79
+
+
+<!-- latest-stop -->
+
 ## v5.0.78 (2026-06-19)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.77...v5.0.78
 
-
-<!-- latest-stop -->
 
 ## v5.0.77 (2026-06-17)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
