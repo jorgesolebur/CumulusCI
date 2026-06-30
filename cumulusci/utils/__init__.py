@@ -290,6 +290,11 @@ def inject_namespace(
     %%% MANAGED_OR_NAMESPACE_DOT %%%
         → 'namespace.' if managed=True OR namespaced_org=True, else ''
         Dot-separated variant of MANAGED_OR_NAMESPACED_ORG.
+
+    %%% NAMESPACE_ALWAYS %%%
+        → 'namespace' if namespace is non-empty, else ''
+        Use for: references that need the bare namespace value whenever a
+        namespace exists, regardless of managed or namespaced_org flags.
     """
 
     # Handle namespace and filename tokens
@@ -347,6 +352,10 @@ def inject_namespace(
     managed_or_namespace_dot = (
         (namespace + ".") if ((managed) or (namespaced_org)) and namespace else ""
     )
+
+    # Handle token %%%NAMESPACE_ALWAYS%%%
+    namespace_always_token = "%%%NAMESPACE_ALWAYS%%%"
+    namespace_always = namespace if namespace else ""
 
     orig_name = name
     prev_content = content
@@ -453,6 +462,14 @@ def inject_namespace(
     if logger and content != prev_content:
         logger.info(
             f'  {name}: Replaced {managed_or_namespace_dot_token} with "{managed_or_namespace_dot}"'
+        )
+
+    # Replace namespace_always token in content
+    prev_content = content
+    content = content.replace(namespace_always_token, namespace_always)
+    if logger and content != prev_content:
+        logger.info(
+            f'  {name}: Replaced {namespace_always_token} with "{namespace_always}"'
         )
 
     # Replace namespace token in file name

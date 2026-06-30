@@ -826,6 +826,68 @@ Options\n------------------------------------------\n\n
         assert content == "ApexClass"
 
     # ------------------------------------------------------------------
+    # %%%NAMESPACE_ALWAYS%%% — namespace regardless of managed/namespaced_org
+    # ------------------------------------------------------------------
+
+    def test_inject_namespace__namespace_always__with_namespace(self):
+        """%%%NAMESPACE_ALWAYS%%% → 'ns' whenever namespace is set."""
+        logger = mock.Mock()
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%NAMESPACE_ALWAYS%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=False,
+            logger=logger,
+        )
+        assert content == "nsField__c"
+        logger.info.assert_called()
+
+    def test_inject_namespace__namespace_always__managed_true(self):
+        """%%%NAMESPACE_ALWAYS%%% → 'ns' even when managed=True."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%NAMESPACE_ALWAYS%%%Field__c",
+            namespace="ns",
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "nsField__c"
+
+    def test_inject_namespace__namespace_always__namespaced_org_true(self):
+        """%%%NAMESPACE_ALWAYS%%% → 'ns' even when namespaced_org=True."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%NAMESPACE_ALWAYS%%%Field__c",
+            namespace="ns",
+            managed=False,
+            namespaced_org=True,
+        )
+        assert content == "nsField__c"
+
+    def test_inject_namespace__namespace_always__no_namespace(self):
+        """%%%NAMESPACE_ALWAYS%%% → '' when namespace is None."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%NAMESPACE_ALWAYS%%%Field__c",
+            namespace=None,
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "Field__c"
+
+    def test_inject_namespace__namespace_always__empty_namespace(self):
+        """%%%NAMESPACE_ALWAYS%%% → '' when namespace is an empty string."""
+        name, content = utils.inject_namespace(
+            "test",
+            "%%%NAMESPACE_ALWAYS%%%Field__c",
+            namespace="",
+            managed=True,
+            namespaced_org=False,
+        )
+        assert content == "Field__c"
+
+    # ------------------------------------------------------------------
     # Logger branches for package.xml and managed_or_* tokens
     # ------------------------------------------------------------------
 
