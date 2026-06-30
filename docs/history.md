@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.80 (2026-06-30)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Namespace always keyword by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#248](https://github.com/jorgesolebur/CumulusCI/pull/248)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.79...v5.0.80
+
+
+<!-- latest-stop -->
+
 ## v5.0.79 (2026-06-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.78...v5.0.79
 
-
-<!-- latest-stop -->
 
 ## v5.0.78 (2026-06-19)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
