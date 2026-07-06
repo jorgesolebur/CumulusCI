@@ -419,6 +419,7 @@ class SfdmuTask(BaseSalesforceTask):
                 args=command_parts,
                 check_return=not return_always_success,  # Don't check return if return_always_success is True
                 username=None,
+                env=os.environ,
             )
 
             for line in p.stdout_text:
