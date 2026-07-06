@@ -26,9 +26,59 @@ def git_path(repo_root: str, tail: Any = None) -> Optional[pathlib.Path]:
     return path
 
 
+def resolve_worktree_git_dirs(
+    repo_root: str,
+) -> Tuple[Optional[pathlib.Path], Optional[pathlib.Path]]:
+    """Return (worktree_git_dir, common_git_dir) for the given repo root.
+
+    For a normal (non-worktree) repo both values are the same ``.git``
+    directory.  For a git worktree checkout ``.git`` is a file whose
+    content points to the worktree-specific gitdir; the common gitdir is
+    found via that directory's ``commondir`` file.
+
+    Returns ``(None, None)`` when *repo_root* is not set or ``.git`` is
+    absent.
+
+    worktree_git_dir  – owns HEAD, index, COMMIT_EDITMSG, etc.
+    common_git_dir    – owns config, packed-refs, objects, refs/heads/, etc.
+    """
+    if not repo_root:
+        return None, None
+
+    git_entry = git_path(repo_root)
+    if git_entry is None:
+        return None, None
+
+    if git_entry.is_dir():
+        return git_entry, git_entry
+
+    if git_entry.is_file():
+        content = git_entry.read_text().strip()
+        if content.startswith("gitdir: "):
+            wt_dir = pathlib.Path(content[len("gitdir: ") :])
+            if not wt_dir.is_absolute():
+                wt_dir = (git_entry.parent / wt_dir).resolve()
+
+            commondir_file = wt_dir / "commondir"
+            if commondir_file.exists():
+                commondir = commondir_file.read_text().strip()
+                common = pathlib.Path(commondir)
+                if not common.is_absolute():
+                    common = (wt_dir / common).resolve()
+                return wt_dir, common
+
+            return wt_dir, wt_dir
+
+    return None, None
+
+
 def current_branch(repo_root: str) -> Optional[str]:
-    if repo_root:
-        head_path = git_path(repo_root, "HEAD")
+    if not repo_root:
+        return None
+
+    wt_dir, _ = resolve_worktree_git_dirs(repo_root)
+    if wt_dir:
+        head_path = wt_dir / "HEAD"
         if head_path.exists():
             branch_ref = head_path.read_text().strip()
             if branch_ref.startswith("ref: "):
