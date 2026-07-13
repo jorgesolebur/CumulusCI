@@ -227,7 +227,10 @@ class VCSSource(ABC):
             resolve_dependency(
                 dep,
                 self.project_config,
-                get_resolver_stack(self.project_config, self.spec.resolution_strategy),
+                get_resolver_stack(
+                    self.project_config,
+                    (self.spec.resolution_strategy or "preproduction"),
+                ),
             )
 
             self.commit = self.description = dep.ref

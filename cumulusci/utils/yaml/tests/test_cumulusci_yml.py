@@ -223,7 +223,7 @@ def test_github_source():
 
     assert (
         GitHubSourceModel(github="https://github.com/Test/TestRepo").resolution_strategy
-        == "production"
+        is None
     )
 
 

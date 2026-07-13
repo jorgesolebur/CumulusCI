@@ -453,18 +453,21 @@ class TestBaseProjectConfig:
         with temporary_dir():
             assert config.repo_url is None
 
-    @mock.patch("cumulusci.core.config.project_config.git_path")
-    def test_repo_url_from_git(self, git_path):
-        git_config_file = "git_config"
-        git_path.return_value = git_config_file
+    def test_repo_url_from_git(self):
         repo_url = "https://github.com/foo/bar.git"
-        with open(git_config_file, "w") as f:
-            f.writelines(['[remote "origin"]\n' f"\turl = {repo_url}"])
+        with TemporaryDirectory() as tmp_dir:
+            git_dir = pathlib.Path(tmp_dir)
+            config_file = git_dir / "config"
+            config_file.write_text(f'[remote "origin"]\n\turl = {repo_url}\n')
 
-        config = BaseProjectConfig(UniversalConfig())
-        assert repo_url == config.repo_url
-
-        os.remove(git_config_file)
+            with mock.patch.object(
+                BaseProjectConfig,
+                "common_git_dir",
+                new_callable=mock.PropertyMock,
+            ) as mock_common_git_dir:
+                mock_common_git_dir.return_value = git_dir
+                config = BaseProjectConfig(UniversalConfig())
+                assert repo_url == config.repo_url
 
     def test_repo_owner_from_repo_info(self):
         config = BaseProjectConfig(UniversalConfig())
@@ -844,39 +847,54 @@ class TestBaseProjectConfig:
         with pytest.raises(ConfigError):
             project_config._validate_package_api_format()
 
-    @mock.patch("cumulusci.core.config.project_config.git_path")
-    def test_git_config_remote_origin_line(self, git_path):
-        git_config_file = "test_git_config_file"
-        git_path.return_value = git_config_file
+    def test_git_config_remote_origin_line(self):
+        with TemporaryDirectory() as tmp_dir:
+            git_dir = pathlib.Path(tmp_dir)
+            config_file = git_dir / "config"
 
-        with open(git_config_file, "w") as f:
-            f.writelines(
-                [
-                    '[branch "feature-1"]\n',
-                    "\tremote = origin\n",
-                    "\tmerge = refs/heads/feature-1\n",
-                    '[remote "origin"]\n',
-                    "\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
-                ]
-            )
+            with config_file.open("w") as f:
+                f.writelines(
+                    [
+                        '[branch "feature-1"]\n',
+                        "\tremote = origin\n",
+                        "\tmerge = refs/heads/feature-1\n",
+                        '[remote "origin"]\n',
+                        "\tfetch = +refs/heads/*:refs/remotes/origin/*\n",
+                    ]
+                )
 
-        project_config = BaseProjectConfig(UniversalConfig())
-        actual_line = project_config.git_config_remote_origin_url()
-        assert actual_line is None  # no url under [remote "origin"]
+            with mock.patch.object(
+                BaseProjectConfig,
+                "common_git_dir",
+                new_callable=mock.PropertyMock,
+            ) as mock_common_git_dir:
+                mock_common_git_dir.return_value = git_dir
 
-        with open(git_config_file, "a") as f:
-            f.write("\turl = some.url.here\n")
+                project_config = BaseProjectConfig(UniversalConfig())
+                actual_line = project_config.git_config_remote_origin_url()
+                assert actual_line is None  # no url under [remote "origin"]
 
-        actual_line = project_config.git_config_remote_origin_url()
-        assert actual_line == "some.url.here"
+                with config_file.open("a") as f:
+                    f.write("\turl = some.url.here\n")
 
-        os.remove(git_config_file)
-        actual_line = project_config.git_config_remote_origin_url()
-        assert actual_line is None  # no config file present
+                actual_line = project_config.git_config_remote_origin_url()
+                assert actual_line == "some.url.here"
+
+                os.remove(config_file)
+                actual_line = project_config.git_config_remote_origin_url()
+                assert actual_line is None  # no config file present
 
     def test_default_package_path(self):
-        config = BaseProjectConfig(UniversalConfig())
-        assert str(config.default_package_path.relative_to(config.repo_root)) == "src"
+        with temporary_dir() as path:
+            pathlib.Path(path, ".git").mkdir()
+            with pathlib.Path(path, "cumulusci.yml").open("w") as f:
+                yaml.dump(
+                    {"project": {"name": "TestProject", "source_format": "mdapi"}}, f
+                )
+            config = BaseProjectConfig(UniversalConfig())
+            assert (
+                str(config.default_package_path.relative_to(config.repo_root)) == "src"
+            )
 
     def test_default_package_path__sfdx(self):
         with temporary_dir() as path:

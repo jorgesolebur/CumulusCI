@@ -261,8 +261,6 @@ class VCSSourceModel(HashableBaseModel):
             raise ValueError(
                 'Sources must use only one of "resolution_strategy", "commit", "ref", "branch", "tag", or "release".'
             )
-        elif key_count == 0:
-            values["resolution_strategy"] = "production"
 
         return values
 

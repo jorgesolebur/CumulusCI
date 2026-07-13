@@ -33,7 +33,12 @@ from cumulusci.core.exceptions import (
 )
 from cumulusci.core.source import LocalFolderSource, NullSource
 from cumulusci.utils.fileutils import FSResource, open_fs_resource
-from cumulusci.utils.git import current_branch, generic_parse_repo_url, git_path
+from cumulusci.utils.git import (
+    current_branch,
+    generic_parse_repo_url,
+    git_path,
+    resolve_worktree_git_dirs,
+)
 from cumulusci.utils.yaml.cumulusci_yml import (
     LocalFolderSourceModel,
     VCSSourceModel,
@@ -332,10 +337,11 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
         """Returns the url under the [remote origin]
         section of the .git/config file. Returns None
         if .git/config file not present or no matching
-        line is found."""
+        line is found. Supports git worktrees."""
         config = ConfigParser(strict=False)
         try:
-            config.read(git_path(self.repo_root, "config"))
+            common = self.common_git_dir
+            config.read(common / "config" if common else None)
             url = config['remote "origin"']["url"]
         except (KeyError, TypeError):
             url = None
@@ -350,8 +356,41 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
         path = Path.cwd().resolve()
         paths = chain((path,), path.parents)
         for path in paths:
-            if (path / ".git").is_dir():
+            git_entry = path / ".git"
+            # Normal repo: .git is a directory.
+            # Git worktree: .git is a file containing "gitdir: <path>".
+            if git_entry.is_dir() or git_entry.is_file():
                 return str(path)
+
+    @property
+    def is_worktree(self) -> bool:
+        """True when the current repo root is a git worktree checkout.
+
+        In a worktree, ``.git`` is a file (not a directory) that contains
+        a ``gitdir:`` pointer to the worktree-specific git directory.
+        """
+        git_entry = git_path(self.repo_root)
+        return git_entry is not None and git_entry.is_file()
+
+    @property
+    def worktree_git_dir(self) -> Optional[pathlib.Path]:
+        """The worktree-specific git directory.
+
+        Owns per-worktree files: HEAD, index, COMMIT_EDITMSG, etc.
+        For a normal (non-worktree) repo this is the same as ``common_git_dir``.
+        """
+        wt_dir, _ = resolve_worktree_git_dirs(self.repo_root)
+        return wt_dir
+
+    @property
+    def common_git_dir(self) -> Optional[pathlib.Path]:
+        """The common (main) git directory shared across all worktrees.
+
+        Owns shared state: config, packed-refs, objects, refs/heads/, etc.
+        For a normal (non-worktree) repo this is the same as ``worktree_git_dir``.
+        """
+        _, common = resolve_worktree_git_dirs(self.repo_root)
+        return common
 
     @property
     def server_domain(self) -> Optional[str]:
@@ -428,17 +467,18 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
 
         branch = self.repo_branch
         if branch:
-            commit_file_path = pathlib.Path(self.repo_root) / ".git" / "refs" / "heads"
+            # Branch refs live in the common (shared) git directory.
+            commit_file_path = self.common_git_dir / "refs" / "heads"
             commit_file_path = commit_file_path.joinpath(*branch.split("/"))
         else:
-            # We're in detached HEAD mode; .git/HEAD contains the SHA
-            commit_file_path = pathlib.Path(self.repo_root) / ".git" / "HEAD"
+            # Detached HEAD: the SHA is stored in the worktree-specific HEAD file.
+            commit_file_path = self.worktree_git_dir / "HEAD"
 
         if commit_file_path.exists() and commit_file_path.is_file():
             return commit_file_path.read_text().strip()
         else:
             if branch:
-                packed_refs_path = os.path.join(self.repo_root, ".git", "packed-refs")
+                packed_refs_path = self.common_git_dir / "packed-refs"
                 with open(packed_refs_path, "r") as f:
                     for line in f:
                         parts = line.split(" ")
