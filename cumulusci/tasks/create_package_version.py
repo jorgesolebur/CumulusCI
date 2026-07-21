@@ -197,6 +197,15 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         "is_dev_use_pkg_zip_requested": {
             "description": "If True, request a dev use package zip. Defaults to False. If true, a downloadable package zip file containing package metadata is generated when a new package version is created."
         },
+        "unpackaged_metadata_path": {
+            "description": "The path where unpackaged metadata is stored. Defaults to the path specified in the project configuration."
+        },
+        "apex_test_access": {
+            "description": "The list of permission set names to assign to the package version for Apex Test Access. Defaults to the list specified in the project configuration."
+        },
+        "package_metadata_access": {
+            "description": "The list of permission set names to assign to the package version for Package Metadata Access. Defaults to the list specified in the project configuration."
+        },
     }
 
     def _init_options(self, kwargs):
@@ -231,9 +240,12 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             version_name=self.options.get("version_name") or "Release",
             version_base=self.options.get("version_base"),
             version_type=self.options.get("version_type") or VersionTypeEnum("build"),
-            apex_test_access=self.project_config.project__package__apex_test_access,
-            package_metadata_access=self.project_config.project__package__package_metadata_access,
-            unpackaged_metadata_path=self.project_config.project__package__unpackaged_metadata_path,
+            apex_test_access=self.options.get("apex_test_access")
+            or self.project_config.project__package__apex_test_access,
+            package_metadata_access=self.options.get("package_metadata_access")
+            or self.project_config.project__package__package_metadata_access,
+            unpackaged_metadata_path=self.options.get("unpackaged_metadata_path")
+            or self.project_config.project__package__unpackaged_metadata_path,
         )
         self.options["skip_validation"] = process_bool_arg(
             self.options.get("skip_validation") or False
