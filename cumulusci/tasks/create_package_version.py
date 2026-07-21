@@ -39,10 +39,7 @@ from cumulusci.salesforce_api.package_zip import (
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
 from cumulusci.tasks.salesforce.BaseSalesforceApiTask import BaseSalesforceApiTask
 from cumulusci.tasks.salesforce.org_settings import build_settings_package
-from cumulusci.tasks.utility.copyContents import (
-    ConsolidateUnpackagedMetadata,
-    clean_temp_directory,
-)
+from cumulusci.tasks.utility.copyContents import ConsolidateUnpackagedMetadata
 from cumulusci.utils.salesforce.soql import (
     format_subscriber_package_version_where_clause,
 )
@@ -593,7 +590,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
             )
 
             if package_config.unpackaged_metadata_path:
-                self._get_unpackaged_metadata_path(version_info)
+                self._get_unpackaged_metadata_path(
+                    version_info, package_config.unpackaged_metadata_path
+                )
 
         finally:
             version_info.close()
@@ -838,10 +837,10 @@ class CreatePackageVersion(BaseSalesforceApiTask):
     def _create_unlocked_package_from_unmanaged_dep(
         self, dependency: UnmanagedVcsDependency, dependencies
     ) -> str:
+
+        package_name = dependency.description
         if isinstance(dependency, UnmanagedVcsDependency):
             package_name = dependency.package_name
-        else:
-            package_name = dependency.description
 
         package_zip_builder = dependency.get_metadata_package_zip_builder(
             self.project_config, self.org_config
@@ -949,16 +948,23 @@ class CreatePackageVersion(BaseSalesforceApiTask):
     def _get_unpackaged_metadata_path(
         self,
         version_info: zipfile.ZipFile,
+        unpackaged_metadata_path: Optional[
+            Union[str, List[str], Dict[str, Union[str, List[str]]]]
+        ] = None,
     ) -> zipfile.ZipFile:
 
-        if not self._all_dependencies:
+        if not self._all_dependencies and not unpackaged_metadata_path:
+            self.logger.info(
+                "No dependencies or unpackaged metadata path found, skipping unpackaged metadata"
+            )
             return version_info
 
         task_config = TaskConfig(
             {
                 "options": {
+                    "unpackaged_metadata_path": unpackaged_metadata_path,
                     "base_path": self.project_config.repo_root,
-                    "resolution_strategy": self.options["resolution_strategy"],
+                    "resolution_strategy": self.options.get("resolution_strategy"),
                     "keep_temp": True,
                 }
             }
@@ -972,6 +978,9 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         file_count = task.return_values["file_count"]
 
         if file_count == 0:
+            self.logger.info(
+                "No unpackaged metadata found, skipping unpackaged metadata"
+            )
             return version_info
 
         # Use the consolidated temp directory with convert_sfdx_source
@@ -988,7 +997,5 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 "unpackaged-metadata-package.zip",
                 unpackaged_metadata_zip_builder.as_bytes(),
             )
-
-        clean_temp_directory(metadata_temp_dir)
 
         return version_info
