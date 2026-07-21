@@ -1280,10 +1280,8 @@ class TestCreatePackageVersionNewFeatures:
     @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
-    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
     def test_get_unpackaged_metadata_path_string(
         self,
-        mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
         mock_consolidate_task_cls,
@@ -1317,7 +1315,6 @@ class TestCreatePackageVersionNewFeatures:
         mock_convert_sfdx.assert_called_once()
         mock_zip_builder.assert_called_once()
         mock_builder_instance.as_bytes.assert_called_once()
-        mock_clean_temp.assert_called_once_with(temp_path)
         assert "unpackaged-metadata-package.zip" in [
             name for name in version_info.namelist()
         ]
@@ -1328,10 +1325,8 @@ class TestCreatePackageVersionNewFeatures:
     @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
-    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
     def test_get_unpackaged_metadata_path_list(
         self,
-        mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
         mock_consolidate_task_cls,
@@ -1363,17 +1358,14 @@ class TestCreatePackageVersionNewFeatures:
 
         assert result == version_info
         mock_task.assert_called_once()
-        mock_clean_temp.assert_called_once_with(temp_path)
         version_info.close()
 
     @responses.activate
     @mock.patch("cumulusci.tasks.create_package_version.ConsolidateUnpackagedMetadata")
     @mock.patch("cumulusci.tasks.create_package_version.convert_sfdx_source")
     @mock.patch("cumulusci.tasks.create_package_version.MetadataPackageZipBuilder")
-    @mock.patch("cumulusci.tasks.create_package_version.clean_temp_directory")
     def test_get_unpackaged_metadata_path_dict(
         self,
-        mock_clean_temp,
         mock_zip_builder,
         mock_convert_sfdx,
         mock_consolidate_task_cls,
@@ -1405,7 +1397,6 @@ class TestCreatePackageVersionNewFeatures:
 
         assert result == version_info
         mock_task.assert_called_once()
-        mock_clean_temp.assert_called_once_with(temp_path)
         version_info.close()
 
     @responses.activate
@@ -1459,7 +1450,7 @@ class TestCreatePackageVersionNewFeatures:
                 skip_validation=True,
             )
 
-            mock_unpackaged.assert_called_once_with(mock.ANY)
+            mock_unpackaged.assert_called_once_with(mock.ANY, "unpackaged/pre")
             version_info.close()
 
     @responses.activate

@@ -454,6 +454,8 @@ class ConsolidateUnpackagedMetadata(BaseTask):
         file_count = 0
 
         with self.project_config.open_cache("unpackaged_metadata") as metadata_temp_dir:
+            metadata_temp_dir = Path(metadata_temp_dir).resolve()
+
             # get all the unpackaged metadata from the dependency packages
             for dep in dependencies:
                 if (
