@@ -69,9 +69,10 @@ def test_service_connect__list_service_types():
 def test_service_connect__list_service_types_from_universal_config():
     runtime = BaseCumulusCI()
     runtime.project_config = None
-    runtime.universal_config.config["services"] = {"universal_test": {}}
-
-    result = run_cli_command("service", "connect", "--help", runtime=runtime)
+    with mock.patch.dict(
+        runtime.universal_config.config, {"services": {"universal_test": {}}}
+    ):
+        result = run_cli_command("service", "connect", "--help", runtime=runtime)
     assert "universal_test" in result.output
 
 
@@ -249,11 +250,11 @@ def test_service_connect__global_keychain():
     runtime = BaseCumulusCI()
     runtime.project_config = None
     runtime.keychain.project_config = runtime.universal_config
-    runtime.universal_config.config["services"] = {
-        "test": {"attributes": {"attr": {"required": False}}}
-    }
-
-    run_cli_command("service", "connect", "test", "test-alias", runtime=runtime)
+    with mock.patch.dict(
+        runtime.universal_config.config,
+        {"services": {"test": {"attributes": {"attr": {"required": False}}}}},
+    ):
+        run_cli_command("service", "connect", "test", "test-alias", runtime=runtime)
 
     assert "test-alias" in runtime.keychain.list_services()["test"]
 
