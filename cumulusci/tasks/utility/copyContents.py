@@ -437,10 +437,15 @@ class ConsolidateUnpackagedMetadata(BaseTask):
             with self.project_config.open_cache(
                 "unpackaged_metadata"
             ) as metadata_temp_dir:
-                shutil.rmtree(str(metadata_temp_dir), ignore_errors=True)
-                os.makedirs(metadata_temp_dir, exist_ok=True)
+                # Use getsyspath() to get a proper OS-native path string.
+                # str(metadata_temp_dir) calls FSResource.__str__ which converts
+                # the file:// URL by stripping only 6 chars, leaving "/C:/..." on
+                # Windows — an invalid path that causes WinError 123.
+                metadata_temp_path = str(metadata_temp_dir.getsyspath())
+                shutil.rmtree(metadata_temp_path, ignore_errors=True)
+                os.makedirs(metadata_temp_path, exist_ok=True)
                 shutil.copytree(
-                    str(consolidated_path), str(metadata_temp_dir), dirs_exist_ok=True
+                    consolidated_path, metadata_temp_path, dirs_exist_ok=True
                 )
 
             self.return_values["path"] = consolidated_path
