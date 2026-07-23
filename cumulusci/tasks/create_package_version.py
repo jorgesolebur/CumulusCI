@@ -39,7 +39,10 @@ from cumulusci.salesforce_api.package_zip import (
 from cumulusci.salesforce_api.utils import get_simple_salesforce_connection
 from cumulusci.tasks.salesforce.BaseSalesforceApiTask import BaseSalesforceApiTask
 from cumulusci.tasks.salesforce.org_settings import build_settings_package
-from cumulusci.tasks.utility.copyContents import ConsolidateUnpackagedMetadata
+from cumulusci.tasks.utility.copyContents import (
+    ConsolidateUnpackagedMetadata,
+    clean_temp_directory,
+)
 from cumulusci.utils.salesforce.soql import (
     format_subscriber_package_version_where_clause,
 )
@@ -997,5 +1000,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 "unpackaged-metadata-package.zip",
                 unpackaged_metadata_zip_builder.as_bytes(),
             )
+
+        clean_temp_directory(metadata_temp_dir)
 
         return version_info

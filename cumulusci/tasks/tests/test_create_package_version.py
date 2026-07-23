@@ -49,6 +49,9 @@ def repo_root():
         pathlib.Path(path, "src", "package.xml").write_text(
             '<?xml version="1.0" encoding="utf-8"?>\n<Package xmlns="http://soap.sforce.com/2006/04/metadata"></Package>'
         )
+        pathlib.Path(path, "sfdx-project.json").write_text(
+            json.dumps({"packageDirectories": [{"path": "src", "default": True}]})
+        )
         with open("cumulusci.yml", "w") as f:
             yaml.dump(
                 {
@@ -83,6 +86,7 @@ def project_config(repo_root):
     )
     project_config.config["project"]["package"]["install_class"] = "Install"
     project_config.config["project"]["package"]["uninstall_class"] = "Uninstall"
+    project_config.config["project"]["package"]["unpackaged_metadata_path"] = None
     project_config.keychain = BaseProjectKeychain(project_config, key=None)
     pathlib.Path(repo_root, "orgs").mkdir()
     pathlib.Path(repo_root, "orgs", "scratch_def.json").write_text(
