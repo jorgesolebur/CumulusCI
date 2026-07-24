@@ -30,8 +30,8 @@ def merge_directory_contents(src_dir: str, dest_dir: str, overwrite: bool = Fals
     If a file exists in both, the source file overwrites the destination.
     """
     for item in os.listdir(src_dir):
-        src_item = os.path.join(src_dir, item)
-        dest_item = os.path.join(dest_dir, item)
+        src_item = str(Path(os.path.join(src_dir, item)).resolve())
+        dest_item = str(Path(os.path.join(dest_dir, item)).resolve())
 
         if os.path.isdir(src_item):
             if os.path.exists(dest_item) and os.path.isdir(dest_item):
@@ -49,7 +49,8 @@ def merge_directory_contents(src_dir: str, dest_dir: str, overwrite: bool = Fals
             # Copy file, overwriting if it exists
             if os.path.exists(dest_item) and os.path.isdir(dest_item) and overwrite:
                 shutil.rmtree(dest_item)
-            shutil.copy2(src_item, dest_item)
+            if src_item != dest_item:
+                shutil.copy2(src_item, dest_item)
 
 
 def copy_item_to_destination(source_item: str, dest_item: str, overwrite: bool = False):
@@ -75,7 +76,8 @@ def copy_item_to_destination(source_item: str, dest_item: str, overwrite: bool =
         # Remove destination if it's a directory
         if os.path.exists(dest_item) and os.path.isdir(dest_item) and overwrite:
             shutil.rmtree(dest_item)
-        shutil.copy2(source_item, dest_item)
+        if source_item != dest_item:
+            shutil.copy2(source_item, dest_item)
 
 
 def copy_directory_contents(
@@ -380,12 +382,18 @@ class ConsolidateUnpackagedMetadata(BaseTask):
             description="Keep temporary directory after execution. Defaults to False.",
         )
         resolution_strategy: str = Field(
-            "production",
+            None,
             description="The name of a sequence of resolution_strategy to apply to unpackaged metadata dependencies. Defaults to 'production'.",
         )
         print_tree: bool = Field(
             True,
             description="Print the directory tree after consolidation. Defaults to True.",
+        )
+        unpackaged_metadata_path: Union[
+            str, List[str], Dict[str, Union[str, List[str]]]
+        ] = Field(
+            None,
+            description="The path to the unpackaged metadata to consolidate. Defaults to None.",
         )
 
     parsed_options: Options
@@ -393,7 +401,10 @@ class ConsolidateUnpackagedMetadata(BaseTask):
     def _run_task(self):
         """Execute the consolidation task."""
         # Get unpackaged_metadata_path from project config
-        metadata_path = self.project_config.project__package__unpackaged_metadata_path
+        metadata_path = (
+            self.parsed_options.unpackaged_metadata_path
+            or self.project_config.project__package__unpackaged_metadata_path
+        )
 
         if not metadata_path:
             self.logger.warning(
@@ -423,15 +434,36 @@ class ConsolidateUnpackagedMetadata(BaseTask):
         if not self.parsed_options.keep_temp:
             clean_temp_directory(consolidated_path)
         else:
+            with self.project_config.open_cache(
+                "unpackaged_metadata"
+            ) as metadata_temp_dir:
+                # Use getsyspath() to get a proper OS-native path string.
+                # str(metadata_temp_dir) calls FSResource.__str__ which converts
+                # the file:// URL by stripping only 6 chars, leaving "/C:/..." on
+                # Windows — an invalid path that causes WinError 123.
+                metadata_temp_path = str(metadata_temp_dir.getsyspath())
+                shutil.rmtree(metadata_temp_path, ignore_errors=True)
+                os.makedirs(metadata_temp_path, exist_ok=True)
+                shutil.copytree(
+                    consolidated_path, metadata_temp_path, dirs_exist_ok=True
+                )
+
             self.return_values["path"] = consolidated_path
 
     def _consolidate_with_dependencies(self, base_path: str):
-        dependencies = self.dependencies or get_static_dependencies(
-            self.project_config,
-            resolution_strategy=self.parsed_options.resolution_strategy,
-        )
 
-        metadata_path = self.project_config.project__package__unpackaged_metadata_path
+        if self.parsed_options.resolution_strategy:
+            dependencies = self.dependencies or get_static_dependencies(
+                self.project_config,
+                resolution_strategy=self.parsed_options.resolution_strategy,
+            )
+        else:
+            dependencies = self.dependencies or []
+
+        metadata_path = (
+            self.parsed_options.unpackaged_metadata_path
+            or self.project_config.project__package__unpackaged_metadata_path
+        )
 
         metadata_temp_dir = tempfile.mkdtemp(prefix="metadata_consolidate_")
         file_count = 0
