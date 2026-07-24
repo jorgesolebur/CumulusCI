@@ -465,50 +465,56 @@ class ConsolidateUnpackagedMetadata(BaseTask):
             or self.project_config.project__package__unpackaged_metadata_path
         )
 
-        metadata_temp_dir = tempfile.mkdtemp(prefix="metadata_consolidate_")
         file_count = 0
 
-        # get all the unpackaged metadata from the dependency packages
-        for dep in dependencies:
-            if (
-                not isinstance(dep, PackageVersionIdDependency)
-                or not hasattr(dep, "source_info")
-                or not dep.source_info
-            ):
-                continue
+        with self.project_config.open_cache("unpackaged_metadata") as metadata_temp_dir:
+            shutil.rmtree(str(metadata_temp_dir), ignore_errors=True)
+            metadata_temp_dir.mkdir(exist_ok=True, parents=True)
 
-            # Download the VCSSource from the repo_info url and commit.
-            try:
-                vcs_source_model = VCSSourceModel(
-                    vcs=dep.source_info["vcs"],
-                    url=dep.source_info["url"],
-                    commit=dep.source_info["commit"],
-                )
-
-                vcs_source = VCSSource.create(self.project_config, vcs_source_model)
-                remote_project_config = vcs_source.fetch()
-
-                _, remote_file_count = consolidate_metadata(
-                    metadata_path,
-                    remote_project_config.repo_root,
-                    logger=self.logger,
-                    temp_dir=metadata_temp_dir,
-                )
-
-                if remote_file_count < 1:
+            # get all the unpackaged metadata from the dependency packages
+            for dep in dependencies:
+                if (
+                    not isinstance(dep, PackageVersionIdDependency)
+                    or not hasattr(dep, "source_info")
+                    or not dep.source_info
+                ):
                     continue
 
-                file_count += remote_file_count
+                # Download the VCSSource from the repo_info url and commit.
+                try:
+                    vcs_source_model = VCSSourceModel(
+                        vcs=dep.source_info["vcs"],
+                        url=dep.source_info["url"],
+                        commit=dep.source_info["commit"],
+                    )
 
-            except Exception as e:
-                self.logger.error(
-                    f"Error consolidating metadata with dependency {dep}: {e}"
-                )
-                continue
+                    vcs_source = VCSSource.create(self.project_config, vcs_source_model)
+                    remote_project_config = vcs_source.fetch()
 
-        _, pkg_file_count = consolidate_metadata(
-            metadata_path, base_path, logger=self.logger, temp_dir=metadata_temp_dir
-        )
-        file_count += pkg_file_count
+                    _, remote_file_count = consolidate_metadata(
+                        metadata_path,
+                        remote_project_config.repo_root,
+                        logger=self.logger,
+                        temp_dir=str(metadata_temp_dir),
+                    )
 
-        return metadata_temp_dir, file_count
+                    if remote_file_count < 1:
+                        continue
+
+                    file_count += remote_file_count
+
+                except Exception as e:
+                    self.logger.error(
+                        f"Error consolidating metadata with dependency {dep}: {e}"
+                    )
+                    continue
+
+            _, pkg_file_count = consolidate_metadata(
+                metadata_path,
+                base_path,
+                logger=self.logger,
+                temp_dir=str(metadata_temp_dir),
+            )
+            file_count += pkg_file_count
+
+        return str(metadata_temp_dir), file_count
