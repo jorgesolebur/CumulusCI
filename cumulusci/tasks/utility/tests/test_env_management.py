@@ -100,7 +100,6 @@ class TestVcsRemoteBranch(unittest.TestCase):
         self.assertEqual(result.name, "feature/branch-1")
         repo_mock.branch.assert_called_once_with("feature/branch-1")
 
-    @patch("cumulusci.tasks.utility.env_management.parse_format_config")
     @patch("cumulusci.tasks.utility.env_management.get_release_identifier")
     @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
     @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
@@ -109,10 +108,12 @@ class TestVcsRemoteBranch(unittest.TestCase):
         is_release_branch_or_child,
         construct_release_branch_name,
         get_release_identifier,
-        parse_format_config,
     ):
         project_config = create_project_config()
         project_config.repo_info["branch"] = "feature/branch-1"
+        project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("release", {"prefix_release": "release"})
+        )
         task_config = TaskConfig(
             {
                 "options": {
@@ -121,7 +122,6 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 }
             }
         )
-        parse_format_config.return_value = {"prefix_release": "release"}
         is_release_branch_or_child.return_value = True
         get_release_identifier.return_value = "1.2"
         construct_release_branch_name.return_value = "feature/release/1.2"
