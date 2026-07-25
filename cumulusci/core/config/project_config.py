@@ -761,7 +761,7 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
         format_config = parse_format_config(self)
         branch_prefix = self.project__git__prefix_feature or "feature/"
 
-        if self.repo_branch.startswith(self.project__git__prefix_release):
+        if self.repo_branch.startswith(self.project__git__prefix_release or "release/"):
             branch_prefix = self.project__git__prefix_release or "release/"
             format_config = None
         return branch_prefix, format_config

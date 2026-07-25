@@ -7,7 +7,7 @@ from typing import Optional, Set
 from cumulusci.core.tasks import BaseTask
 from cumulusci.utils.git import construct_release_branch_name
 from cumulusci.utils.options import CCIOptions, Field, ListOfStringsOption
-from cumulusci.utils.release_branch import get_release_identifier, parse_format_config
+from cumulusci.utils.release_branch import get_release_identifier
 
 
 class ListModifiedFiles(BaseTask):
@@ -47,16 +47,19 @@ class ListModifiedFiles(BaseTask):
 
     def _get_reference_branch(self) -> str:
         """Get the reference branch name."""
-        format_config = parse_format_config(self.project_config)
+        (
+            branch_prefix,
+            format_config,
+        ) = self.project_config.get_release_branch_prefix_and_format_config()
         release_id = get_release_identifier(
             self.project_config.repo_branch or "",
-            self.project_config.project__git__prefix_feature or "feature/",
+            branch_prefix,
             format_config,
         )
         if release_id:
             try:
                 branch = construct_release_branch_name(
-                    self.project_config.project__git__prefix_feature or "feature/",
+                    branch_prefix,
                     release_id,
                     format_config,
                 )
