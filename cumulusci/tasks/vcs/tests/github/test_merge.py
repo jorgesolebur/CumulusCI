@@ -1,4 +1,5 @@
 import http.client
+import importlib
 
 import github3
 import pytest
@@ -757,7 +758,142 @@ class TestMergeBranch(MockUtilBase):
 
         actual_branches = [branch.name for branch in task._get_branches_to_merge()]
 
-        assert ["feature/232", "feature/300"] == actual_branches
+        assert ["feature/232"] == actual_branches
+        assert 2 == len(responses.calls)
+
+    @responses.activate
+    def test_merge_to_future_release_branches_with_sprint_flag(self):
+        """Tests that update_future_sprint_releases can drive sprint automerge progression."""
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "FYyyQqSn",
+        }
+        self._setup_mocks(
+            [
+                "feature/FY26Q4S1",
+                "feature/FY26Q4S2",
+                "feature/FY26Q4S3",
+                "feature/work-item",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "feature/FY26Q4S1",
+                    "branch_prefix": "feature/",
+                    "update_future_sprint_releases": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+
+        assert ["feature/FY26Q4S2"] == actual_branches
+        assert 2 == len(responses.calls)
+
+    @responses.activate
+    def test_merge_release_to_future_release_branches_with_feature_format(self):
+        """Tests release-prefix automerge uses sequential ordering despite sprint date format."""
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "prefix": "FY",
+            "pattern": "yyQqSn",
+        }
+        self._setup_mocks(
+            [
+                "release/001",
+                "release/002",
+                "feature/FY26Q4S1",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "release/001",
+                    "branch_prefix": "release/",
+                    "update_future_releases": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+
+        assert ["release/002"] == actual_branches
+        assert 2 == len(responses.calls)
+
+    @responses.activate
+    def test_merge_release_to_next_sprint_branch(self):
+        """Tests release-prefix automerge can also include the lowest sprint branch."""
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "prefix": "FY",
+            "pattern": "yyQqSn",
+        }
+        self._setup_mocks(
+            [
+                "release/001",
+                "release/002",
+                "feature/FY26Q4S1",
+                "feature/FY26Q4S2",
+                "feature/work-item",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "release/001",
+                    "branch_prefix": "release/",
+                    "sprint_branch_prefix": "feature/",
+                    "update_sprint_branches": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+
+        assert ["feature/FY26Q4S1"] == actual_branches
+        assert 2 == len(responses.calls)
+
+    @responses.activate
+    def test_merge_release_to_future_releases_and_next_sprint_branch(self):
+        """Tests release automerge can include both future releases and next sprint branch."""
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "prefix": "FY",
+            "pattern": "yyQqSn",
+        }
+        self._setup_mocks(
+            [
+                "release/001",
+                "release/002",
+                "release/003",
+                "feature/FY26Q4S1",
+                "feature/FY26Q4S2",
+            ]
+        )
+
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "release/001",
+                    "branch_prefix": "release/",
+                    "sprint_branch_prefix": "feature/",
+                    "update_future_releases": True,
+                    "update_sprint_branches": True,
+                }
+            }
+        )
+        task._init_task()
+
+        actual_branches = [branch.name for branch in task._get_branches_to_merge()]
+
+        assert ["release/002", "feature/FY26Q4S1"] == actual_branches
         assert 2 == len(responses.calls)
 
     @responses.activate
@@ -884,7 +1020,7 @@ class TestMergeBranch(MockUtilBase):
 
         actual_branches = [branch.name for branch in task._get_branches_to_merge()]
 
-        assert ["prefix-no-slash232", "prefix-no-slash300"] == actual_branches
+        assert ["prefix-no-slash232"] == actual_branches
         assert 2 == len(responses.calls)
 
     @responses.activate
@@ -915,7 +1051,7 @@ class TestMergeBranch(MockUtilBase):
         task._init_task()
 
         actual_branches = [branch.name for branch in task._get_branches_to_merge()]
-        assert ["feature/230__child1", "feature/300", "feature/400"] == actual_branches
+        assert ["feature/230__child1", "feature/300"] == actual_branches
         assert 2 == len(responses.calls)
 
     @responses.activate
@@ -1138,7 +1274,7 @@ class TestMergeBranch(MockUtilBase):
         task._init_task()
 
         actual_branches = [branch.name for branch in task._get_branches_to_merge()]
-        assert ["feature/2026-02", "feature/2026-04"] == actual_branches
+        assert ["feature/2026-02"] == actual_branches
 
     @responses.activate
     def test_merge_to_future_release_branches_fy_pattern(self):
@@ -1168,7 +1304,7 @@ class TestMergeBranch(MockUtilBase):
         task._init_task()
 
         actual_branches = [branch.name for branch in task._get_branches_to_merge()]
-        assert ["feature/FY26Q3S5", "feature/FY26Q4S1"] == actual_branches
+        assert ["feature/FY26Q3S5"] == actual_branches
 
     @responses.activate
     def test_main_skip_future_releases_sequential_with_prefix(self):
@@ -1229,6 +1365,124 @@ class TestMergeBranch(MockUtilBase):
                 "WARNING",
                 "Disabling release-order based branch selection: Pattern release has no sortable tokens.",
             ) in log_lines
+
+    def test_merge_module_reload_covers_module_initialization(self):
+        import cumulusci.tasks.vcs.merge as merge_module
+
+        reloaded = importlib.reload(merge_module)
+        assert reloaded.MergeBranch.__name__ == "MergeBranch"
+
+    @responses.activate
+    def test_get_next_release_branch_returns_none_when_identifiers_absent(self):
+        self._setup_mocks(["main", "feature/work-item"])
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "main",
+                    "branch_prefix": "feature/",
+                }
+            }
+        )
+        task._init_task()
+
+        release_branches = [
+            branch
+            for branch in task.repo.branches()
+            if branch.name == "feature/work-item"
+        ]
+        assert task._get_next_release_branch(release_branches) is None
+
+    @responses.activate
+    def test_get_next_release_branch_returns_none_when_ordering_errors(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "release",
+        }
+        self._setup_mocks(["feature/release", "feature/release__child"])
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "feature/release",
+                    "branch_prefix": "feature/",
+                }
+            }
+        )
+        task._init_task()
+
+        release_branches = [
+            branch
+            for branch in task.repo.branches()
+            if branch.name == "feature/release"
+        ]
+        assert task._get_next_release_branch(release_branches) is None
+
+    @responses.activate
+    def test_get_next_release_branch_returns_none_when_sorted_identifier_not_found(
+        self,
+    ):
+        self._setup_mocks(["main", "feature/230"])
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "main",
+                    "branch_prefix": "feature/",
+                }
+            }
+        )
+        task._init_task()
+
+        release_branches = [
+            branch for branch in task.repo.branches() if branch.name == "feature/230"
+        ]
+        import cumulusci.tasks.vcs.merge as merge_module
+
+        original_sort = merge_module.sort_release_identifiers
+        merge_module.sort_release_identifiers = (
+            lambda identifiers, format_config=None: ["999"]
+        )
+        try:
+            assert task._get_next_release_branch(release_branches) is None
+        finally:
+            merge_module.sort_release_identifiers = original_sort
+
+    @responses.activate
+    def test_get_next_sprint_release_returns_none_when_ordering_errors(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "release",
+        }
+        self._setup_mocks(["feature/release", "feature/release__child"])
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "feature/release",
+                    "branch_prefix": "feature/",
+                    "sprint_branch_prefix": "feature/",
+                }
+            }
+        )
+        task._init_task()
+
+        assert task._get_next_sprint_release(list(task.repo.branches())) is None
+
+    @responses.activate
+    def test_is_future_release_branch_returns_false_when_ordering_errors(self):
+        self.project_config.config["project"]["git"]["release_branch_format"] = {
+            "type": "date",
+            "pattern": "release",
+        }
+        self._setup_mocks(["feature/release"])
+        task = self._create_task(
+            task_config={
+                "options": {
+                    "source_branch": "main",
+                    "branch_prefix": "feature/",
+                }
+            }
+        )
+        task._init_task()
+
+        assert not task._is_future_release_branch("feature/release", "release")
 
 
 def log_header():

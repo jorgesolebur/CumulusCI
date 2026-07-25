@@ -384,6 +384,18 @@ tasks:
             update_future_releases: True
 ```
 
+Example automerge chain with one child branch:
+
+```mermaid
+flowchart TD
+    release_001["release/001"] -->|"vcs_automerge_release\nupdate_future_releases=True"| release_002["release/002"]
+    release_001 -->|"vcs_automerge_release\nupdate_sprint_branches=True"| feature_s1["feature/FY26Q4S1"]
+    feature_s1 -->|"vcs_automerge_feature\nupdate_future_releases=True"| feature_s2["feature/FY26Q4S2"]
+    feature_s1 -->|"vcs_automerge_feature"| feature_s1_child["feature/FY26Q4S1__intake"]
+```
+
+Child branches receive automerges from their direct parent branch only.
+
 ### Orphan Branches
 
 If you have both a parent and a child branch, and the parent is deleted,

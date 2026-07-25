@@ -397,6 +397,13 @@ tasks:
         options:
             source_branch: $project_config.repo_branch
         group: VCS
+    vcs_automerge_release:
+        description: Merges the latest commit on the release branch into child and future release branches, and optionally into the next sprint branch
+        class_path: cumulusci.tasks.vcs.MergeBranch
+        options:
+            source_branch: $project_config.repo_branch
+            branch_prefix: $project_config.project__git__prefix_release
+        group: VCS
     github_copy_subtree:
         description: Copies one or more subtrees from the project repository for a given release to a target repository, with the option to include release notes.
         class_path: cumulusci.tasks.github.publish.PublishSubtree
