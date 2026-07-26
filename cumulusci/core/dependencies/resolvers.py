@@ -421,14 +421,14 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         try:
             from cumulusci.vcs.bootstrap import find_repo_feature_prefix
 
-            _, format_config = context.get_release_branch_prefix_and_format_config()
-
             remote_branch_prefix = find_repo_feature_prefix(repo)
         except Exception:
             context.logger.info(
                 f"Could not find feature branch prefix or commit-status context for {repo.clone_url}. Unable to resolve packages."
             )
             return []
+
+        _, format_config = context.get_release_branch_prefix_and_format_config()
 
         # We will check at least the release branch corresponding to our release id.
         # We may be configured to check backwards on release branches.
