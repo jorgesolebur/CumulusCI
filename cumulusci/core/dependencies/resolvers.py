@@ -34,7 +34,7 @@ from cumulusci.utils.git import (
     get_release_identifier,
     is_release_branch_or_child,
 )
-from cumulusci.utils.release_branch import get_previous_identifier, parse_format_config
+from cumulusci.utils.release_branch import get_previous_identifier
 from cumulusci.vcs.models import AbstractBranch, AbstractGitTag, AbstractRepo
 
 PACKAGE_TYPE_RE = re.compile(r"^package_type: (.*)$", re.MULTILINE)
@@ -45,16 +45,18 @@ def get_release_id(context: BaseProjectConfig) -> str:
     """Detect release identifier (e.g. NNN in feature/NNN__some_branch) in the
     current branch and return it as a string. Supports custom formats via
     project__git__release_branch_format."""
-    if not context.repo_branch or not context.project__git__prefix_feature:
+    if not context.repo_branch:
         raise DependencyResolutionError(
             "Cannot get current branch or feature branch prefix"
         )
-    format_config = parse_format_config(context)
+
+    branch_prefix, format_config = context.get_release_branch_prefix_and_format_config()
     release_id = get_release_identifier(
         context.repo_branch,
-        context.project__git__prefix_feature,
+        branch_prefix,
         format_config,
     )
+
     if not release_id:
         raise DependencyResolutionError("Cannot get current release identifier")
 
@@ -384,12 +386,15 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
     branch_offset_end = 0
 
     def is_valid_repo_context(self, context: BaseProjectConfig) -> bool:
-        format_config = parse_format_config(context)
+        (
+            branch_prefix,
+            format_config,
+        ) = context.get_release_branch_prefix_and_format_config()
         return bool(
             super().is_valid_repo_context(context)
             and is_release_branch_or_child(
                 context.repo_branch,
-                context.project__git__prefix_feature,
+                branch_prefix,
                 format_config,
             )
         )
@@ -406,7 +411,6 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         context: BaseProjectConfig,
     ) -> List[AbstractBranch]:
         release_id = get_release_id(context)
-        format_config = parse_format_config(context)
 
         repo = self.get_repo(context, dep.url)
         if not repo:
@@ -423,6 +427,8 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
                 f"Could not find feature branch prefix or commit-status context for {repo.clone_url}. Unable to resolve packages."
             )
             return []
+
+        _, format_config = context.get_release_branch_prefix_and_format_config()
 
         # We will check at least the release branch corresponding to our release id.
         # We may be configured to check backwards on release branches.

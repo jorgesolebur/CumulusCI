@@ -34,6 +34,15 @@ class MergeBranch(BaseSourceControlTask):
         "update_future_releases": {
             "description": "If true, then include release branches that are not the lowest release number even if they are not child branches. Defaults to False."
         },
+        "update_future_sprint_releases": {
+            "description": "If true, then include sprint release branches that are not the lowest sprint release branch. Defaults to False."
+        },
+        "sprint_branch_prefix": {
+            "description": "Prefix used to identify sprint release branches. Defaults to project__git__prefix_feature."
+        },
+        "update_sprint_branches": {
+            "description": "If true and source_branch is a release branch, then include the lowest sprint release branch. Defaults to False."
+        },
         "create_pull_request_on_conflict": {
             "description": "If true, then create a pull request when a merge conflict arises. Defaults to True."
         },
@@ -48,6 +57,10 @@ class MergeBranch(BaseSourceControlTask):
             self.options[
                 "branch_prefix"
             ] = self.project_config.project__git__prefix_feature
+        if "sprint_branch_prefix" not in self.options:
+            self.options[
+                "sprint_branch_prefix"
+            ] = self.project_config.project__git__prefix_feature
         if "source_branch" not in self.options:
             self.options[
                 "source_branch"
@@ -61,6 +74,12 @@ class MergeBranch(BaseSourceControlTask):
         self.options["update_future_releases"] = process_bool_arg(
             self.options.get("update_future_releases") or False
         )
+        self.options["update_future_sprint_releases"] = process_bool_arg(
+            self.options.get("update_future_sprint_releases") or False
+        )
+        self.options["update_sprint_branches"] = process_bool_arg(
+            self.options.get("update_sprint_branches") or False
+        )
         if "create_pull_request_on_conflict" not in self.options:
             self.options["create_pull_request_on_conflict"] = True
         else:
@@ -68,7 +87,12 @@ class MergeBranch(BaseSourceControlTask):
                 self.options.get("create_pull_request_on_conflict")
             )
 
-        self.format_config = parse_format_config(self.project_config)
+        self.sprint_format_config = parse_format_config(self.project_config)
+        self.format_config = (
+            self.sprint_format_config
+            if self.options["branch_prefix"] == self.options["sprint_branch_prefix"]
+            else None
+        )
         self._release_ordering_warning_emitted = False
 
     def _init_task(self):
@@ -113,17 +137,40 @@ class MergeBranch(BaseSourceControlTask):
         all branches with branch_prefix that are direct descendents of source_branch.
 
         If update_future_releases is True, and source_branch is a release branch
-        then we also collect all future release branches.
+        then we also collect the next future release branch.
+
+        If update_future_sprint_releases is True, and source_branch is a sprint release branch
+        then we also collect the next future sprint release branch.
         """
         repo_branches = list(self.repo.branches())
         next_release = self._get_next_release(repo_branches)
         skip_future_releases = self.options["skip_future_releases"]
         update_future_releases = self._update_future_releases(next_release)
+        update_sprint_branches = self._should_update_sprint_branches()
+        next_sprint_release = (
+            self._get_next_sprint_release(repo_branches)
+            if update_sprint_branches
+            else None
+        )
 
         child_branches = []
         main_descendents = []
         release_branches = []
+        sprint_release_branches = []
         for branch in repo_branches:
+            if update_sprint_branches and self._is_sprint_release_branch(branch.name):
+                branch_sprint_release = self._get_sprint_release_number(branch.name)
+                if (
+                    next_sprint_release is not None
+                    and branch_sprint_release == next_sprint_release
+                ):
+                    sprint_release_branches.append(branch)
+                else:
+                    self.logger.debug(
+                        f"Skipping sprint branch {branch.name}: is not the next sprint release"
+                    )
+                continue
+
             # check for adding future release branches
             if update_future_releases and self._is_future_release_branch(
                 branch.name, next_release
@@ -181,10 +228,18 @@ class MergeBranch(BaseSourceControlTask):
             )
 
         if release_branches:
+            next_release_branch = self._get_next_release_branch(release_branches)
+            release_branches = [next_release_branch] if next_release_branch else []
             self.logger.debug(
-                f"Found future release branches to update: {[branch.name for branch in release_branches]}"
+                f"Found next release branch to update: {[branch.name for branch in release_branches]}"
             )
             to_merge = to_merge + release_branches
+
+        if sprint_release_branches:
+            self.logger.debug(
+                f"Found sprint release branches to update: {[branch.name for branch in sprint_release_branches]}"
+            )
+            to_merge = to_merge + sprint_release_branches
 
         if main_descendents:
             self.logger.debug(
@@ -222,7 +277,7 @@ class MergeBranch(BaseSourceControlTask):
         Returns True if all of the below checks are True. False otherwise.
 
         Checks:
-        (1) Did we receive the 'update_future_release' flag?
+        (1) Did we receive the 'update_future_releases' or 'update_future_sprint_releases' flag?
         (2) Is the source_branch a release branch?
         (3) Is it the lowest numbered release branch that exists?
 
@@ -231,7 +286,10 @@ class MergeBranch(BaseSourceControlTask):
         """
         update_future_releases = False
         if (
-            self.options["update_future_releases"]
+            (
+                self.options["update_future_releases"]
+                or self.options["update_future_sprint_releases"]
+            )
             and self._is_release_branch(self.options["source_branch"])
             and next_release is not None
             and next_release == self._get_release_number(self.options["source_branch"])
@@ -239,11 +297,78 @@ class MergeBranch(BaseSourceControlTask):
             update_future_releases = True
         return update_future_releases
 
+    def _should_update_sprint_branches(self):
+        """Returns True when the source release should merge into next sprint branch."""
+        return self.options["update_sprint_branches"] and self._is_release_branch(
+            self.options["source_branch"]
+        )
+
+    def _is_sprint_release_branch(self, branch_name):
+        """A sprint release branch begins with sprint_branch_prefix and matches sprint format."""
+        return is_release_branch(
+            branch_name,
+            self.options["sprint_branch_prefix"],
+            self.sprint_format_config,
+        )
+
+    def _get_sprint_release_number(self, branch_name):
+        """Get sprint release identifier from a sprint release branch name."""
+        return get_release_identifier(
+            branch_name,
+            self.options["sprint_branch_prefix"],
+            self.sprint_format_config,
+        )
+
+    def _get_next_sprint_release(self, repo_branches):
+        """Returns the lowest ordered sprint release identifier."""
+        release_identifiers = [
+            self._get_sprint_release_number(branch.name)
+            for branch in repo_branches
+            if self._is_sprint_release_branch(branch.name)
+        ]
+        release_identifiers = [
+            identifier for identifier in release_identifiers if identifier
+        ]
+        if not release_identifiers:
+            return None
+        try:
+            next_release = sort_release_identifiers(
+                release_identifiers, self.sprint_format_config
+            )[0]
+        except ValueError as exc:
+            self._warn_release_ordering_disabled(exc)
+            next_release = None
+        return next_release
+
     def _is_release_branch(self, branch_name):
         """A release branch begins with the given prefix"""
         return is_release_branch(
             branch_name, self.options["branch_prefix"], self.format_config
         )
+
+    def _get_next_release_branch(self, release_branches):
+        """Returns the closest future release branch from release_branches."""
+        branches_with_identifiers = [
+            (branch, self._get_release_number(branch.name))
+            for branch in release_branches
+        ]
+        release_identifiers = [
+            identifier for _, identifier in branches_with_identifiers if identifier
+        ]
+        if not release_identifiers:
+            return None
+        try:
+            next_release = sort_release_identifiers(
+                release_identifiers, self.format_config
+            )[0]
+        except ValueError as exc:
+            self._warn_release_ordering_disabled(exc)
+            return None
+
+        for branch, release_identifier in branches_with_identifiers:
+            if release_identifier == next_release:
+                return branch
+        return None
 
     def _get_release_number(self, branch_name):
         """Get release identifier from a release branch name.

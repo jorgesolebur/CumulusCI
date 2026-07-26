@@ -15,7 +15,6 @@ from cumulusci.utils.git import (
     is_release_branch_or_child,
 )
 from cumulusci.utils.options import CCIOptions, Field
-from cumulusci.utils.release_branch import parse_format_config
 from cumulusci.vcs.bootstrap import get_repo_from_url
 
 
@@ -189,13 +188,6 @@ class VcsRemoteBranch(BaseTask):
         return self.return_values
 
     def get_release_branch(self, repo, local_branch: str):
-        format_config = parse_format_config(self.project_config)
-
-        # Remote project may not be a CCI project.
-        remote_branch_prefix = (
-            self.project_config.project__git__prefix_feature or "feature/"
-        )
-
         try:
             return repo.branch(local_branch)
         except Exception as e:
@@ -203,9 +195,15 @@ class VcsRemoteBranch(BaseTask):
                 f"Branch {local_branch} not found in repository {repo.clone_url}: {e}"
             )
 
+            # Remote project may not be a CCI project.
+            (
+                remote_branch_prefix,
+                format_config,
+            ) = self.project_config.get_release_branch_prefix_and_format_config()
+
             if is_release_branch_or_child(
                 local_branch,
-                self.project_config.project__git__prefix_feature,
+                remote_branch_prefix,
                 format_config,
             ):
                 release_id = get_release_identifier(

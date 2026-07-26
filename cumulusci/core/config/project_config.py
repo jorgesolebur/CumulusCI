@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Union
 from cumulusci.core.config.base_config import BaseConfig
 from cumulusci.core.debug import get_debug_mode
 from cumulusci.core.versions import PackageVersionNumber
+from cumulusci.utils.release_branch import parse_format_config
 from cumulusci.utils.version_strings import LooseVersion
 
 API_VERSION_RE = re.compile(r"^\d\d+\.0$")
@@ -57,6 +58,7 @@ tasks.__path__ = []
 if TYPE_CHECKING:
     from cumulusci.core.config.universal_config import UniversalConfig
     from cumulusci.core.keychain.base_project_keychain import BaseProjectKeychain
+    from cumulusci.utils.yaml.cumulusci_yml import ReleaseBranchFormat
     from cumulusci.vcs.base import VCSService
 
 
@@ -752,6 +754,19 @@ class BaseProjectConfig(BaseTaskFlowConfig, ProjectConfigPropertiesMixin):
                 project_config._add_tasks_directory_to_python_path()
 
         return project_config
+
+    def get_release_branch_prefix_and_format_config(
+        self,
+    ) -> tuple[str, Optional["ReleaseBranchFormat"]]:
+        format_config = parse_format_config(self)
+        branch_prefix = self.project__git__prefix_feature or "feature/"
+
+        if self.repo_branch and self.repo_branch.startswith(
+            self.project__git__prefix_release or "release/"
+        ):
+            branch_prefix = self.project__git__prefix_release or "release/"
+            format_config = None
+        return branch_prefix, format_config
 
     def _add_tasks_directory_to_python_path(self):
         # https://stackoverflow.com/a/2700924/113477
