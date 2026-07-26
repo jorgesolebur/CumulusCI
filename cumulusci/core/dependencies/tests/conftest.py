@@ -10,6 +10,7 @@ from cumulusci.core.config.tests.test_config import (
     DummyRepository,
 )
 from cumulusci.utils.git import split_repo_url
+from cumulusci.utils.release_branch import parse_format_config
 
 
 @pytest.fixture
@@ -453,6 +454,26 @@ def project_config(github, init_git_repo):
 
     pc.get_repo_from_url = get_repo_from_url
     pc.get_github_repo_side_effect = get_github_repo_side_effect
+
+    def get_release_branch_prefix_and_format_config():
+        format_config = parse_format_config(pc)
+        prefix_feature = pc.project__git__prefix_feature
+        branch_prefix = (
+            prefix_feature if isinstance(prefix_feature, str) else "feature/"
+        )
+        prefix_release = pc.project__git__prefix_release
+        prefix_release_str = (
+            prefix_release if isinstance(prefix_release, str) else "release/"
+        )
+        repo_branch = pc.repo_branch
+        if isinstance(repo_branch, str) and repo_branch.startswith(prefix_release_str):
+            branch_prefix = prefix_release_str
+            format_config = None
+        return branch_prefix, format_config
+
+    pc.get_release_branch_prefix_and_format_config.side_effect = (
+        get_release_branch_prefix_and_format_config
+    )
 
     return pc
 

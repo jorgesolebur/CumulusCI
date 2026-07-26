@@ -304,6 +304,10 @@ class TestBootstrapFunctions:
 
         mock_config = Mock()
         mock_config.project__git__prefix_feature = "custom-feature/"
+        mock_config.get_release_branch_prefix_and_format_config.return_value = (
+            "custom-feature/",
+            None,
+        )
         mock_get_config.return_value = mock_config
 
         result = bootstrap.find_repo_feature_prefix(mock_repo)
@@ -322,6 +326,10 @@ class TestBootstrapFunctions:
 
         mock_config = Mock()
         mock_config.project__git__prefix_feature = None
+        mock_config.get_release_branch_prefix_and_format_config.return_value = (
+            "feature/",
+            None,
+        )
         mock_get_config.return_value = mock_config
 
         result = bootstrap.find_repo_feature_prefix(mock_repo)

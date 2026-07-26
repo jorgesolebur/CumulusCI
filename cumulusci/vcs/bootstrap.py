@@ -161,7 +161,11 @@ def get_remote_project_config(repo: AbstractRepo, ref: str) -> BaseProjectConfig
 def find_repo_feature_prefix(repo: AbstractRepo) -> str:
     ref = repo.branch(repo.default_branch).commit.sha
     head_cumulusci_project_config = get_remote_project_config(repo, ref)
-    return head_cumulusci_project_config.project__git__prefix_feature or "feature/"
+    (
+        branch_prefix,
+        _,
+    ) = head_cumulusci_project_config.get_release_branch_prefix_and_format_config()
+    return branch_prefix
 
 
 def get_remote_context(
