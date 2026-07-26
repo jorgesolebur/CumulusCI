@@ -770,15 +770,15 @@ class TestGitHubPreviousReleaseBranchCommitStatusResolver:
 
         assert resolver.can_resolve(dep, project_config)
         # FY26Q3S1 -> previous is FY26Q3S0 (i=1); feature/FY26Q3S0 has the package
-        sha, dep = resolver.resolve(dep, project_config)
+        resolve_sha, resolve_dep = resolver.resolve(dep, project_config)
 
-        print(sha)
+        print(f"resolve_sha: {resolve_sha}")
 
-        assert sha == "parent_sha_FY26Q2S4"
+        assert resolve_sha == "parent_sha_FY26Q2S4"
 
-        print(dep)
+        print(f"resolve_dep: {resolve_dep}")
 
-        assert dep == PackageVersionIdDependency(
+        assert resolve_dep == PackageVersionIdDependency(
             version_id="04t000000000013",
             package_name="CumulusCI-2GP-Test",
             source_info={
