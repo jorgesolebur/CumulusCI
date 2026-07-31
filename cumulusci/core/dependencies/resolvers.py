@@ -31,6 +31,7 @@ from cumulusci.core.exceptions import (
 from cumulusci.core.versions import PackageType
 from cumulusci.utils.git import (
     construct_release_branch_name,
+    get_parent_branch_candidates,
     get_release_identifier,
     is_release_branch_or_child,
 )
@@ -428,28 +429,24 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
             )
             return []
 
-        branch_prefix, format_config = (
-            context.get_release_branch_prefix_and_format_config()
-        )
+        (
+            branch_prefix,
+            format_config,
+        ) = context.get_release_branch_prefix_and_format_config()
 
         release_branches = []
 
         # For multi-level branches (e.g. release/001__1.1__HZCC-2075),
         # cascade through intermediate parents before the root release branch.
-        # Tries release/001__1.1 first, then release/001.
-        if context.repo_branch and context.repo_branch.startswith(branch_prefix):
-            suffix = context.repo_branch[len(branch_prefix) :]
-            parts = suffix.split("__")
-            for i in range(len(parts) - 1, 1, -1):
-                parent_branch_name = (
-                    f"{remote_branch_prefix}{'__'.join(parts[:i])}"
-                )
-                try:
-                    release_branches.append(repo.branch(parent_branch_name))
-                except VcsNotFoundError:
-                    context.logger.info(
-                        f"Remote branch {parent_branch_name} not found"
-                    )
+        # Root is excluded here because it is handled below in offset loop.
+        for candidate in get_parent_branch_candidates(
+            context.repo_branch or "", branch_prefix, format_config
+        )[:-1]:
+            remote_candidate = remote_branch_prefix + candidate[len(branch_prefix) :]
+            try:
+                release_branches.append(repo.branch(remote_candidate))
+            except VcsNotFoundError:
+                context.logger.info(f"Remote branch {remote_candidate} not found")
 
         # Root release branch (and previous ones based on offset).
         for i in range(self.branch_offset_start, self.branch_offset_end):

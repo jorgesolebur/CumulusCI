@@ -577,6 +577,34 @@ class TestGitHubReleaseBranchCommitStatusResolver:
             ),
         )
 
+    def test_2gp_release_branch_resolver__multi_level_branch(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/232__1.1__HZCC"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
+
+        resolver = GitHubReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "feature/232__1.1_parent_sha",
+            PackageVersionIdDependency(
+                version_id="04t000000000020",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "feature/232__1.1_parent_sha",
+                    "vcs": "github",
+                },
+            ),
+        )
+
     def test_commit_status_not_found(
         self, project_config, patch_github_resolvers_get_github_repo
     ):

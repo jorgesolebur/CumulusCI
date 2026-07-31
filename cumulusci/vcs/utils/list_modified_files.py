@@ -5,9 +5,8 @@ import subprocess
 from typing import Optional, Set
 
 from cumulusci.core.tasks import BaseTask
-from cumulusci.utils.git import construct_release_branch_name
+from cumulusci.utils.git import get_parent_branch_candidates
 from cumulusci.utils.options import CCIOptions, Field, ListOfStringsOption
-from cumulusci.utils.release_branch import get_release_identifier
 
 
 class ListModifiedFiles(BaseTask):
@@ -51,23 +50,21 @@ class ListModifiedFiles(BaseTask):
             branch_prefix,
             format_config,
         ) = self.project_config.get_release_branch_prefix_and_format_config()
-        release_id = get_release_identifier(
+        candidates = get_parent_branch_candidates(
             self.project_config.repo_branch or "",
             branch_prefix,
             format_config,
         )
-        if release_id:
-            try:
-                branch = construct_release_branch_name(
-                    branch_prefix,
-                    release_id,
-                    format_config,
-                )
-                repo = self.project_config.get_repo()
-                repo_branch = repo.branch(branch)
-                return repo_branch.name
-            except Exception:
-                self.logger.warning(f"Could not find branch {branch} in repository.")
+        if candidates:
+            repo = self.project_config.get_repo()
+            if repo:
+                for candidate in candidates:
+                    try:
+                        return repo.branch(candidate).name
+                    except Exception:
+                        self.logger.warning(
+                            f"Could not find branch {candidate} in repository."
+                        )
 
         return self.project_config.project__git__default_branch or "main"
 

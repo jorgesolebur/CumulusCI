@@ -267,6 +267,26 @@ def github():
                     )
                 ),
             ),
+            "feature/232__1.1_sha": mock.Mock(
+                sha="feature/232__1.1_sha",
+                parents=[{"sha": "feature/232__1.1_parent_sha"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "feature/232__1.1_parent_sha": mock.Mock(
+                sha="feature/232__1.1_parent_sha",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000020",
+                            )
+                        ]
+                    )
+                ),
+            ),
             "feature/2025-03_sha": mock.Mock(
                 sha="feature/2025-03_sha",
                 parents=[{"sha": "parent_sha_2025-03"}],
