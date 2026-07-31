@@ -158,8 +158,8 @@ def get_remote_project_config(repo: AbstractRepo, ref: str) -> BaseProjectConfig
     return project_config
 
 
-def find_repo_feature_prefix(repo: AbstractRepo) -> str:
-    ref = repo.branch(repo.default_branch).commit.sha
+def find_repo_feature_prefix(repo: AbstractRepo, ref: Optional[str] = None) -> str:
+    ref = repo.branch(ref or repo.default_branch).commit.sha
     head_cumulusci_project_config = get_remote_project_config(repo, ref)
     (
         branch_prefix,

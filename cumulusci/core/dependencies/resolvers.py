@@ -420,19 +420,23 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
             )
 
         try:
-            from cumulusci.vcs.bootstrap import find_repo_feature_prefix
+            from cumulusci.vcs.bootstrap import get_remote_project_config
 
-            remote_branch_prefix = find_repo_feature_prefix(repo)
+            remote_project_config = get_remote_project_config(repo, context.repo_branch)
+            (
+                branch_prefix,
+                format_config,
+            ) = remote_project_config.get_release_branch_prefix_and_format_config()
         except Exception:
             context.logger.info(
                 f"Could not find feature branch prefix or commit-status context for {repo.clone_url}. Unable to resolve packages."
             )
             return []
 
-        (
-            branch_prefix,
-            format_config,
-        ) = context.get_release_branch_prefix_and_format_config()
+        # Use local format_config so date/sequential identifier logic matches the
+        # current branch naming convention, not the remote repo's (possibly absent) config.
+        if format_config is None:
+            _, format_config = context.get_release_branch_prefix_and_format_config()
 
         release_branches = []
 
@@ -440,9 +444,9 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         # cascade through intermediate parents before the root release branch.
         # Root is excluded here because it is handled below in offset loop.
         for candidate in get_parent_branch_candidates(
-            context.repo_branch or "", branch_prefix, format_config
+            context.repo_branch, branch_prefix, format_config
         )[:-1]:
-            remote_candidate = remote_branch_prefix + candidate[len(branch_prefix) :]
+            remote_candidate = branch_prefix + candidate[len(branch_prefix) :]
             try:
                 release_branches.append(repo.branch(remote_candidate))
             except VcsNotFoundError:
@@ -452,7 +456,7 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         for i in range(self.branch_offset_start, self.branch_offset_end):
             prev_id = get_previous_identifier(release_id, i, format_config)
             remote_matching_branch = construct_release_branch_name(
-                remote_branch_prefix, prev_id, format_config
+                branch_prefix, prev_id, format_config
             )
             try:
                 release_branches.append(repo.branch(remote_matching_branch))

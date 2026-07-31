@@ -2,7 +2,6 @@ from typing import List, Optional, Tuple
 from unittest import mock
 
 import pytest
-from github3.exceptions import NotFoundError
 from pydantic.v1 import root_validator
 
 from cumulusci.core.config import UniversalConfig
@@ -647,16 +646,22 @@ class TestGitHubReleaseBranchCommitStatusResolver:
 
         assert "Could not find a GitHub service for URL" in str(exc)
 
-    @mock.patch("cumulusci.vcs.bootstrap.find_repo_feature_prefix")
+    @mock.patch("cumulusci.vcs.bootstrap.get_remote_project_config")
     def test_unable_locate_feature_prefix(
         self,
-        find_repo_feature_prefix_mock,
+        mock_get_remote_project_config,
         project_config,
         patch_github_resolvers_get_github_repo,
     ):
         setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
 
-        find_repo_feature_prefix_mock.side_effect = NotFoundError
+        def _side_effect(repo, ref):
+            if ref == "feature/232__test":
+                raise Exception("Could not locate feature prefix for remote repo")
+            return mock.Mock(lookup=mock.Mock(return_value=None))
+
+        mock_get_remote_project_config.side_effect = _side_effect
+
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
         project_config.project__git__release_branch_format__type = None
@@ -820,6 +825,7 @@ class TestGitHubExactMatch2GPResolver:
 
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubExactMatch2GPResolver()
         dep = GitHubDynamicDependency(
@@ -835,6 +841,63 @@ class TestGitHubExactMatch2GPResolver:
                 source_info={
                     "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
                     "commit": "feature/232__test_sha",
+                    "vcs": "github",
+                },
+            ),
+        )
+
+    def test_exact_branch_resolver__multi_level_branch(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "feature/232__1.1__HZCC"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
+
+        resolver = GitHubExactMatch2GPResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "feature/232__1.1__HZCC_sha",
+            PackageVersionIdDependency(
+                version_id="04t000000000025",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "feature/232__1.1__HZCC_sha",
+                    "vcs": "github",
+                },
+            ),
+        )
+
+    def test_exact_branch_resolver__release_branch(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "release/232__1.1__HZCC"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__prefix_release = "release/"
+        project_config.project__git__release_branch_format__type = None
+
+        resolver = GitHubExactMatch2GPResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "release/232__1.1__HZCC_sha",
+            PackageVersionIdDependency(
+                version_id="04t000000000030",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "release/232__1.1__HZCC_sha",
                     "vcs": "github",
                 },
             ),
@@ -863,16 +926,16 @@ class TestGitHubExactMatch2GPResolver:
 
         assert "Could not find a GitHub service for URL" in str(exc)
 
-    @mock.patch("cumulusci.core.dependencies.github_resolvers.find_repo_feature_prefix")
     def test_unable_locate_feature_prefix(
         self,
-        find_repo_feature_prefix_mock,
         project_config,
         patch_github_resolvers_get_github_repo,
     ):
         setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
 
-        find_repo_feature_prefix_mock.side_effect = NotFoundError
+        project_config.get_release_branch_prefix_and_format_config.side_effect = (
+            Exception("Could not locate branch prefix")
+        )
         project_config.repo_branch = "feature/232__test"
         project_config.project__git__prefix_feature = "feature/"
 
@@ -889,6 +952,7 @@ class TestGitHubExactMatch2GPResolver:
 
         project_config.repo_branch = "feature/290__test"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
 
         resolver = GitHubExactMatch2GPResolver()
         dep = GitHubDynamicDependency(
@@ -904,6 +968,7 @@ class TestGitHubExactMatch2GPResolver:
 
         project_config.repo_branch = "feature/232"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
         project_config.project__git__settings__stop_on_missing_version = []
 
         resolver = GitHubExactMatch2GPResolver()
@@ -921,6 +986,7 @@ class TestGitHubExactMatch2GPResolver:
 
         project_config.repo_branch = "feature/232"
         project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__release_branch_format__type = None
         project_config.project__git__settings__stop_on_missing_version = [
             "GitHub Exact-Match Commit Status Resolver"
         ]
