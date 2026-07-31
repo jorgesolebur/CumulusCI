@@ -132,6 +132,53 @@ def get_release_identifier(
         return get_feature_branch_name(branch_name, prefix).split("__")[0]
 
 
+def get_parent_branch_candidates(
+    branch_name: str,
+    prefix: str,
+    format_config: Optional[ReleaseBranchFormat] = None,
+) -> list[str]:
+    """Return an ordered list of parent branch candidates for a child branch.
+
+    Candidates are ordered from most-specific (immediate parent) to least-specific
+    (root release branch). Returns an empty list when ``branch_name`` is not a
+    release branch or child of one.
+
+    Examples (prefix ``release/``, no format_config)::
+
+        release/001__1.1__enhancement3  →  [release/001__1.1, release/001]
+        release/001__enhancement1       →  [release/001]
+        release/001                     →  []  (already the root, no parents)
+
+    Examples (prefix ``feature/``, format_config with prefix ``FY``)::
+
+        feature/FY26Q4S4__group__enhancement4  →  [feature/FY26Q4S4__group, feature/FY26Q4S4]
+        feature/FY26Q4S4__enhancement1         →  [feature/FY26Q4S4]
+    """
+    if not is_release_branch_or_child(branch_name, prefix, format_config):
+        return []
+
+    suffix = branch_name[len(prefix) :]
+    parts = suffix.split("__")
+
+    # A root release branch (single part) has no parents.
+    if len(parts) <= 1:
+        return []
+
+    candidates: list[str] = []
+
+    # Intermediate parents: drop the last k segments one at a time.
+    # For ['001', '1.1', 'enh'], k=1 → 001__1.1; stops before the root.
+    for k in range(1, len(parts) - 1):
+        candidates.append(prefix + "__".join(parts[:-k]))
+
+    # Root release branch via format_config-aware construction so that branch
+    # prefixes (e.g. "FY" in FY26Q4S4) are re-applied correctly.
+    release_id = get_release_identifier(branch_name, prefix, format_config)
+    candidates.append(construct_release_branch_name(prefix, release_id, format_config))
+
+    return candidates
+
+
 def construct_release_branch_name(
     prefix: str,
     release_identifier: str,

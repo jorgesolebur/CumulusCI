@@ -100,19 +100,12 @@ class TestVcsRemoteBranch(unittest.TestCase):
         self.assertEqual(result.name, "feature/branch-1")
         repo_mock.branch.assert_called_once_with("feature/branch-1")
 
-    @patch("cumulusci.tasks.utility.env_management.get_release_identifier")
-    @patch("cumulusci.tasks.utility.env_management.construct_release_branch_name")
-    @patch("cumulusci.tasks.utility.env_management.is_release_branch_or_child")
-    def test_get_release_branch_falls_back_to_local_branch_when_release_lookup_fails(
-        self,
-        is_release_branch_or_child,
-        construct_release_branch_name,
-        get_release_identifier,
-    ):
+    def test_get_release_branch_finds_intermediate_parent_release_branch(self):
+        """release/001__1.1__enhancement3 → release/001__1.1 when it exists in remote."""
         project_config = create_project_config()
-        project_config.repo_info["branch"] = "feature/branch-1"
+        project_config.repo_info["branch"] = "release/001__1.1__enhancement3"
         project_config.get_release_branch_prefix_and_format_config = Mock(
-            return_value=("release", {"prefix_release": "release"})
+            return_value=("release/", None)
         )
         task_config = TaskConfig(
             {
@@ -122,9 +115,176 @@ class TestVcsRemoteBranch(unittest.TestCase):
                 }
             }
         )
-        is_release_branch_or_child.return_value = True
-        get_release_identifier.return_value = "1.2"
-        construct_release_branch_name.return_value = "feature/release/1.2"
+        repo_mock = Mock()
+        intermediate_branch_mock = Mock()
+        intermediate_branch_mock.name = "release/001__1.1"
+        # First call (exact branch) fails; second call (intermediate parent) succeeds.
+        repo_mock.branch.side_effect = [
+            Exception("branch not found"),
+            intermediate_branch_mock,
+        ]
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(repo_mock, "release/001__1.1__enhancement3")
+
+        self.assertEqual(result.name, "release/001__1.1")
+        self.assertEqual(
+            repo_mock.branch.call_args_list[0].args[0], "release/001__1.1__enhancement3"
+        )
+        self.assertEqual(repo_mock.branch.call_args_list[1].args[0], "release/001__1.1")
+
+    def test_get_release_branch_falls_back_to_root_when_intermediate_parent_not_found(
+        self,
+    ):
+        """release/001__1.1__enhancement3 → falls back to release/001 when release/001__1.1 missing."""
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "release/001__1.1__enhancement3"
+        project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("release/", None)
+        )
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        repo_mock = Mock()
+        root_branch_mock = Mock()
+        root_branch_mock.name = "release/001"
+        # First call (exact) fails; second call (intermediate) fails; third call (root) succeeds.
+        repo_mock.branch.side_effect = [
+            Exception("branch not found"),
+            Exception("branch not found"),
+            root_branch_mock,
+        ]
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(repo_mock, "release/001__1.1__enhancement3")
+
+        self.assertEqual(result.name, "release/001")
+        self.assertEqual(
+            repo_mock.branch.call_args_list[0].args[0], "release/001__1.1__enhancement3"
+        )
+        self.assertEqual(repo_mock.branch.call_args_list[1].args[0], "release/001__1.1")
+        self.assertEqual(repo_mock.branch.call_args_list[2].args[0], "release/001")
+
+    @patch("cumulusci.tasks.utility.env_management.get_parent_branch_candidates")
+    def test_get_release_branch_finds_intermediate_parent_feature_branch_with_format_config(
+        self,
+        get_parent_branch_candidates_mock,
+    ):
+        """feature/FY26Q4S4__group__enhancement4 → feature/FY26Q4S4__group when it exists in remote."""
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "feature/FY26Q4S4__group__enhancement4"
+        project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("feature/", {"type": "date", "prefix": "FY"})
+        )
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        get_parent_branch_candidates_mock.return_value = [
+            "feature/FY26Q4S4__group",
+            "feature/FY26Q4S4",
+        ]
+
+        repo_mock = Mock()
+        intermediate_branch_mock = Mock()
+        intermediate_branch_mock.name = "feature/FY26Q4S4__group"
+        # First call (exact) fails; second call (intermediate) succeeds.
+        repo_mock.branch.side_effect = [
+            Exception("branch not found"),
+            intermediate_branch_mock,
+        ]
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(
+            repo_mock, "feature/FY26Q4S4__group__enhancement4"
+        )
+
+        self.assertEqual(result.name, "feature/FY26Q4S4__group")
+        self.assertEqual(
+            repo_mock.branch.call_args_list[0].args[0],
+            "feature/FY26Q4S4__group__enhancement4",
+        )
+        self.assertEqual(
+            repo_mock.branch.call_args_list[1].args[0], "feature/FY26Q4S4__group"
+        )
+
+    @patch("cumulusci.tasks.utility.env_management.get_parent_branch_candidates")
+    def test_get_release_branch_falls_back_to_root_feature_branch_when_intermediate_missing(
+        self,
+        get_parent_branch_candidates_mock,
+    ):
+        """feature/FY26Q4S4__group__enhancement4 → falls back to feature/FY26Q4S4 when __group missing."""
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "feature/FY26Q4S4__group__enhancement4"
+        project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("feature/", {"type": "date", "prefix": "FY"})
+        )
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        get_parent_branch_candidates_mock.return_value = [
+            "feature/FY26Q4S4__group",
+            "feature/FY26Q4S4",
+        ]
+
+        repo_mock = Mock()
+        root_branch_mock = Mock()
+        root_branch_mock.name = "feature/FY26Q4S4"
+        # First call (exact) fails; second call (intermediate) fails; third call (root) succeeds.
+        repo_mock.branch.side_effect = [
+            Exception("branch not found"),
+            Exception("branch not found"),
+            root_branch_mock,
+        ]
+
+        task = VcsRemoteBranch(project_config, task_config)
+        result = task.get_release_branch(
+            repo_mock, "feature/FY26Q4S4__group__enhancement4"
+        )
+
+        self.assertEqual(result.name, "feature/FY26Q4S4")
+        self.assertEqual(
+            repo_mock.branch.call_args_list[0].args[0],
+            "feature/FY26Q4S4__group__enhancement4",
+        )
+        self.assertEqual(
+            repo_mock.branch.call_args_list[1].args[0], "feature/FY26Q4S4__group"
+        )
+        self.assertEqual(repo_mock.branch.call_args_list[2].args[0], "feature/FY26Q4S4")
+
+    @patch("cumulusci.tasks.utility.env_management.get_parent_branch_candidates")
+    def test_get_release_branch_falls_back_to_local_branch_when_release_lookup_fails(
+        self,
+        get_parent_branch_candidates_mock,
+    ):
+        project_config = create_project_config()
+        project_config.repo_info["branch"] = "feature/branch-1"
+        project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("release/", None)
+        )
+        task_config = TaskConfig(
+            {
+                "options": {
+                    "url": "https://github.com/TestOwner/TestRepo",
+                    "name": "VCS_URL",
+                }
+            }
+        )
+        get_parent_branch_candidates_mock.return_value = ["feature/release/1.2"]
         repo_mock = Mock()
         local_branch_mock = Mock()
         repo_mock.branch.side_effect = [Exception("release missing"), local_branch_mock]

@@ -9,11 +9,7 @@ from pydantic.v1 import BaseModel, validator
 
 from cumulusci.core.config import BaseProjectConfig, OrgConfig, TaskConfig
 from cumulusci.core.tasks import BaseTask
-from cumulusci.utils.git import (
-    construct_release_branch_name,
-    get_release_identifier,
-    is_release_branch_or_child,
-)
+from cumulusci.utils.git import get_parent_branch_candidates
 from cumulusci.utils.options import CCIOptions, Field
 from cumulusci.vcs.bootstrap import get_repo_from_url
 
@@ -201,22 +197,17 @@ class VcsRemoteBranch(BaseTask):
                 format_config,
             ) = self.project_config.get_release_branch_prefix_and_format_config()
 
-            if is_release_branch_or_child(
+            for candidate in get_parent_branch_candidates(
                 local_branch,
                 remote_branch_prefix,
                 format_config,
             ):
-                release_id = get_release_identifier(
-                    local_branch,
-                    remote_branch_prefix,
-                    format_config,
-                )
+                try:
+                    self.logger.info(
+                        f"Checking if branch {candidate} exists in repository {repo.clone_url}"
+                    )
+                    return repo.branch(candidate)
+                except Exception:
+                    pass
 
-                remote_matching_branch = construct_release_branch_name(
-                    remote_branch_prefix, release_id, format_config
-                )
-                self.logger.info(
-                    f"Checking if Release branch {remote_matching_branch} exists in repository {repo.clone_url}"
-                )
-                return repo.branch(remote_matching_branch)
             raise e
