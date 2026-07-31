@@ -594,9 +594,9 @@ class TestListModifiedFiles:
             return_value=("release/", None)
         )
         repo = Mock()
-        repo.branch = Mock(
-            return_value=Mock(name="branch", **{"name": "release/001__1.1"})
-        )
+        branch_mock = Mock()
+        branch_mock.name = "release/001__1.1"
+        repo.branch = Mock(return_value=branch_mock)
         self.project_config.get_repo = Mock(return_value=repo)
 
         task = self._create_task()
@@ -615,7 +615,9 @@ class TestListModifiedFiles:
         def branch_side_effect(branch_name):
             if branch_name == "release/001__1.1":
                 raise Exception("missing intermediate")
-            return Mock(name="branch", **{"name": branch_name})
+            m = Mock()
+            m.name = branch_name
+            return m
 
         repo.branch = Mock(side_effect=branch_side_effect)
         self.project_config.get_repo = Mock(return_value=repo)
