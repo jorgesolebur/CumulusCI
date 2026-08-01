@@ -586,3 +586,46 @@ class TestListModifiedFiles:
 
         # base_ref should be preserved
         assert task.parsed_options.base_ref == "origin/develop"
+
+    def test_init_options_uses_intermediate_parent_release_branch(self):
+        """Test that _init_options picks intermediate parent before root release branch."""
+        self.project_config.repo_info["branch"] = "release/001__1.1__HZCC-2075"
+        self.project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("release/", None)
+        )
+        repo = Mock()
+        branch_mock = Mock()
+        branch_mock.name = "release/001__1.1"
+        repo.branch = Mock(return_value=branch_mock)
+        self.project_config.get_repo = Mock(return_value=repo)
+
+        task = self._create_task()
+
+        assert task.parsed_options.base_ref == "release/001__1.1"
+        repo.branch.assert_called_once_with("release/001__1.1")
+
+    def test_init_options_falls_back_to_root_release_branch(self):
+        """Test that _init_options falls back to root when intermediate parent is missing."""
+        self.project_config.repo_info["branch"] = "release/001__1.1__HZCC-2075"
+        self.project_config.get_release_branch_prefix_and_format_config = Mock(
+            return_value=("release/", None)
+        )
+        repo = Mock()
+
+        def branch_side_effect(branch_name):
+            if branch_name == "release/001__1.1":
+                raise Exception("missing intermediate")
+            m = Mock()
+            m.name = branch_name
+            return m
+
+        repo.branch = Mock(side_effect=branch_side_effect)
+        self.project_config.get_repo = Mock(return_value=repo)
+
+        task = self._create_task()
+
+        assert task.parsed_options.base_ref == "release/001"
+        assert repo.branch.call_args_list == [
+            mock.call("release/001__1.1"),
+            mock.call("release/001"),
+        ]

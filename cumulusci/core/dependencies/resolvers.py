@@ -31,6 +31,7 @@ from cumulusci.core.exceptions import (
 from cumulusci.core.versions import PackageType
 from cumulusci.utils.git import (
     construct_release_branch_name,
+    get_parent_branch_candidates,
     get_release_identifier,
     is_release_branch_or_child,
 )
@@ -419,30 +420,48 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
             )
 
         try:
-            from cumulusci.vcs.bootstrap import find_repo_feature_prefix
+            from cumulusci.vcs.bootstrap import get_remote_project_config
 
-            remote_branch_prefix = find_repo_feature_prefix(repo)
+            remote_project_config = get_remote_project_config(repo, context.repo_branch)
+            (
+                branch_prefix,
+                format_config,
+            ) = remote_project_config.get_release_branch_prefix_and_format_config()
         except Exception:
             context.logger.info(
                 f"Could not find feature branch prefix or commit-status context for {repo.clone_url}. Unable to resolve packages."
             )
             return []
 
-        _, format_config = context.get_release_branch_prefix_and_format_config()
+        # Use local format_config so date/sequential identifier logic matches the
+        # current branch naming convention, not the remote repo's (possibly absent) config.
+        if format_config is None:
+            _, format_config = context.get_release_branch_prefix_and_format_config()
 
-        # We will check at least the release branch corresponding to our release id.
-        # We may be configured to check backwards on release branches.
         release_branches = []
+
+        # For multi-level branches (e.g. release/001__1.1__HZCC-2075),
+        # cascade through intermediate parents before the root release branch.
+        # Root is excluded here because it is handled below in offset loop.
+        for candidate in get_parent_branch_candidates(
+            context.repo_branch, branch_prefix, format_config
+        )[:-1]:
+            remote_candidate = branch_prefix + candidate[len(branch_prefix) :]
+            try:
+                release_branches.append(repo.branch(remote_candidate))
+            except VcsNotFoundError:
+                context.logger.info(f"Remote branch {remote_candidate} not found")
+
+        # Root release branch (and previous ones based on offset).
         for i in range(self.branch_offset_start, self.branch_offset_end):
             prev_id = get_previous_identifier(release_id, i, format_config)
             remote_matching_branch = construct_release_branch_name(
-                remote_branch_prefix, prev_id, format_config
+                branch_prefix, prev_id, format_config
             )
             try:
                 release_branches.append(repo.branch(remote_matching_branch))
             except VcsNotFoundError:
                 context.logger.info(f"Remote branch {remote_matching_branch} not found")
-                pass
 
         return release_branches
 

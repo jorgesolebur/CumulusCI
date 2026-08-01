@@ -378,19 +378,6 @@ def get_commit(repo: Repository, commit_sha: str) -> Optional[RepoCommit]:
     return commit
 
 
-def find_repo_feature_prefix(repo: Repository) -> str:
-    contents = repo.file_contents(
-        "cumulusci.yml",
-        ref=repo.branch(repo.default_branch).commit.sha,
-    )
-    head_cumulusci_yml = cci_safe_load(io.StringIO(contents.decoded.decode("utf-8")))
-    return (
-        head_cumulusci_yml.get("project", {})
-        .get("git", {})
-        .get("prefix_feature", "feature/")
-    )
-
-
 def find_repo_commit_status_context(
     repo: Repository, context_name: str, default: str
 ) -> str:

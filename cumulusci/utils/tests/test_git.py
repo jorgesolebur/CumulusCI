@@ -3,6 +3,7 @@ import pytest
 from cumulusci.utils.git import (
     EMPTY_URL_MESSAGE,
     construct_release_branch_name,
+    get_parent_branch_candidates,
     get_release_identifier,
     is_release_branch,
     is_release_branch_or_child,
@@ -88,6 +89,80 @@ class TestGitWithFormatConfig:
         assert is_release_branch_or_child("feature/230__test", "feature/") is True
         assert get_release_identifier("feature/230", "feature/") == "230"
         assert get_release_identifier("feature/rel-230", "feature/") is None
+
+
+class TestGetParentBranchCandidates:
+    """Tests for get_parent_branch_candidates — ordered list of parent branches."""
+
+    # ------------------------------------------------------------------
+    # No format_config (integer release identifiers)
+    # ------------------------------------------------------------------
+
+    def test_single_child_returns_root_only(self):
+        """release/001__enhancement1 has one parent: the root release/001."""
+        assert get_parent_branch_candidates(
+            "release/001__enhancement1", "release/"
+        ) == ["release/001"]
+
+    def test_two_level_child_returns_intermediate_then_root(self):
+        """release/001__1.1__enhancement3 → [release/001__1.1, release/001]."""
+        assert get_parent_branch_candidates(
+            "release/001__1.1__enhancement3", "release/"
+        ) == ["release/001__1.1", "release/001"]
+
+    def test_three_level_child_returns_all_ancestors_in_order(self):
+        """release/001__1.1__1.1.1__enh5 → [release/001__1.1__1.1.1, release/001__1.1, release/001]."""
+        assert get_parent_branch_candidates(
+            "release/001__1.1__1.1.1__enh5", "release/"
+        ) == [
+            "release/001__1.1__1.1.1",
+            "release/001__1.1",
+            "release/001",
+        ]
+
+    def test_root_branch_returns_empty(self):
+        """release/001 is a root — it has no parent candidates."""
+        assert get_parent_branch_candidates("release/001", "release/") == []
+
+    def test_non_release_branch_returns_empty(self):
+        """main is not a release branch — returns empty list."""
+        assert get_parent_branch_candidates("main", "release/") == []
+
+    # ------------------------------------------------------------------
+    # With format_config (FYyyQqSn date format, prefix "FY")
+    # ------------------------------------------------------------------
+
+    def test_single_child_with_format_config_returns_root(self):
+        """feature/FY26Q4S4__enhancement1 → [feature/FY26Q4S4]."""
+        fmt = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert get_parent_branch_candidates(
+            "feature/FY26Q4S4__enhancement1", "feature/", fmt
+        ) == ["feature/FY26Q4S4"]
+
+    def test_two_level_child_with_format_config(self):
+        """feature/FY26Q4S4__group__enhancement4 → [feature/FY26Q4S4__group, feature/FY26Q4S4]."""
+        fmt = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert get_parent_branch_candidates(
+            "feature/FY26Q4S4__group__enhancement4", "feature/", fmt
+        ) == ["feature/FY26Q4S4__group", "feature/FY26Q4S4"]
+
+    def test_root_with_format_config_returns_empty(self):
+        """feature/FY26Q4S4 is the root — returns empty list."""
+        fmt = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert get_parent_branch_candidates("feature/FY26Q4S4", "feature/", fmt) == []
+
+    def test_non_release_branch_with_format_config_returns_empty(self):
+        """main does not match the format — returns empty list."""
+        fmt = ReleaseBranchFormat(
+            type="date", pattern="FYyyQqSn", max_sprints_per_quarter=4
+        )
+        assert get_parent_branch_candidates("main", "feature/", fmt) == []
 
 
 @pytest.mark.parametrize(
