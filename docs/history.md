@@ -2,6 +2,21 @@
 
 <!-- latest-start -->
 
+## v5.0.84 (2026-08-01)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* ADO Branch fix for release branches by [@sdutta-thhealth](https://github.com/sdutta-thhealth) in [#257](https://github.com/jorgesolebur/CumulusCI/pull/257)
+
+## New Contributors
+* @sdutta-thhealth made their first contribution in [#257](https://github.com/jorgesolebur/CumulusCI/pull/257)
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.83...v5.0.84
+
+
+<!-- latest-stop -->
+
 ## v5.0.83 (2026-07-26)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.82...v5.0.83
 
-
-<!-- latest-stop -->
 
 ## v5.0.82 (2026-07-24)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
