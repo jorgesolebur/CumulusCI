@@ -419,14 +419,48 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
                 f"Unable to access VCS repository for {dep.url}"
             )
 
+        (
+            local_branch_prefix,
+            local_format_config,
+        ) = context.get_release_branch_prefix_and_format_config()
+        local_parent_branch_candidates = get_parent_branch_candidates(
+            context.repo_branch, local_branch_prefix, local_format_config
+        )
+
+        format_config = None
+        branch_prefix = None
+
         try:
             from cumulusci.vcs.bootstrap import get_remote_project_config
 
-            remote_project_config = get_remote_project_config(repo, context.repo_branch)
-            (
-                branch_prefix,
-                format_config,
-            ) = remote_project_config.get_release_branch_prefix_and_format_config()
+            remote_project_config = None
+            for remote_parent_branch in local_parent_branch_candidates:
+                try:
+                    remote_project_config = get_remote_project_config(
+                        repo, remote_parent_branch
+                    )
+                    (
+                        branch_prefix,
+                        format_config,
+                    ) = (
+                        remote_project_config.get_release_branch_prefix_and_format_config()
+                    )
+                    break  # use the most-specific parent config that resolves successfully
+                except Exception:
+                    remote_project_config = None
+                    context.logger.debug(
+                        f"Remote branch {remote_parent_branch} not found"
+                    )
+                    continue
+
+            if remote_project_config is None:
+                remote_project_config = get_remote_project_config(
+                    repo, repo.default_branch
+                )
+                (
+                    branch_prefix,
+                    format_config,
+                ) = remote_project_config.get_release_branch_prefix_and_format_config()
         except Exception:
             context.logger.info(
                 f"Could not find feature branch prefix or commit-status context for {repo.clone_url}. Unable to resolve packages."
@@ -436,16 +470,14 @@ class AbstractVcsReleaseBranchResolver(AbstractVcsCommitStatusPackageResolver, A
         # Use local format_config so date/sequential identifier logic matches the
         # current branch naming convention, not the remote repo's (possibly absent) config.
         if format_config is None:
-            _, format_config = context.get_release_branch_prefix_and_format_config()
+            branch_prefix, format_config = local_branch_prefix, local_format_config
 
         release_branches = []
 
         # For multi-level branches (e.g. release/001__1.1__HZCC-2075),
         # cascade through intermediate parents before the root release branch.
         # Root is excluded here because it is handled below in offset loop.
-        for candidate in get_parent_branch_candidates(
-            context.repo_branch, branch_prefix, format_config
-        )[:-1]:
+        for candidate in local_parent_branch_candidates[:-1]:
             remote_candidate = branch_prefix + candidate[len(branch_prefix) :]
             try:
                 release_branches.append(repo.branch(remote_candidate))

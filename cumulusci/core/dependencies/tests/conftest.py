@@ -418,6 +418,27 @@ def github():
                     )
                 ),
             ),
+            # release/001 branch commits — used by test_2gp_release_branch_resolver__release_prefix_child_branch
+            "release/001_sha": mock.Mock(
+                sha="release/001_sha",
+                parents=[{"sha": "release/001_parent_sha"}],
+                status=mock.Mock(return_value=mock.Mock(statuses=[])),
+            ),
+            "release/001_parent_sha": mock.Mock(
+                sha="release/001_parent_sha",
+                parents=[],
+                status=mock.Mock(
+                    return_value=mock.Mock(
+                        statuses=[
+                            mock.Mock(
+                                state="success",
+                                context="Nonstandard Package Status",
+                                description="version_id: 04t000000000007",
+                            )
+                        ]
+                    )
+                ),
+            ),
         },
     )
 

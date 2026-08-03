@@ -604,6 +604,42 @@ class TestGitHubReleaseBranchCommitStatusResolver:
             ),
         )
 
+    def test_2gp_release_branch_resolver__release_prefix_child_branch(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        """Child branch with a release/ prefix (release/001__newFeature) should resolve
+        to the parent release branch (release/001) using the new parent-candidate lookup."""
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+
+        project_config.repo_branch = "release/001__newFeature"
+        project_config.project__git__prefix_feature = "feature/"
+        project_config.project__git__prefix_release = "release/"
+
+        project_config.project__git__release_branch_format__type = "date"
+        project_config.project__git__release_branch_format__pattern = "yyyy-mm"
+        project_config.project__git__release_branch_format__prefix = ""
+        project_config.project__git__release_branch_format__max_sprints_per_quarter = 4
+
+        resolver = GitHubReleaseBranchCommitStatusResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/TwoGPRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+
+        assert resolver.resolve(dep, project_config) == (
+            "release/001_parent_sha",
+            PackageVersionIdDependency(
+                version_id="04t000000000007",
+                package_name="CumulusCI-2GP-Test",
+                source_info={
+                    "url": "https://github.com/SFDO-Tooling/TwoGPRepo",
+                    "commit": "release/001_parent_sha",
+                    "vcs": "github",
+                },
+            ),
+        )
+
     def test_commit_status_not_found(
         self, project_config, patch_github_resolvers_get_github_repo
     ):
@@ -656,7 +692,9 @@ class TestGitHubReleaseBranchCommitStatusResolver:
         setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
 
         def _side_effect(repo, ref):
-            if ref == "feature/232__test":
+            # Raise for any feature branch candidate (parent of "feature/232__test"),
+            # but allow the default branch lookup used by get_remote_context to succeed.
+            if isinstance(ref, str) and ref.startswith("feature/"):
                 raise Exception("Could not locate feature prefix for remote repo")
             return mock.Mock(lookup=mock.Mock(return_value=None))
 
