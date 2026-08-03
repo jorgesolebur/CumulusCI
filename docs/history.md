@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.85 (2026-08-03)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Resolve the branch with parent candidates by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#259](https://github.com/jorgesolebur/CumulusCI/pull/259)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.84...v5.0.85
+
+
+<!-- latest-stop -->
+
 ## v5.0.84 (2026-08-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -14,8 +27,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.83...v5.0.84
 
-
-<!-- latest-stop -->
 
 ## v5.0.83 (2026-07-26)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
