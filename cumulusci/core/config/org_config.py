@@ -244,10 +244,17 @@ class OrgConfig(BaseConfig):
         result = {
             "org_type": self._org_sobject["OrganizationType"],
             "is_sandbox": self._org_sobject["IsSandbox"],
+            "sandbox": self._org_sobject["IsSandbox"],
             "instance_name": self._org_sobject["InstanceName"],
             "namespace": self._org_sobject["NamespacePrefix"],
             "org_name": self._org_sobject["Name"],
         }
+
+        if self.instance_url and "scratch" in self.instance_url:
+            result["scratch"] = True
+            result["is_sandbox"] = False
+            result["sandbox"] = False
+
         self.config.update(result)
 
     def populate_expiration_date(self):
