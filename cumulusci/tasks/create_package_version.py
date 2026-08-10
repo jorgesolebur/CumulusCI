@@ -333,7 +333,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
 
         # get the new version number from Package2Version
         res = self.tooling.query(
-            f"SELECT MajorVersion, MinorVersion, PatchVersion, BuildNumber, SubscriberPackageVersionId FROM Package2Version WHERE Id='{self.package_version_id}'"
+            f"SELECT MajorVersion, MinorVersion, PatchVersion, BuildNumber, SubscriberPackageVersionId FROM Package2Version WHERE Id='{self.package_version_id}' AND IsDeprecated = false"
         )
         package2_version = res["records"][0]
         self.return_values["subscriber_package_version_id"] = package2_version[
@@ -683,7 +683,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         """
         package_2_version_id = ""
         res = self.tooling.query(
-            f"SELECT Id FROM Package2Version WHERE SubscriberPackageVersionId='{ancestor_id}'"
+            f"SELECT Id FROM Package2Version WHERE SubscriberPackageVersionId='{ancestor_id}' AND IsDeprecated = false"
         )
         if res["size"] > 0:
             package_2_version_id = res["records"][0]["Id"]
@@ -869,7 +869,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         self._reset_poll()
         res = self.tooling.query(
             "SELECT SubscriberPackageVersionId FROM Package2Version "
-            f"WHERE Id='{self.package_version_id}'"
+            f"WHERE Id='{self.package_version_id}' AND IsDeprecated = false"
         )
         package2_version = res["records"][0]
         return package2_version["SubscriberPackageVersionId"]
@@ -903,7 +903,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
         self._reset_poll()
         res = self.tooling.query(
             "SELECT SubscriberPackageVersionId FROM Package2Version "
-            f"WHERE Id='{self.package_version_id}'"
+            f"WHERE Id='{self.package_version_id}' AND IsDeprecated = false"
         )
         package2_version = res["records"][0]
         return package2_version["SubscriberPackageVersionId"]
