@@ -154,6 +154,9 @@ class AbstractGitHubExactMatchCommitStatusResolver(
         # Use the local context's prefix so that release/ branches are matched
         # with the release prefix, not always the feature prefix from the remote.
         try:
+            if context.repo_branch == context.project__git__default_branch:
+                return [repo.branch(context.repo_branch or "")]
+
             branch_prefix, _ = context.get_release_branch_prefix_and_format_config()
             branch = get_feature_branch_name(context.repo_branch, branch_prefix)
             release_branch = repo.branch(f"{branch_prefix}{branch}")
