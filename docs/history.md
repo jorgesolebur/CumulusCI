@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.0.86 (2026-08-10)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/default branch ado commit status by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#261](https://github.com/jorgesolebur/CumulusCI/pull/261)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.85...v5.0.86
+
+
+<!-- latest-stop -->
+
 ## v5.0.85 (2026-08-03)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.84...v5.0.85
 
-
-<!-- latest-stop -->
 
 ## v5.0.84 (2026-08-01)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
