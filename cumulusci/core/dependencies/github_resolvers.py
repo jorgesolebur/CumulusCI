@@ -8,6 +8,7 @@ from cumulusci.core.dependencies.github import (
     get_github_repo,
 )
 from cumulusci.core.dependencies.resolvers import (
+    AbstractReleaseBranchBetaTagResolver,
     AbstractReleaseTagResolver,
     AbstractTagResolver,
     AbstractUnmanagedHeadResolver,
@@ -49,6 +50,18 @@ class GitHubBetaReleaseTagResolver(GitHubReleaseTagResolver):
 
     name = "GitHub Release Resolver (Betas)"
     include_beta = True
+
+
+class GitHubReleaseBranchBetaTagResolver(AbstractReleaseBranchBetaTagResolver):
+    """Resolver that identifies latest beta release constrained by release branch line."""
+
+    name = "GitHub Release Branch Beta Resolver"
+    vcs = VCS_GITHUB
+
+    def get_repo(
+        self, context: BaseProjectConfig, url: Optional[str]
+    ) -> GitHubRepository:
+        return get_github_repo(context, url)
 
 
 class GitHubUnmanagedHeadResolver(AbstractUnmanagedHeadResolver):
@@ -230,6 +243,7 @@ GITHUB_RESOLVER_CLASSES: dict[str, type[Any]] = {
     DependencyResolutionStrategy.COMMIT_STATUS_RELEASE_BRANCH: GitHubReleaseBranchCommitStatusResolver,
     DependencyResolutionStrategy.COMMIT_STATUS_PREVIOUS_RELEASE_BRANCH: GitHubPreviousReleaseBranchCommitStatusResolver,
     DependencyResolutionStrategy.COMMIT_STATUS_DEFAULT_BRANCH: GitHubDefaultBranch2GPResolver,
+    DependencyResolutionStrategy.RELEASE_BRANCH_BETA_TAG: GitHubReleaseBranchBetaTagResolver,
     DependencyResolutionStrategy.BETA_RELEASE_TAG: GitHubBetaReleaseTagResolver,
     DependencyResolutionStrategy.RELEASE_TAG: GitHubReleaseTagResolver,
     DependencyResolutionStrategy.UNMANAGED_HEAD: GitHubUnmanagedHeadResolver,

@@ -9,6 +9,7 @@ from cumulusci.utils.git import construct_release_branch_name
 from cumulusci.utils.release_branch import (
     _reconstruct_identifier_from_groups,
     get_previous_identifier,
+    get_release_branch_version_constraint,
     get_release_identifier,
     is_valid_release_identifier,
     parse_format_config,
@@ -352,6 +353,50 @@ class TestGetReleaseIdentifier:
         assert get_release_identifier("feature/", "feature/", None) is None
         fmt = ReleaseBranchFormat(type="date", pattern="yyyy-mm")
         assert get_release_identifier("feature/", "feature/", fmt) is None
+
+
+class TestGetReleaseBranchVersionConstraint:
+    def test_release_branch_major_only(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "release/001"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) == (1, None, None)
+
+    def test_release_branch_minor(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "release/001__1"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) == (1, 1, None)
+
+    def test_release_branch_patch(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "release/001__1.1"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) == (1, 1, 1)
+
+    def test_release_branch_named_child_ignores_suffix(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "release/001__hotfix"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) == (1, None, None)
+
+    def test_release_branch_bad_identifier_returns_none(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "release/abc__1"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) is None
+
+    def test_non_release_branch_returns_none(self):
+        config = _make_project_config()
+        config.repo_info["branch"] = "main"
+        config.project__git["prefix_release"] = "release/"
+        assert get_release_branch_version_constraint(config) is None
+
+    def test_none_branch_returns_none(self):
+        config = MagicMock()
+        config.repo_branch = None
+        config.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(config) is None
 
 
 class TestGetPreviousIdentifier:

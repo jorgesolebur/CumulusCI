@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 from cumulusci.core.config import BaseProjectConfig, UniversalConfig
 from cumulusci.core.exceptions import VcsException, VcsNotFoundError
+from cumulusci.core.versions import PackageVersionNumber
 from cumulusci.utils.yaml.cumulusci_yml import cci_safe_load
 from cumulusci.vcs.base import VCSService
 from cumulusci.vcs.models import (
@@ -185,6 +186,59 @@ def find_latest_release(
             return repo.latest_release()
     except (VcsNotFoundError, StopIteration):
         pass
+
+
+def find_latest_release_matching_version(
+    repo: AbstractRepo,
+    major: int,
+    minor: Optional[int] = None,
+    patch: Optional[int] = None,
+) -> Optional[AbstractRelease]:
+    """Find latest beta release constrained to a version line.
+
+    Matching is done against parsed beta tag versions and latest is selected by
+    version tuple (major, minor, patch, build).
+    """
+    prefix_beta = getattr(repo.project_config, "project__git__prefix_beta", None)  # type: ignore
+    if not isinstance(prefix_beta, str):
+        prefix_beta = "beta/"
+    prefix_release = getattr(repo.project_config, "project__git__prefix_release", None)  # type: ignore
+    if not isinstance(prefix_release, str):
+        prefix_release = "release/"
+    best_match: Optional[AbstractRelease] = None
+    best_key: Optional[Tuple[int, int, int, int]] = None
+
+    for release in repo.releases():
+        if not release.tag_name.startswith(prefix_beta):
+            continue
+
+        try:
+            version = PackageVersionNumber.parse_tag(
+                release.tag_name, prefix_beta, prefix_release
+            )
+        except ValueError:
+            continue
+
+        if version.IsReleased:
+            continue
+        if version.MajorVersion != major:
+            continue
+        if minor is not None and version.MinorVersion != minor:
+            continue
+        if patch is not None and version.PatchVersion != patch:
+            continue
+
+        key = (
+            version.MajorVersion,
+            version.MinorVersion,
+            version.PatchVersion,
+            int(version.BuildNumber),
+        )
+        if best_key is None or key > best_key:
+            best_key = key
+            best_match = release
+
+    return best_match
 
 
 def get_latest_prerelease(repo: AbstractRepo) -> Optional[AbstractRelease]:

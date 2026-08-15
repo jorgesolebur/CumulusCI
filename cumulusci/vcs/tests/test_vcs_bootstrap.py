@@ -392,6 +392,57 @@ class TestBootstrapFunctions:
 
         assert result is None
 
+    def test_find_latest_release_matching_version_major(self, mock_repo):
+        mock_repo.project_config = Mock()
+        mock_repo.project_config.project__git__prefix_beta = "beta/"
+        mock_repo.project_config.project__git__prefix_release = "release/"
+
+        rel_2 = Mock(spec=AbstractRelease)
+        rel_2.tag_name = "beta/2.0.0.1"
+        rel_1_0 = Mock(spec=AbstractRelease)
+        rel_1_0.tag_name = "beta/1.0.0.10"
+        rel_1_2 = Mock(spec=AbstractRelease)
+        rel_1_2.tag_name = "beta/1.2.0.5"
+        mock_repo.releases.return_value = [rel_2, rel_1_0, rel_1_2]
+
+        assert (
+            bootstrap.find_latest_release_matching_version(mock_repo, major=1)
+            == rel_1_2
+        )
+
+    def test_find_latest_release_matching_version_minor(self, mock_repo):
+        mock_repo.project_config = Mock()
+        mock_repo.project_config.project__git__prefix_beta = "beta/"
+        mock_repo.project_config.project__git__prefix_release = "release/"
+
+        rel_1_0 = Mock(spec=AbstractRelease)
+        rel_1_0.tag_name = "beta/1.0.0.99"
+        rel_1_1 = Mock(spec=AbstractRelease)
+        rel_1_1.tag_name = "beta/1.1.0.3"
+        rel_1_2 = Mock(spec=AbstractRelease)
+        rel_1_2.tag_name = "beta/1.2.0.1"
+        mock_repo.releases.return_value = [rel_1_0, rel_1_1, rel_1_2]
+
+        assert (
+            bootstrap.find_latest_release_matching_version(mock_repo, major=1, minor=1)
+            == rel_1_1
+        )
+
+    def test_find_latest_release_matching_version_none(self, mock_repo):
+        mock_repo.project_config = Mock()
+        mock_repo.project_config.project__git__prefix_beta = "beta/"
+        mock_repo.project_config.project__git__prefix_release = "release/"
+
+        rel_1 = Mock(spec=AbstractRelease)
+        rel_1.tag_name = "beta/1.2.0.5"
+        rel_2 = Mock(spec=AbstractRelease)
+        rel_2.tag_name = "beta/2.0.0.1"
+        mock_repo.releases.return_value = [rel_1, rel_2]
+
+        assert (
+            bootstrap.find_latest_release_matching_version(mock_repo, major=3) is None
+        )
+
     def test_get_latest_prerelease(self, mock_repo):
         """Test getting latest prerelease"""
         mock_release = Mock(spec=AbstractRelease)
