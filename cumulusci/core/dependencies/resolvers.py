@@ -35,7 +35,10 @@ from cumulusci.utils.git import (
     get_release_identifier,
     is_release_branch_or_child,
 )
-from cumulusci.utils.release_branch import get_previous_identifier
+from cumulusci.utils.release_branch import (
+    get_previous_identifier,
+    get_release_branch_version_constraint,
+)
 from cumulusci.vcs.models import AbstractBranch, AbstractGitTag, AbstractRepo
 
 PACKAGE_TYPE_RE = re.compile(r"^package_type: (.*)$", re.MULTILINE)
@@ -94,6 +97,7 @@ class DependencyResolutionStrategy(StrEnum):
     UNLOCKED_RELEASE_BRANCH = "unlocked_release_branch"
     UNLOCKED_PREVIOUS_RELEASE_BRANCH = "unlocked_previous_release_branch"
     UNLOCKED_DEFAULT_BRANCH = "unlocked_default_branch"
+    RELEASE_BRANCH_BETA_TAG = "release_branch_beta"
     BETA_RELEASE_TAG = "latest_beta"
     RELEASE_TAG = "latest_release"
     UNMANAGED_HEAD = "unmanaged"
@@ -206,18 +210,21 @@ class AbstractReleaseTagResolver(AbstractResolver):
             and self.vcs == dep.vcs
         )
 
+    def get_release(
+        self, repo: AbstractRepo, dep: VcsDynamicDependency, context: BaseProjectConfig
+    ):
+        from cumulusci.vcs.bootstrap import find_latest_release
+
+        return find_latest_release(repo, include_beta=self.include_beta)
+
     def resolve(
         self, dep: VcsDynamicDependency, context: BaseProjectConfig
     ) -> Tuple[Optional[str], Optional[StaticDependency]]:
 
-        from cumulusci.vcs.bootstrap import (
-            find_latest_release,
-            get_remote_project_config,
-            get_tag_by_name,
-        )
+        from cumulusci.vcs.bootstrap import get_remote_project_config, get_tag_by_name
 
         repo = self.get_repo(context, dep.url)
-        release = find_latest_release(repo, include_beta=self.include_beta)
+        release = self.get_release(repo, dep, context)
         if release:
             tag = get_tag_by_name(repo, release.tag_name)
             version_id, package_type = get_package_details_from_tag(tag)
@@ -259,6 +266,29 @@ class AbstractReleaseTagResolver(AbstractResolver):
                 return (ref, package_dep)
 
         return (None, None)
+
+
+class AbstractReleaseBranchBetaTagResolver(AbstractReleaseTagResolver, ABC):
+    """Resolver that identifies latest beta tag constrained by release branch version line."""
+
+    include_beta = True
+
+    def can_resolve(self, dep: DynamicDependency, context: BaseProjectConfig) -> bool:
+        return super().can_resolve(dep, context) and (
+            get_release_branch_version_constraint(context) is not None
+        )
+
+    def get_release(
+        self, repo: AbstractRepo, dep: VcsDynamicDependency, context: BaseProjectConfig
+    ):
+        from cumulusci.vcs.bootstrap import find_latest_release_matching_version
+
+        constraint = get_release_branch_version_constraint(context)
+        if not constraint:
+            return None
+
+        major, minor, patch = constraint
+        return find_latest_release_matching_version(repo, major, minor, patch)
 
 
 class AbstractUnmanagedHeadResolver(AbstractResolver):

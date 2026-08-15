@@ -600,6 +600,42 @@ strategy:
 After this change, flows like `dev_org` will install beta releases of
 dependencies, if present.
 
+#### Resolver: `release_branch_beta`
+
+If your team maintains multiple active version lines (for example,
+`main` for next major work and `release/*` for UAT fixes), you can use
+the `release_branch_beta` resolver to constrain beta fallback to the
+current release line.
+
+Unlike `latest_beta`, which always takes the newest beta across all
+versions, `release_branch_beta` filters beta tags by the current
+`release/*` branch and then selects the highest matching version.
+
+-   `release/001` matches `1.x.x.x`
+-   `release/001__1` matches `1.1.x.x`
+-   `release/001__1.1` matches `1.1.1.x`
+-   `release/001__hotfix` matches `1.x.x.x` (non-numeric child suffixes
+    are ignored for version filtering)
+
+When the current branch is not `release/*` (for example, `main` or
+`feature/*`), this resolver is skipped so that later resolvers (such as
+`latest_beta`) can still run.
+
+To use this behavior, add `release_branch_beta` before `latest_beta` in
+a custom resolution strategy:
+
+```yaml
+project:
+    dependency_resolutions:
+        resolution_strategies:
+            include_beta_release_line:
+                - tag
+                - release_branch_beta
+                - latest_beta
+                - latest_release
+                - unmanaged
+```
+
 #### Resolution Strategy Details
 
 The standard resolution strategies execute the following steps to

@@ -22,6 +22,7 @@ from cumulusci.core.dependencies.github_resolvers import (
     GitHubDefaultBranch2GPResolver,
     GitHubExactMatch2GPResolver,
     GitHubPreviousReleaseBranchCommitStatusResolver,
+    GitHubReleaseBranchBetaTagResolver,
     GitHubReleaseBranchCommitStatusResolver,
     GitHubReleaseTagResolver,
     GitHubTagResolver,
@@ -31,6 +32,7 @@ from cumulusci.core.dependencies.resolvers import (
     AbstractVcsReleaseBranchResolver,
     DependencyResolutionStrategy,
     dependency_filter_ignore_deps,
+    get_release_branch_version_constraint,
     get_release_id,
     get_resolver,
     get_resolver_stack,
@@ -403,6 +405,78 @@ version_id: 04t000000000000""",
         assert resolver.resolve(dep, project_config) == (None, None)
 
 
+class TestGitHubReleaseBranchBetaTagResolver:
+    def test_release_branch_major_line_resolver(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+        project_config.repo_branch = "release/001"
+        project_config.project__git__prefix_release = "release/"
+        resolver = GitHubReleaseBranchBetaTagResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/ReleasesRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "tag_sha",
+            PackageNamespaceVersionDependency(
+                namespace="ccitestdep",
+                version="1.2.0.5",
+                package_name="CumulusCI-Test-Dep",
+                version_id=None,
+            ),
+        )
+
+    def test_release_branch_minor_line_resolver(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+        project_config.repo_branch = "release/001__1"
+        project_config.project__git__prefix_release = "release/"
+        resolver = GitHubReleaseBranchBetaTagResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/ReleasesRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (
+            "tag_sha",
+            PackageNamespaceVersionDependency(
+                namespace="ccitestdep",
+                version="1.1.1.3",
+                package_name="CumulusCI-Test-Dep",
+                version_id=None,
+            ),
+        )
+
+    def test_release_branch_beta_no_match_returns_none(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+        project_config.repo_branch = "release/003"
+        project_config.project__git__prefix_release = "release/"
+        resolver = GitHubReleaseBranchBetaTagResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/ReleasesRepo"
+        )
+
+        assert resolver.can_resolve(dep, project_config)
+        assert resolver.resolve(dep, project_config) == (None, None)
+
+    def test_release_branch_beta_skips_non_release_branch(
+        self, project_config, patch_github_resolvers_get_github_repo
+    ):
+        setup_github_repo_mock(patch_github_resolvers_get_github_repo, project_config)
+        project_config.repo_branch = "main"
+        project_config.project__git__prefix_release = "release/"
+        resolver = GitHubReleaseBranchBetaTagResolver()
+        dep = GitHubDynamicDependency(
+            github="https://github.com/SFDO-Tooling/ReleasesRepo"
+        )
+        assert not resolver.can_resolve(dep, project_config)
+
+
 class TestGitHubUnmanagedHeadResolver:
     def test_unmanaged_head_resolver(
         self, project_config, patch_github_resolvers_get_github_repo
@@ -526,6 +600,36 @@ class TestGitHubReleaseBranchResolver:
         )
 
         assert get_release_id(pc) == "230"
+
+    def test_release_branch_version_constraint__major_only(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "release/001"
+        pc.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(pc) == (1, None, None)
+
+    def test_release_branch_version_constraint__minor(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "release/001__1"
+        pc.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(pc) == (1, 1, None)
+
+    def test_release_branch_version_constraint__patch(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "release/001__1.1"
+        pc.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(pc) == (1, 1, 1)
+
+    def test_release_branch_version_constraint__named_child(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "release/001__hotfix"
+        pc.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(pc) == (1, None, None)
+
+    def test_release_branch_version_constraint__non_release(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.repo_info["branch"] = "main"
+        pc.project__git__prefix_release = "release/"
+        assert get_release_branch_version_constraint(pc) is None
 
     def test_locate_commit_status_package_id__not_found_with_parent(
         self, github, project_config
@@ -1097,6 +1201,13 @@ class TestResolverAccess:
                 GitHubDynamicDependency(github="https://github.com/SFDO-Tooling/Test"),
             ),
             GitHubTagResolver,
+        )
+        assert isinstance(
+            get_resolver(
+                DependencyResolutionStrategy.RELEASE_BRANCH_BETA_TAG,
+                GitHubDynamicDependency(github="https://github.com/SFDO-Tooling/Test"),
+            ),
+            GitHubReleaseBranchBetaTagResolver,
         )
 
     def test_get_resolver_stack__indirect(self):

@@ -205,6 +205,46 @@ def get_release_identifier(
     return None
 
 
+def get_release_branch_version_constraint(
+    context: "BaseProjectConfig",
+) -> Optional[Tuple[int, Optional[int], Optional[int]]]:
+    """Extract version constraint tuple from release/* branches.
+
+    Examples:
+    - release/001 -> (1, None, None)
+    - release/001__1 -> (1, 1, None)
+    - release/001__1.1 -> (1, 1, 1)
+    """
+    if not context.repo_branch:
+        return None
+
+    release_prefix = context.project__git__prefix_release or "release/"
+    if not context.repo_branch.startswith(release_prefix):
+        return None
+
+    suffix = context.repo_branch[len(release_prefix) :]
+    parts = suffix.split("__")
+    if not parts:
+        return None
+
+    release_id = parts[0]
+    if not release_id.isdigit():
+        return None
+
+    major = int(release_id)
+    minor: Optional[int] = None
+    patch: Optional[int] = None
+
+    if len(parts) > 1:
+        match = re.match(r"^(?P<minor>\d+)(?:\.(?P<patch>\d+))?$", parts[1])
+        if match:
+            minor = int(match.group("minor"))
+            if match.group("patch") is not None:
+                patch = int(match.group("patch"))
+
+    return major, minor, patch
+
+
 def get_previous_identifier(
     identifier: str,
     n: int,

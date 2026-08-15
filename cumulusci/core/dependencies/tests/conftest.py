@@ -110,6 +110,10 @@ def github():
             "unpackaged/post": {},
         },
         [
+            DummyRelease("beta/2.0.0.1", "2.0.0.1"),
+            DummyRelease("beta/1.2.0.5", "1.2.0.5"),
+            DummyRelease("beta/1.1.0.9", "1.1.0.9"),
+            DummyRelease("beta/1.1.1.3", "1.1.1.3"),
             DummyRelease("beta/2.1_Beta_1", "2.1 Beta 1"),
             DummyRelease("release/2.0", "2.0"),
             DummyRelease("release/1.0", "1.0"),
