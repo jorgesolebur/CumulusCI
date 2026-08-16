@@ -188,6 +188,12 @@ def find_latest_release(
         pass
 
 
+def _git_tag_prefix(project_config, attr: str, default: str) -> str:
+    """Return a git tag prefix from project config, falling back to default."""
+    value = getattr(project_config, attr, None) if project_config is not None else None
+    return value if isinstance(value, str) and value else default
+
+
 def find_latest_release_matching_version(
     repo: AbstractRepo,
     major: int,
@@ -199,8 +205,11 @@ def find_latest_release_matching_version(
     Matching is done against parsed beta tag versions and latest is selected by
     version tuple (major, minor, patch, build).
     """
-    prefix_beta = repo.project_config.project__git__prefix_beta  # type: ignore
-    prefix_release = repo.project_config.project__git__prefix_release  # type: ignore
+    project_config = getattr(repo, "project_config", None)
+    prefix_beta = _git_tag_prefix(project_config, "project__git__prefix_beta", "beta/")
+    prefix_release = _git_tag_prefix(
+        project_config, "project__git__prefix_release", "release/"
+    )
 
     best_match: Optional[AbstractRelease] = None
     best_key: Optional[Tuple[int, int, int, int]] = None

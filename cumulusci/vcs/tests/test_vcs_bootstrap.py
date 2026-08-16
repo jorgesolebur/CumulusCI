@@ -443,6 +443,17 @@ class TestBootstrapFunctions:
             bootstrap.find_latest_release_matching_version(mock_repo, major=3) is None
         )
 
+    def test_find_latest_release_matching_version_default_prefixes(self, mock_repo):
+        mock_repo.project_config = Mock()
+        mock_repo.project_config.project__git__prefix_beta = None
+        mock_repo.project_config.project__git__prefix_release = None
+
+        rel = Mock(spec=AbstractRelease)
+        rel.tag_name = "beta/1.2.0.5"
+        mock_repo.releases.return_value = [rel]
+
+        assert bootstrap.find_latest_release_matching_version(mock_repo, major=1) == rel
+
     def test_get_latest_prerelease(self, mock_repo):
         """Test getting latest prerelease"""
         mock_release = Mock(spec=AbstractRelease)
