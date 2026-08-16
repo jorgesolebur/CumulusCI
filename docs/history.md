@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.2.0 (2026-08-16)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/fix lists merge by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#265](https://github.com/jorgesolebur/CumulusCI/pull/265)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.1.0...v5.2.0
+
+
+<!-- latest-stop -->
+
 ## v5.1.0 (2026-08-15)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.0.86...v5.1.0
 
-
-<!-- latest-stop -->
 
 ## v5.0.86 (2026-08-10)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
