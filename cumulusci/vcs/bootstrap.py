@@ -199,12 +199,9 @@ def find_latest_release_matching_version(
     Matching is done against parsed beta tag versions and latest is selected by
     version tuple (major, minor, patch, build).
     """
-    prefix_beta = getattr(repo.project_config, "project__git__prefix_beta", None)  # type: ignore
-    if not isinstance(prefix_beta, str):
-        prefix_beta = "beta/"
-    prefix_release = getattr(repo.project_config, "project__git__prefix_release", None)  # type: ignore
-    if not isinstance(prefix_release, str):
-        prefix_release = "release/"
+    prefix_beta = repo.project_config.project__git__prefix_beta  # type: ignore
+    prefix_release = repo.project_config.project__git__prefix_release  # type: ignore
+
     best_match: Optional[AbstractRelease] = None
     best_key: Optional[Tuple[int, int, int, int]] = None
 
