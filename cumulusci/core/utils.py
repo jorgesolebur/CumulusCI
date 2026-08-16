@@ -297,6 +297,10 @@ def dictmerge(a, b, name=None):
     """Deeply merge two ``dict``s that consist of lists, dicts, and scalars.
     This function (recursively) merges ``b`` INTO ``a``, does not copy any values, and returns ``a``.
 
+    Lists from ``b`` replace lists in ``a`` so that higher-precedence config
+    layers fully override list values (for example resolution strategy order)
+    rather than concatenating them.
+
     based on https://stackoverflow.com/a/15836901/5042831
     NOTE: tuples and arbitrary objects are NOT handled and will raise TypeError"""
 
@@ -310,10 +314,9 @@ def dictmerge(a, b, name=None):
             # first run, or if ``a``` is a scalar
             a = b
         elif isinstance(a, list):
-            # lists can be only appended
             if isinstance(b, list):
-                # merge lists
-                a.extend(b)
+                # Higher-precedence list fully replaces the lower-precedence list
+                a = copy.deepcopy(b)
             else:
                 # append to list
                 a.append(b)

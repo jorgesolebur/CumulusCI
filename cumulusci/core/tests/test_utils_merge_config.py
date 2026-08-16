@@ -42,6 +42,52 @@ def test_init():
     assert config["hello"] == "christian"
 
 
+def test_list_values_are_overridden_by_higher_precedence_config():
+    """Higher-precedence config lists replace lower-precedence lists instead of concatenating."""
+    config = utils.merge_config(
+        {
+            "universal_config": {
+                "project": {
+                    "dependency_resolutions": {
+                        "resolution_strategies": {
+                            "include_beta": [
+                                "tag",
+                                "latest_beta",
+                                "latest_release",
+                                "unmanaged",
+                            ]
+                        }
+                    }
+                }
+            },
+            "global_config": {
+                "project": {
+                    "dependency_resolutions": {
+                        "resolution_strategies": {
+                            "include_beta": [
+                                "tag",
+                                "release_branch_beta",
+                                "latest_beta",
+                                "latest_release",
+                                "unmanaged",
+                            ]
+                        }
+                    }
+                }
+            },
+        }
+    )
+    assert config["project"]["dependency_resolutions"]["resolution_strategies"][
+        "include_beta"
+    ] == [
+        "tag",
+        "release_branch_beta",
+        "latest_beta",
+        "latest_release",
+        "unmanaged",
+    ]
+
+
 def test_merge_failure():
     with pytest.raises(ConfigMergeError) as e:
         utils.merge_config(
