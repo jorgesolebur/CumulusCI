@@ -154,6 +154,7 @@ def get_remote_project_config(repo: AbstractRepo, ref: str) -> BaseProjectConfig
             "universal_config": project_config.config_universal,
             "global_config": project_config.config_global,
             "project_config": project_config.config,
+            "project_local_config": project_config.config_project_local,
         }
     )
     return project_config
