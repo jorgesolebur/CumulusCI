@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.3.0 (2026-08-18)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Feature/dict merge by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#267](https://github.com/jorgesolebur/CumulusCI/pull/267)
+* Also load local project config by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#269](https://github.com/jorgesolebur/CumulusCI/pull/269)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.2.0...v5.3.0
+
+
+<!-- latest-stop -->
+
 ## v5.2.0 (2026-08-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.1.0...v5.2.0
 
-
-<!-- latest-stop -->
 
 ## v5.1.0 (2026-08-15)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
