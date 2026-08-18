@@ -1238,6 +1238,98 @@ class TestResolverAccess:
 
         assert "not found" in str(e)
 
+    def test_get_resolver_stack__override_replaces_named_stack(self):
+        """override_strategies fully replaces a named stack instead of using
+        resolution_strategies (which would be concatenated across config layers)."""
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {
+            "latest_release": [
+                "tag",
+                "release_branch_beta",
+                "latest_beta",
+                "latest_release",
+                "unmanaged",
+            ]
+        }
+
+        strategy = get_resolver_stack(pc, "latest_release")
+        assert strategy == [
+            DependencyResolutionStrategy.STATIC_TAG_REFERENCE,
+            DependencyResolutionStrategy.RELEASE_BRANCH_BETA_TAG,
+            DependencyResolutionStrategy.BETA_RELEASE_TAG,
+            DependencyResolutionStrategy.RELEASE_TAG,
+            DependencyResolutionStrategy.UNMANAGED_HEAD,
+        ]
+
+    def test_get_resolver_stack__override_after_alias(self):
+        """Aliases like production resolve first, then override_strategies is
+        looked up by the resolved stack name."""
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {
+            "latest_release": [
+                "tag",
+                "latest_beta",
+                "latest_release",
+                "unmanaged",
+            ]
+        }
+
+        strategy = get_resolver_stack(pc, "production")
+        assert strategy == [
+            DependencyResolutionStrategy.STATIC_TAG_REFERENCE,
+            DependencyResolutionStrategy.BETA_RELEASE_TAG,
+            DependencyResolutionStrategy.RELEASE_TAG,
+            DependencyResolutionStrategy.UNMANAGED_HEAD,
+        ]
+
+    def test_get_resolver_stack__override_does_not_affect_other_stacks(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {
+            "include_beta": ["tag", "unmanaged"]
+        }
+
+        include_beta = get_resolver_stack(pc, "include_beta")
+        assert include_beta == [
+            DependencyResolutionStrategy.STATIC_TAG_REFERENCE,
+            DependencyResolutionStrategy.UNMANAGED_HEAD,
+        ]
+
+        commit_status = get_resolver_stack(pc, "commit_status")
+        assert (
+            DependencyResolutionStrategy.COMMIT_STATUS_RELEASE_BRANCH in commit_status
+        )
+
+    def test_get_resolver_stack__override_custom_stack(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {
+            "custom": ["tag", "unmanaged"]
+        }
+
+        strategy = get_resolver_stack(pc, "custom")
+        assert strategy == [
+            DependencyResolutionStrategy.STATIC_TAG_REFERENCE,
+            DependencyResolutionStrategy.UNMANAGED_HEAD,
+        ]
+
+    def test_get_resolver_stack__empty_overrides_falls_back(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {}
+
+        strategy = get_resolver_stack(pc, "latest_release")
+        assert DependencyResolutionStrategy.RELEASE_TAG in strategy
+        assert DependencyResolutionStrategy.BETA_RELEASE_TAG not in strategy
+
+    def test_get_resolver_stack__reserved_config_keys_are_not_aliases(self):
+        pc = BaseProjectConfig(UniversalConfig())
+        pc.project__dependency_resolutions["override_strategies"] = {
+            "latest_release": ["tag", "unmanaged"]
+        }
+
+        with pytest.raises(CumulusCIException, match="not found"):
+            get_resolver_stack(pc, "resolution_strategies")
+        with pytest.raises(CumulusCIException, match="not found"):
+            get_resolver_stack(pc, "override_strategies")
+
 
 class TestStaticDependencyResolution:
     def test_get_static_dependencies(

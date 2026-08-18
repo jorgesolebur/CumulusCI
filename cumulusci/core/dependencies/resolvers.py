@@ -569,9 +569,16 @@ def get_resolver_stack(
     or an alias like `production`."""
     resolutions = context.project__dependency_resolutions
     stacks = context.project__dependency_resolutions__resolution_strategies
+    overrides = context.project__dependency_resolutions__override_strategies
 
-    if name in resolutions and name != "resolution_strategies":
+    if name in resolutions and name not in (
+        "resolution_strategies",
+        "override_strategies",
+    ):
         name = resolutions[name]
+
+    if overrides and name in overrides:
+        return [DependencyResolutionStrategy(n) for n in overrides[name]]
 
     if stacks and name in stacks:
         return [DependencyResolutionStrategy(n) for n in stacks[name]]

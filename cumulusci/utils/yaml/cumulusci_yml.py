@@ -166,6 +166,7 @@ class DependencyResolutions(CCIDictModel):
     production: str = None
     preproduction: str = None
     resolution_strategies: Dict[str, List[str]] = None
+    override_strategies: Dict[str, List[str]] = None
 
 
 class Project(CCIDictModel):

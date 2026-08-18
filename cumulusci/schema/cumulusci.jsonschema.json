@@ -475,6 +475,16 @@
                             "type": "string"
                         }
                     }
+                },
+                "override_strategies": {
+                    "title": "Override Strategies",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
                 }
             },
             "additionalProperties": false
