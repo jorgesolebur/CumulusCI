@@ -42,8 +42,8 @@ def test_init():
     assert config["hello"] == "christian"
 
 
-def test_list_values_are_overridden_by_higher_precedence_config():
-    """Higher-precedence config lists replace lower-precedence lists instead of concatenating."""
+def test_list_values_are_concatenated_by_higher_precedence_config():
+    """Higher-precedence config lists are concatenated with lower-precedence lists instead of overriding."""
     config = utils.merge_config(
         {
             "universal_config": {
@@ -80,6 +80,10 @@ def test_list_values_are_overridden_by_higher_precedence_config():
     assert config["project"]["dependency_resolutions"]["resolution_strategies"][
         "include_beta"
     ] == [
+        "tag",
+        "latest_beta",
+        "latest_release",
+        "unmanaged",
         "tag",
         "release_branch_beta",
         "latest_beta",
