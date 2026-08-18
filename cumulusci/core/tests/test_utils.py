@@ -95,11 +95,11 @@ class TestDictMerger:
         combo = utils.dictmerge([1, 2], 3)
         assert combo == [1, 2, 3]
 
-    def test_list_is_overridden_not_extended(self):
+    def test_list_is_extended_not_overridden(self):
         combo = utils.dictmerge([1, 2], [3, 4])
-        assert combo == [3, 4]
+        assert combo == [1, 2, 3, 4]
 
-    def test_nested_list_is_overridden_not_extended(self):
+    def test_nested_list_is_extended_not_overridden(self):
         combo = utils.dictmerge(
             {"strategies": {"include_beta": ["tag", "latest_beta"]}},
             {
@@ -109,6 +109,8 @@ class TestDictMerger:
             },
         )
         assert combo["strategies"]["include_beta"] == [
+            "tag",
+            "latest_beta",
             "tag",
             "release_branch_beta",
             "latest_beta",
