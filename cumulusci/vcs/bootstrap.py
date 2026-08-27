@@ -277,7 +277,10 @@ def locate_commit_status_package_id(
     count = 0
     commit: Optional[AbstractRepoCommit] = release_branch.commit
     while version_id is None and count < 5:
-        remote_repo.logger.debug(f"Checking commit {commit.sha} for version id")
+        logging.getLogger(__name__).debug(
+            f"Checking commit {commit.sha} for version id"
+        )
+
         version_id = get_version_id_from_commit(remote_repo, commit.sha, context_2gp)
         if version_id:
             break
