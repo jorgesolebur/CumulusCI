@@ -1412,9 +1412,9 @@ class TestCreatePackageVersionNewFeatures:
             {
                 "package_type": "Managed",
                 "package_name": "Test Package",
+                "unpackaged_metadata_path": "unpackaged/pre",
             }
         )
-        task.package_config.unpackaged_metadata_path = "unpackaged/pre"
 
         builder = BasePackageZipBuilder()
 
@@ -1428,6 +1428,8 @@ class TestCreatePackageVersionNewFeatures:
         with mock.patch.object(
             task, "_get_unpackaged_metadata_path"
         ) as mock_unpackaged, mock.patch.object(
+            task, "_get_dependencies"
+        ) as mock_get_deps, mock.patch.object(
             task, "_get_base_version_number"
         ) as mock_version, mock.patch.object(
             builder, "as_hash", return_value="testhash"
@@ -1439,23 +1441,36 @@ class TestCreatePackageVersionNewFeatures:
             mock_version.return_value.increment.return_value.format.return_value = (
                 "1.0.0.1"
             )
-            version_bytes = io.BytesIO()
-            version_info = zipfile.ZipFile(version_bytes, "w", zipfile.ZIP_DEFLATED)
-            mock_unpackaged.return_value = version_info
+            mock_get_deps.return_value = []
+
+            def fake_unpackaged(version_info, path=None):
+                version_info.writestr("unpackaged-metadata-package.zip", b"unpackaged")
+                return version_info
+
+            mock_unpackaged.side_effect = fake_unpackaged
 
             mock_tooling_obj = mock.Mock()
-            mock_tooling_obj.create.return_value = {"id": "08c000000000002AAA"}
+
+            def capture_create(request):
+                import base64
+
+                version_info_b64 = request["VersionInfo"]
+                version_info_bytes = base64.b64decode(version_info_b64)
+                version_info_zip = zipfile.ZipFile(io.BytesIO(version_info_bytes), "r")
+                # Verify unpackaged metadata zip was included in VersionInfo
+                assert "unpackaged-metadata-package.zip" in version_info_zip.namelist()
+                mock_unpackaged.assert_called_once_with(mock.ANY, "unpackaged/pre")
+                return {"id": "08c000000000002AAA"}
+
+            mock_tooling_obj.create.side_effect = capture_create
             mock_tooling.return_value = mock_tooling_obj
 
             task._create_version_request(
                 "0Ho6g000000fy4ZCAQ",
                 task.package_config,
                 builder,
-                skip_validation=True,
+                skip_validation=False,
             )
-
-            mock_unpackaged.assert_called_once_with(mock.ANY, "unpackaged/pre")
-            version_info.close()
 
     @responses.activate
     def test_apex_test_access_partial_config(self, get_task, devhub_config):
