@@ -592,7 +592,7 @@ class CreatePackageVersion(BaseSalesforceApiTask):
                 "package2-descriptor.json", json.dumps(package_descriptor)
             )
 
-            if package_config.unpackaged_metadata_path:
+            if package_config.unpackaged_metadata_path and not skip_validation:
                 self._get_unpackaged_metadata_path(
                     version_info, package_config.unpackaged_metadata_path
                 )
