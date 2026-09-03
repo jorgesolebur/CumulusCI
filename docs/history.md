@@ -2,6 +2,19 @@
 
 <!-- latest-start -->
 
+## v5.4.0 (2026-09-03)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Skip unmanaged metadata when skip validation is true by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#273](https://github.com/jorgesolebur/CumulusCI/pull/273)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.3.1...v5.4.0
+
+
+<!-- latest-stop -->
+
 ## v5.3.1 (2026-08-27)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +25,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.3.0...v5.3.1
 
-
-<!-- latest-stop -->
 
 ## v5.3.0 (2026-08-18)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
