@@ -136,6 +136,14 @@ class TestSfdmuTask:
             with open(os.path.join(subdir, "file.txt"), "w") as f:
                 f.write("subdir file")
 
+            # Create objectset_source tree (should be copied)
+            objectset_dir = os.path.join(base_dir, "objectset_source", "object-set-2")
+            os.makedirs(objectset_dir)
+            with open(os.path.join(objectset_dir, "nested.csv"), "w") as f:
+                f.write("col1,col2\nnested1,nested2")
+            with open(os.path.join(objectset_dir, "nested.txt"), "w") as f:
+                f.write("should not copy")
+
             task = create_task(
                 SfdmuTask, {"source": "dev", "target": "qa", "path": base_dir}
             )
@@ -155,6 +163,16 @@ class TestSfdmuTask:
             assert not os.path.exists(
                 os.path.join(execute_path, "subdir")
             )  # Not a file
+            assert os.path.exists(
+                os.path.join(
+                    execute_path, "objectset_source", "object-set-2", "nested.csv"
+                )
+            )
+            assert not os.path.exists(
+                os.path.join(
+                    execute_path, "objectset_source", "object-set-2", "nested.txt"
+                )
+            )
 
             # Check file contents
             with open(os.path.join(execute_path, "export.json"), "r") as f:
@@ -568,10 +586,31 @@ class TestSfdmuTask:
             with open(old_csv2, "w", encoding="utf-8") as f:
                 f.write("Id,Name\n001,Old Contact\n")
 
+            # Create existing nested CSV files under objectset_source
+            nested_target_dir = os.path.join(
+                base_dir, "objectset_source", "object-set-2"
+            )
+            os.makedirs(nested_target_dir)
+            old_nested_csv = os.path.join(nested_target_dir, "Account.csv")
+            with open(old_nested_csv, "w", encoding="utf-8") as f:
+                f.write("Id,testns__Field\n001,old\n")
+            old_nested_csv2 = os.path.join(nested_target_dir, "Identifier.csv")
+            with open(old_nested_csv2, "w", encoding="utf-8") as f:
+                f.write("Id,Name\n001,old\n")
+
             # Create new CSV file in execute directory
             new_csv = os.path.join(execute_dir, "Account.csv")
             with open(new_csv, "w", encoding="utf-8") as f:
                 f.write("Id,Name\n002,New Account\n")
+
+            # Create new nested CSV file in execute/objectset_source directory
+            execute_nested_dir = os.path.join(
+                execute_dir, "objectset_source", "object-set-2"
+            )
+            os.makedirs(execute_nested_dir)
+            new_nested_csv = os.path.join(execute_nested_dir, "Account.csv")
+            with open(new_nested_csv, "w", encoding="utf-8") as f:
+                f.write("Id,testns__Field\n002,testns__value\n")
 
             task = create_task(
                 SfdmuTask, {"source": "dev", "target": "csvfile", "path": base_dir}
@@ -589,6 +628,16 @@ class TestSfdmuTask:
 
             # Check that old CSV2 was deleted (not in execute directory)
             assert not os.path.exists(old_csv2)
+
+            # Check nested CSV was replaced and tokenized
+            with open(old_nested_csv, "r", encoding="utf-8") as f:
+                content = f.read()
+                assert "%%%MANAGED_OR_NAMESPACED_ORG%%%Field" in content
+                assert "%%%MANAGED_OR_NAMESPACED_ORG%%%value" in content
+                assert "testns__" not in content
+
+            # Check stale nested file was deleted
+            assert not os.path.exists(old_nested_csv2)
 
     def test_process_csv_exports_skips_when_no_namespace(self):
         """Test that CSV post-processing is skipped when no namespace is configured."""

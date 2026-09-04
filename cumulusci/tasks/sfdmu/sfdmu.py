@@ -130,6 +130,22 @@ class SfdmuTask(BaseSalesforceTask):
             if os.path.isfile(item_path) and item.endswith((".json", ".csv")):
                 shutil.copy2(item_path, execute_path)
 
+        # Copy objectset_source tree if present so SFDMU can use
+        # useSeparatedCSVFiles/object-set-N inputs.
+        objectset_source_path = os.path.join(base_path, "objectset_source")
+        if os.path.isdir(objectset_source_path):
+            for root, _, files in os.walk(objectset_source_path):
+                relative_root = os.path.relpath(root, base_path)
+                execute_root = os.path.join(execute_path, relative_root)
+                for file_name in files:
+                    # objectset_source folders contain per-object-set CSV sources
+                    if file_name.endswith(".csv"):
+                        os.makedirs(execute_root, exist_ok=True)
+                        shutil.copy2(
+                            os.path.join(root, file_name),
+                            os.path.join(execute_root, file_name),
+                        )
+
         return execute_path
 
     def _update_credentials(self):
@@ -267,7 +283,8 @@ class SfdmuTask(BaseSalesforceTask):
         This method performs the following operations:
         1. Replace namespace prefix with %%%MANAGED_OR_NAMESPACED_ORG%%% in CSV file contents
         2. Rename CSV files replacing namespace prefix with ___MANAGED_OR_NAMESPACED_ORG___
-        3. Copy all CSV files from execute folder to base path, replacing existing files
+        3. Copy all CSV files from execute root/objectset_source to base path,
+           preserving relative paths and replacing existing files
         """
         namespace = self.project_config.project__package__namespace
         if not namespace:
@@ -278,8 +295,21 @@ class SfdmuTask(BaseSalesforceTask):
         content_token = "%%%MANAGED_OR_NAMESPACED_ORG%%%"
         filename_token = "___MANAGED_OR_NAMESPACED_ORG___"
 
-        # Get all CSV files in execute directory
-        csv_files = [f for f in os.listdir(execute_path) if f.endswith(".csv")]
+        # Get all CSV files in execute root and objectset_source tree.
+        # We only copy back these locations to avoid unexpected directories.
+        csv_files = []
+        for root, _, files in os.walk(execute_path):
+            rel_root = os.path.relpath(root, execute_path)
+            is_root_dir = rel_root == "."
+            in_objectset_source = rel_root == "objectset_source" or rel_root.startswith(
+                f"objectset_source{os.sep}"
+            )
+            if not (is_root_dir or in_objectset_source):
+                continue
+
+            for file_name in files:
+                if file_name.endswith(".csv"):
+                    csv_files.append(os.path.join(root, file_name))
 
         if not csv_files:
             self.logger.info("No CSV files found in execute directory")
@@ -289,8 +319,9 @@ class SfdmuTask(BaseSalesforceTask):
 
         # Process each CSV file
         processed_files = []
-        for filename in csv_files:
-            file_path = os.path.join(execute_path, filename)
+        for file_path in csv_files:
+            relative_path = os.path.relpath(file_path, execute_path)
+            filename = os.path.basename(file_path)
 
             # Step 1: Replace namespace prefix in file contents
             with open(file_path, "r", encoding="utf-8") as f:
@@ -305,15 +336,18 @@ class SfdmuTask(BaseSalesforceTask):
             # Step 2: Rename file if it contains namespace prefix
             new_filename = filename.replace(namespace_prefix, filename_token)
             if new_filename != filename:
-                new_file_path = os.path.join(execute_path, new_filename)
+                new_file_path = os.path.join(os.path.dirname(file_path), new_filename)
                 os.rename(file_path, new_file_path)
                 self.logger.debug(f"Renamed file: {filename} -> {new_filename}")
                 file_path = new_file_path
-                filename = new_filename
+                relative_path = os.path.join(
+                    os.path.dirname(relative_path), new_filename
+                )
 
-            processed_files.append((file_path, filename))
+            processed_files.append((file_path, relative_path))
 
-        # Step 3: Delete all CSV files in base_path and copy processed files
+        # Step 3: Delete existing CSV files in base_path root and objectset_source,
+        # then copy processed files preserving relative paths from execute.
         self.logger.debug(f"Copying processed CSV files to {base_path}")
 
         # Remove existing CSV files in base_path
@@ -324,11 +358,23 @@ class SfdmuTask(BaseSalesforceTask):
                     os.remove(item_path)
                     self.logger.debug(f"Removed existing file: {item}")
 
+        # Remove existing CSV files under objectset_source in base_path.
+        # Do not remove anything under execute; execute is the copy source.
+        objectset_source_path = os.path.join(base_path, "objectset_source")
+        if os.path.isdir(objectset_source_path):
+            for root, _, files in os.walk(objectset_source_path):
+                for file_name in files:
+                    if file_name.endswith(".csv"):
+                        file_path = os.path.join(root, file_name)
+                        os.remove(file_path)
+                        self.logger.debug(f"Removed existing file: {file_path}")
+
         # Copy processed files to base_path
-        for file_path, filename in processed_files:
-            target_path = os.path.join(base_path, filename)
+        for file_path, relative_path in processed_files:
+            target_path = os.path.join(base_path, relative_path)
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
             shutil.copy2(file_path, target_path)
-            self.logger.debug(f"Copied {filename} to {base_path}")
+            self.logger.debug(f"Copied {relative_path} to {base_path}")
 
         self.logger.info("CSV post-processing completed successfully")
 
