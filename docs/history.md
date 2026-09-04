@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.5.0 (2026-09-04)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Fix failing tests with unmanaged metadata by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#275](https://github.com/jorgesolebur/CumulusCI/pull/275)
+* feat: Enhance SFDMU to support objectsets by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#277](https://github.com/jorgesolebur/CumulusCI/pull/277)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.4.0...v5.5.0
+
+
+<!-- latest-stop -->
+
 ## v5.4.0 (2026-09-03)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.3.1...v5.4.0
 
-
-<!-- latest-stop -->
 
 ## v5.3.1 (2026-08-27)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
