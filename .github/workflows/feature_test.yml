@@ -79,10 +79,10 @@ jobs:
               run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
               run: sf --version
-            - name: Run Pytest
-              run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
+            - name: Run Pytest Core
+              run: uv run pytest --maxfail=5 --cache-clear --cov-report=xml:coverage-core.xml --cov=cumulusci/core cumulusci/core
+            - name: Run Pytest Remainder
+              run: uv run pytest --maxfail=5 --cache-clear --cov-report=xml:coverage-remainder.xml --cov=cumulusci --ignore=cumulusci/core
 
     unit_tests_opt_deps:
         name: "Unit tests with optional dependencies: ${{ matrix.os }}-${{ matrix.python-version }}"
@@ -110,10 +110,10 @@ jobs:
               run: npm install @salesforce/cli --global
             - name: Verify Salesforce CLI
               run: sf --version
-            - name: Run Pytest
-              run: uv run pytest -v --maxfail=5 --cov-report=term-missing --cov=cumulusci
-              env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
+            - name: Run Pytest Core
+              run: uv run pytest --maxfail=5 --cache-clear --cov-report=xml:coverage-core.xml --cov=cumulusci/core cumulusci/core
+            - name: Run Pytest Remainder
+              run: uv run pytest --maxfail=5 --cache-clear --cov-report=xml:coverage-remainder.xml --cov=cumulusci --ignore=cumulusci/core
 
     robot_api:
         name: "Robot: No browser"
@@ -151,7 +151,7 @@ jobs:
                     -o suites cumulusci/robotframework/tests \
                     -o include no-browser
               env:
-                  NODE_OPTIONS: "--max-old-space-size=4096"
+                  NODE_OPTIONS: "--max-old-space-size=2098"
             - name: Delete scratch org
               if: always()
               run: |
