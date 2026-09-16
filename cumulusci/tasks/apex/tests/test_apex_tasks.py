@@ -1,4 +1,5 @@
 import http.client
+import json
 import logging
 import os
 import shutil
@@ -8,7 +9,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import responses
-from responses.matchers import query_string_matcher
+from responses.matchers import json_params_matcher, query_string_matcher
 from simple_salesforce import SalesforceGeneralError
 
 from cumulusci.core import exceptions as exc
@@ -72,7 +73,9 @@ class TestRunApexTests(MockLoggerMixin):
             self.org_config.instance_url, self.api_version
         )
 
-    def _mock_apex_class_query(self, name="TestClass_TEST", namespace=None):
+    def _mock_apex_class_query(
+        self, name="TestClass_TEST", namespace=None, records=None
+    ):
         namespace_param = "null" if namespace is None else f"%27{namespace}%27"
         url = self.base_tooling_url + "query/"
         query_string = (
@@ -80,10 +83,12 @@ class TestRunApexTests(MockLoggerMixin):
             + f"FROM+ApexClass+WHERE+NamespacePrefix+%3D+{namespace_param}"
             + "+AND+%28Name+LIKE+%27%25_TEST%27%29"
         )
+        if records is None:
+            records = [{"Id": 1, "Name": name}]
         expected_response = {
             "done": True,
-            "records": [{"Id": 1, "Name": name}],
-            "totalSize": 1,
+            "records": records,
+            "totalSize": len(records),
         }
         responses.add(
             responses.GET,
@@ -311,12 +316,76 @@ class TestRunApexTests(MockLoggerMixin):
             json=expected_response,
         )
 
-    def _mock_run_tests(self, success=True, body="JOB_ID1234567"):
+    def _mock_run_tests(
+        self,
+        success=True,
+        body="JOB_ID1234567",
+        mock_async_limits=True,
+        async_tests_remaining=500,
+    ):
         url = self.base_tooling_url + "runTestsAsynchronous"
         if success:
             responses.add(responses.POST, url, json=body)
         else:
             responses.add(responses.POST, url, status=http.client.SERVICE_UNAVAILABLE)
+        if mock_async_limits:
+            self._mock_daily_async_apex_tests(remaining=async_tests_remaining)
+
+    def _limits_url(self, version="56.0"):
+        return f"{self.org_config.instance_url}/services/data/v{version}/limits/"
+
+    def _mock_daily_async_apex_tests(
+        self, remaining=500, max_value=500, version="56.0"
+    ):
+        responses.add(
+            responses.GET,
+            self._limits_url(version),
+            json={"DailyAsyncApexTests": {"Max": max_value, "Remaining": remaining}},
+        )
+
+    def _synchronous_test_method(
+        self, class_name="TestClass_TEST", method_name="TestMethod", time=12, **extra
+    ):
+        payload = {
+            "id": "01p000000000001",
+            "methodName": method_name,
+            "name": class_name,
+            "namespace": None,
+            "seeAllData": False,
+            "time": time,
+        }
+        payload.update(extra)
+        return payload
+
+    def _mock_run_tests_synchronous(
+        self,
+        class_id="1",
+        class_name="TestClass_TEST",
+        successes=None,
+        failures=None,
+    ):
+        url = self.base_tooling_url + "runTestsSynchronous"
+        if successes is None and failures is None:
+            successes = [self._synchronous_test_method(class_name=class_name)]
+            failures = []
+        successes = successes or []
+        failures = failures or []
+        body = {
+            "apexLogId": None,
+            "codeCoverage": [],
+            "codeCoverageWarnings": [],
+            "failures": failures,
+            "numFailures": len(failures),
+            "numTestsRun": len(successes) + len(failures),
+            "successes": successes,
+            "totaltime": sum(item.get("time", 0) or 0 for item in successes + failures),
+        }
+        responses.add(
+            responses.POST,
+            url,
+            match=[json_params_matcher({"tests": [{"classId": str(class_id)}]})],
+            json=body,
+        )
 
     def _mock_get_installpkg_results(self, records=[]):
         url = self.base_tooling_url + "query/"
@@ -347,7 +416,215 @@ class TestRunApexTests(MockLoggerMixin):
         self._mock_get_installpkg_results()
         task = RunApexTests(self.project_config, self.task_config, self.org_config)
         task()
-        assert len(responses.calls) == 7
+        assert len(responses.calls) == 8
+
+    def _synchronous_task_config(self, **extra_options):
+        task_config = TaskConfig()
+        options = {
+            "junit_output": None,
+            "json_output": None,
+            "poll_interval": 1,
+            "test_name_match": "%_TEST",
+            "synchronous": True,
+        }
+        options.update(extra_options)
+        task_config.config["options"] = options
+        return task_config
+
+    def _sync_and_async_posts(self):
+        sync_posts = [
+            call
+            for call in responses.calls
+            if call.request.url.endswith("runTestsSynchronous")
+        ]
+        async_posts = [
+            call
+            for call in responses.calls
+            if call.request.url.endswith("runTestsAsynchronous")
+        ]
+        return sync_posts, async_posts
+
+    @responses.activate
+    def test_run_task__synchronous(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query()
+        self._mock_run_tests_synchronous()
+        task = RunApexTests(
+            self.project_config, self._synchronous_task_config(), self.org_config
+        )
+        task()
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert len(sync_posts) == 1
+        assert async_posts == []
+        assert task.counts["Pass"] == 1
+        assert task.counts["Fail"] == 0
+        assert task.job_id is None
+        log = self._task_log_handler.messages
+        assert "Running tests synchronously..." in log["info"]
+        assert "Running tests synchronously for class TestClass_TEST..." in log["info"]
+
+    @responses.activate
+    def test_run_task__synchronous_multi_class(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query(
+            records=[
+                {"Id": 1, "Name": "TestClass_TEST"},
+                {"Id": 2, "Name": "OtherClass_TEST"},
+            ]
+        )
+        self._mock_run_tests_synchronous(class_id=1, class_name="TestClass_TEST")
+        self._mock_run_tests_synchronous(class_id=2, class_name="OtherClass_TEST")
+        task = RunApexTests(
+            self.project_config, self._synchronous_task_config(), self.org_config
+        )
+        task()
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert len(sync_posts) == 2
+        assert async_posts == []
+        assert task.counts["Pass"] == 2
+        assert "TestClass_TEST" in task.results_by_class_name
+        assert "OtherClass_TEST" in task.results_by_class_name
+
+    @responses.activate
+    def test_run_task__synchronous_failure(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query()
+        self._mock_run_tests_synchronous(
+            successes=[],
+            failures=[
+                self._synchronous_test_method(
+                    message="Assertion Failed",
+                    stackTrace="Class.TestClass_TEST.TestMethod: line 1",
+                )
+            ],
+        )
+        task = RunApexTests(
+            self.project_config, self._synchronous_task_config(), self.org_config
+        )
+        with pytest.raises(ApexTestException):
+            task()
+        assert task.counts["Fail"] == 1
+        assert task.counts["Pass"] == 0
+
+    @responses.activate
+    def test_run_task__synchronous_retries_use_async(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query()
+        self._mock_run_tests_synchronous(
+            successes=[],
+            failures=[
+                self._synchronous_test_method(
+                    message="UNABLE_TO_LOCK_ROW",
+                    stackTrace="Class.TestClass_TEST.TestMethod: line 1",
+                )
+            ],
+        )
+        self._mock_run_tests()
+        self._mock_get_failed_test_classes()
+        self._mock_tests_complete()
+        self._mock_get_test_results()
+        task = RunApexTests(
+            self.project_config,
+            self._synchronous_task_config(retry_failures=["UNABLE_TO_LOCK_ROW"]),
+            self.org_config,
+        )
+        task()
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert len(sync_posts) == 1
+        assert len(async_posts) == 1
+        assert task.counts["Retriable"] == 1
+        assert task.counts["Fail"] == 0
+        assert task.counts["Pass"] == 1
+
+    def _async_task_config(self, **extra_options):
+        task_config = TaskConfig()
+        options = {
+            "junit_output": None,
+            "json_output": None,
+            "poll_interval": 1,
+            "test_name_match": "%_TEST",
+        }
+        options.update(extra_options)
+        task_config.config["options"] = options
+        return task_config
+
+    @responses.activate
+    def test_run_task__async_limit_overflow_runs_sync(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query(
+            records=[
+                {"Id": 1, "Name": "TestClass_TEST"},
+                {"Id": 2, "Name": "OtherClass_TEST"},
+            ]
+        )
+        self._mock_run_tests(async_tests_remaining=1)
+        self._mock_get_failed_test_classes()
+        self._mock_tests_complete()
+        self._mock_get_test_results()
+        self._mock_run_tests_synchronous(class_id=2, class_name="OtherClass_TEST")
+        task = RunApexTests(
+            self.project_config, self._async_task_config(), self.org_config
+        )
+        task()
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert len(async_posts) == 1
+        assert json.loads(async_posts[0].request.body) == {"classids": "1"}
+        assert len(sync_posts) == 1
+        assert task.counts["Pass"] == 2
+        warning_logs = self._task_log_handler.messages["warning"]
+        assert any(
+            "DailyAsyncApexTests remaining (1) is less than the number of test classes (2)"
+            in message
+            for message in warning_logs
+        )
+
+    @responses.activate
+    def test_run_task__async_limit_exhausted_runs_all_sync(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query()
+        self._mock_daily_async_apex_tests(remaining=0)
+        self._mock_run_tests_synchronous()
+        task = RunApexTests(
+            self.project_config, self._async_task_config(), self.org_config
+        )
+        task()
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert async_posts == []
+        assert len(sync_posts) == 1
+        assert task.counts["Pass"] == 1
+        warning_logs = self._task_log_handler.messages["warning"]
+        assert any(
+            "DailyAsyncApexTests remaining is 0" in message for message in warning_logs
+        )
+
+    @responses.activate
+    def test_run_task__fallback_disabled_skips_limits(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
+        self._mock_apex_class_query()
+        self._mock_run_tests(mock_async_limits=False)
+        self._mock_get_failed_test_classes()
+        self._mock_tests_complete()
+        self._mock_get_test_results()
+        task = RunApexTests(
+            self.project_config,
+            self._async_task_config(fallback_sync_on_async_limit=False),
+            self.org_config,
+        )
+        task()
+        limits_gets = [
+            call for call in responses.calls if call.request.url.endswith("/limits/")
+        ]
+        sync_posts, async_posts = self._sync_and_async_posts()
+        assert limits_gets == []
+        assert len(async_posts) == 1
+        assert sync_posts == []
 
     @responses.activate
     def test_run_task_None_methodname_fail(self):
@@ -442,6 +719,8 @@ class TestRunApexTests(MockLoggerMixin):
 
     @responses.activate
     def test_run_task__failed_class_level_no_symboltable__spring20_managed(self):
+        self._mock_api_version_discovery()
+        self._mock_get_installpkg_results()
         self._mock_apex_class_query(name="ns__Test_TEST", namespace="ns")
         self._mock_run_tests()
         self._mock_get_failed_test_classes_failure()
@@ -487,7 +766,7 @@ class TestRunApexTests(MockLoggerMixin):
         }
         task = RunApexTests(self.project_config, task_config, self.org_config)
         task()
-        assert len(responses.calls) == 11
+        assert len(responses.calls) == 12
 
     @responses.activate
     def test_run_task__retry_tests_with_retry_always(self):
@@ -633,7 +912,8 @@ class TestRunApexTests(MockLoggerMixin):
         self._mock_get_test_results()
         task_config = TaskConfig()
         task_config.config["options"] = {
-            "junit_output": "results_junit.xml",
+            "junit_output": None,
+            "json_output": None,
             "poll_interval": 1,
             "test_name_match": "%_TEST",
             "required_org_code_coverage_percent": "90",
@@ -648,6 +928,7 @@ class TestRunApexTests(MockLoggerMixin):
             "test",
         )
         org_config._installed_packages = {"TEST": StrictVersion("1.2.3")}
+        org_config._latest_api_version = "38.0"
         task = RunApexTests(self.project_config, task_config, org_config)
         task._check_code_coverage = Mock()
         task()
@@ -718,7 +999,8 @@ class TestRunApexTests(MockLoggerMixin):
         self._mock_get_test_results()
         task_config = TaskConfig()
         task_config.config["options"] = {
-            "junit_output": "results_junit.xml",
+            "junit_output": None,
+            "json_output": None,
             "poll_interval": 1,
             "test_name_match": "%_TEST",
             "namespace": "TEST",
@@ -733,6 +1015,7 @@ class TestRunApexTests(MockLoggerMixin):
             "test",
         )
         org_config._installed_packages = {"TEST": StrictVersion("1.2.3")}
+        org_config._latest_api_version = "38.0"
 
         task = RunApexTests(self.project_config, task_config, org_config)
         task._check_code_coverage = Mock()

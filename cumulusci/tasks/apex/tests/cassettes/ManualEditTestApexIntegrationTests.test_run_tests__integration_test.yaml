@@ -28,6 +28,23 @@ interactions:
               code: 200
               message: OK
     - request:
+          body: null
+          headers:
+              Request-Headers:
+                  - Elided
+          method: GET
+          uri: https://orgname.my.salesforce.com/services/data/vxx.0/limits/
+      response:
+          body:
+              string: '{"DailyAsyncApexTests": {"Max": 500, "Remaining": 500}}'
+          headers:
+              Content-Type:
+                  - application/json;charset=UTF-8
+              Others: Elided
+          status:
+              code: 200
+              message: OK
+    - request:
           body: '{"classids": "01p1700000PXJMTAA5,01p1700000PXJMRAA5,01p1700000PXUjaAAH"}'
           headers:
               Request-Headers:
@@ -419,6 +436,23 @@ interactions:
                   : \"/services/data/vxx.0/tooling/sobjects/ApexClass/01p1700000PXUjaAAH\"\n
                   \   },\n    \"Id\" : \"01p1700000PXUjaAAH\",\n    \"Name\" : \"SampleClass2_TEST\"\n
                   \ } ]\n}"
+          headers:
+              Content-Type:
+                  - application/json;charset=UTF-8
+              Others: Elided
+          status:
+              code: 200
+              message: OK
+    - request:
+          body: null
+          headers:
+              Request-Headers:
+                  - Elided
+          method: GET
+          uri: https://orgname.my.salesforce.com/services/data/vxx.0/limits/
+      response:
+          body:
+              string: '{"DailyAsyncApexTests": {"Max": 500, "Remaining": 500}}'
           headers:
               Content-Type:
                   - application/json;charset=UTF-8
