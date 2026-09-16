@@ -7,6 +7,8 @@ import os
 import re
 from typing import Dict, List, Optional
 
+from simple_salesforce import SalesforceGeneralError
+
 from cumulusci.core.config import TaskConfig
 from cumulusci.core.exceptions import (
     ApexTestException,
@@ -24,6 +26,10 @@ from cumulusci.utils.options import (
     PercentageOption,
 )
 from cumulusci.vcs.utils.list_modified_files import ListModifiedFiles
+
+# DailyAsyncApexTests is available on GET /limits from API 56.0.
+# https://developer.salesforce.com/docs/platform/api-rest/guide/resources-limits.html
+DAILY_ASYNC_APEX_TESTS_MIN_API = 56.0
 
 APEX_LIMITS = {
     "Soql": {
@@ -159,7 +165,15 @@ class RunApexTests(BaseSalesforceApiTask):
 
     Some projects' unit tests produce so many concurrency errors that
     it's faster to execute the entire run in serial mode than to use retries.
-    Serial and parallel mode are configured in the scratch org definition file."""
+    Serial and parallel mode are configured in the scratch org definition file.
+
+    Set ``synchronous`` to True to execute tests with runTestsSynchronous
+    instead of runTestsAsynchronous. Each class is posted separately.
+    Failed-test retries still use runTestsAsynchronous.
+
+    When running asynchronously, ``fallback_sync_on_async_limit`` (default True)
+    reads DailyAsyncApexTests Remaining from GET /limits. Classes that do not
+    fit in Remaining are executed synchronously after the async job completes."""
 
     api_version = "38.0"
     name = "RunApexTests"
@@ -253,6 +267,35 @@ class RunApexTests(BaseSalesforceApiTask):
             None,
             description="Git reference (branch, tag, or commit) to compare against for delta changes. "
             "If not set, uses the default branch of the repository. Only used when dynamic_filter is 'delta_changes'.",
+        )
+        synchronous: bool = Field(
+            False,
+            description=(
+                "If True, run Apex tests via the Tooling API runTestsSynchronous "
+                "resource instead of runTestsAsynchronous. Each test class is "
+                "executed in its own POST because Salesforce allows only one class "
+                "per synchronous request. Results are returned in the response, so "
+                "the task does not poll ApexTestQueueItem. Retries always use "
+                "runTestsAsynchronous. Defaults to False. Synchronous runs use "
+                "stricter governor limits and may time out for large classes. "
+                "In API 40.0 and later, runTestsSynchronous requires the View Setup "
+                "user permission. See "
+                "https://developer.salesforce.com/docs/atlas.en-us.api_tooling.meta/api_tooling/intro_rest_resources_testing_runner_sync.htm"
+            ),
+        )
+        fallback_sync_on_async_limit: bool = Field(
+            True,
+            description=(
+                "When running asynchronously, compare the number of test classes "
+                "to DailyAsyncApexTests Remaining from GET /limits. If Remaining "
+                "is lower, enqueue that many classes via runTestsAsynchronous and "
+                "run the overflow via runTestsSynchronous, after warning. If "
+                "Remaining is 0, run every class synchronously. Ignored when "
+                "synchronous is True. Defaults to True. See "
+                "https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm "
+                "and "
+                "https://developer.salesforce.com/docs/platform/api-rest/guide/resources-limits.html"
+            ),
         )
 
     parsed_options: Options
@@ -693,23 +736,6 @@ class RunApexTests(BaseSalesforceApiTask):
                     }
                     self.counts["Fail"] += 1
 
-        if allow_retries:
-            for class_name, results in self.results_by_class_name.items():
-                for test_result in results.values():
-                    # Determine whether this failure is retriable.
-                    if test_result["Outcome"] == "Fail" and allow_retries:
-                        can_retry_this_failure = self._is_retriable_failure(test_result)
-                        if can_retry_this_failure:
-                            self.counts["Retriable"] += 1
-
-                        # Even if this failure is not retriable per se,
-                        # persist its details if we might end up retrying
-                        # all failures.
-                        if self.parsed_options.retry_always or can_retry_this_failure:
-                            self.retry_details.setdefault(
-                                test_result["ApexClassId"], []
-                            ).append(test_result["MethodName"])
-
     def _process_test_results(self):
         test_results = []
         class_names = list(self.results_by_class_name.keys())
@@ -809,7 +835,30 @@ class RunApexTests(BaseSalesforceApiTask):
 
         return stats
 
+    def _collect_retry_details(self):
+        """Populate retry_details from recorded Fail outcomes."""
+        self.retry_details = {}
+        for results in self.results_by_class_name.values():
+            for test_result in results.values():
+                if test_result["Outcome"] != "Fail":
+                    continue
+                can_retry_this_failure = self._is_retriable_failure(test_result)
+                if can_retry_this_failure:
+                    self.counts["Retriable"] += 1
+
+                # Even if this failure is not retriable per se,
+                # persist its details if we might end up retrying
+                # all failures.
+                if self.parsed_options.retry_always or can_retry_this_failure:
+                    self.retry_details.setdefault(
+                        test_result["ApexClassId"], []
+                    ).append(test_result["MethodName"])
+
     def _enqueue_test_run(self, class_ids):
+        """Enqueue tests via runTestsAsynchronous and return the AsyncApexJob ID.
+
+        Retries always use this path, even when the original run was synchronous.
+        """
         if isinstance(class_ids, dict):
             body = {
                 "tests": [
@@ -823,10 +872,150 @@ class RunApexTests(BaseSalesforceApiTask):
         return safe_json_from_response(
             self.tooling._call_salesforce(
                 method="POST",
-                url=self.tooling.base_url + "runTestsAsynchronous",
+                url=f"{self.tooling.base_url}runTestsAsynchronous",
                 json=body,
             )
         )
+
+    def _run_tests_asynchronously(self, class_ids):
+        """Enqueue the given classes via runTestsAsynchronous, then wait and load results."""
+        self.logger.info("Queuing tests for execution...")
+        self.job_id = self._enqueue_test_run((str(class_id) for class_id in class_ids))
+        self._wait_for_tests()
+        self._get_test_results()
+
+    def _run_tests_synchronously(self, class_ids=None):
+        """Run each test class via runTestsSynchronous and ingest the response.
+
+        Salesforce allows only one class per synchronous POST, so classes are
+        executed sequentially. See
+        https://developer.salesforce.com/docs/atlas.en-us.api_tooling.meta/api_tooling/intro_rest_resources_testing_runner_sync.htm
+        """
+        if class_ids is None:
+            class_ids = list(self.classes_by_id.keys())
+        for class_id in class_ids:
+            class_name = self.classes_by_id[class_id]
+            self.logger.info(f"Running tests synchronously for class {class_name}...")
+            body = {"tests": [{"classId": str(class_id)}]}
+            response = safe_json_from_response(
+                self.tooling._call_salesforce(
+                    method="POST",
+                    url=f"{self.tooling.base_url}runTestsSynchronous",
+                    json=body,
+                )
+            )
+            self._ingest_synchronous_response(class_id, class_name, response)
+            self.logger.info(
+                "Synchronous run complete for {}: {} tests, {} failures ({}ms)".format(
+                    class_name,
+                    response.get("numTestsRun", 0),
+                    response.get("numFailures", 0),
+                    response.get("totaltime", 0),
+                )
+            )
+
+    def _get_limits_api_version(self):
+        """API version for GET /limits. DailyAsyncApexTests requires 56.0 or later."""
+        try:
+            latest = float(self.org_config.latest_api_version)
+        except (TypeError, ValueError):
+            latest = DAILY_ASYNC_APEX_TESTS_MIN_API
+        return f"{max(latest, DAILY_ASYNC_APEX_TESTS_MIN_API):.1f}"
+
+    def _get_daily_async_apex_tests_remaining(self):
+        """Return DailyAsyncApexTests Remaining, or None if it cannot be read."""
+        version = self._get_limits_api_version()
+        url = f"{self.org_config.instance_url}/services/data/v{version}/limits/"
+        try:
+            payload = safe_json_from_response(
+                self.sf._call_salesforce(method="GET", url=url)
+            )
+        except (SalesforceGeneralError, CumulusCIException) as exc:
+            self.logger.warning(
+                "Unable to read org limits from %s (%s). "
+                "Running all tests asynchronously.",
+                url,
+                exc,
+            )
+            return None
+
+        limit_info = payload.get("DailyAsyncApexTests") if payload else None
+        if not isinstance(limit_info, dict) or "Remaining" not in limit_info:
+            self.logger.warning(
+                "DailyAsyncApexTests was not present in the org limits response. "
+                "Running all tests asynchronously. See "
+                "https://developer.salesforce.com/docs/platform/api-rest/guide/resources-limits.html"
+            )
+            return None
+
+        remaining = limit_info["Remaining"]
+        self.logger.info(
+            "DailyAsyncApexTests: {} remaining of {}.".format(
+                remaining, limit_info.get("Max")
+            )
+        )
+        return remaining
+
+    def _split_classes_for_async_limit(self, class_ids, remaining):
+        """Split class ids into async and sync overflow lists.
+
+        Warns when Remaining cannot cover every class. A None remaining value
+        means the limit could not be read, so all classes stay asynchronous.
+        """
+        total = len(class_ids)
+        if remaining is None:
+            return class_ids, []
+        if remaining <= 0:
+            self.logger.warning(
+                "DailyAsyncApexTests remaining is {}. Running all {} test "
+                "class(es) synchronously. See "
+                "https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm".format(
+                    remaining, total
+                )
+            )
+            return [], class_ids
+        if remaining >= total:
+            return class_ids, []
+
+        async_ids = class_ids[:remaining]
+        sync_ids = class_ids[remaining:]
+        self.logger.warning(
+            "DailyAsyncApexTests remaining ({}) is less than the number of "
+            "test classes ({}). Enqueueing {} class(es) asynchronously, then "
+            "running {} class(es) synchronously. See "
+            "https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm".format(
+                remaining, total, len(async_ids), len(sync_ids)
+            )
+        )
+        return async_ids, sync_ids
+
+    def _ingest_synchronous_response(self, class_id, class_name, response):
+        """Map a runTestsSynchronous payload onto the ApexTestResult-like model."""
+        for success in response.get("successes") or []:
+            method_name = success.get("methodName")
+            self.results_by_class_name[class_name][method_name] = {
+                "ApexClassId": class_id,
+                "MethodName": method_name,
+                "Outcome": "Pass",
+                "Message": None,
+                "StackTrace": None,
+                "RunTime": success.get("time"),
+                "TestTimestamp": None,
+            }
+            self.counts["Pass"] += 1
+
+        for failure in response.get("failures") or []:
+            method_name = failure.get("methodName")
+            self.results_by_class_name[class_name][method_name] = {
+                "ApexClassId": class_id,
+                "MethodName": method_name,
+                "Outcome": "Fail",
+                "Message": failure.get("message"),
+                "StackTrace": failure.get("stackTrace") or "",
+                "RunTime": failure.get("time"),
+                "TestTimestamp": None,
+            }
+            self.counts["Fail"] += 1
 
     def _init_task(self):
         super()._init_task()
@@ -848,7 +1037,6 @@ class RunApexTests(BaseSalesforceApiTask):
             self.classes_by_id[test_class["Id"]] = test_class["Name"]
             self.classes_by_name[test_class["Name"]] = test_class["Id"]
             self.results_by_class_name[test_class["Name"]] = {}
-        self.logger.info("Queuing tests for execution...")
 
         self.counts = {
             "Pass": 0,
@@ -857,12 +1045,28 @@ class RunApexTests(BaseSalesforceApiTask):
             "Skip": 0,
             "Retriable": 0,
         }
-        self.job_id = self._enqueue_test_run(
-            (str(id) for id in self.classes_by_id.keys())
-        )
+        class_ids = list(self.classes_by_id.keys())
+        if self.parsed_options.synchronous:
+            self.logger.info("Running tests synchronously...")
+            self._run_tests_synchronously(class_ids)
+        elif self.parsed_options.fallback_sync_on_async_limit:
+            remaining = self._get_daily_async_apex_tests_remaining()
+            async_ids, sync_ids = self._split_classes_for_async_limit(
+                class_ids, remaining
+            )
+            if async_ids:
+                self._run_tests_asynchronously(async_ids)
+            if sync_ids:
+                self.logger.info(
+                    "Running {} overflow test class(es) synchronously...".format(
+                        len(sync_ids)
+                    )
+                )
+                self._run_tests_synchronously(sync_ids)
+        else:
+            self._run_tests_asynchronously(class_ids)
 
-        self._wait_for_tests()
-        self._get_test_results()
+        self._collect_retry_details()
 
         # Did we get back retriable test results? Check our retry policy,
         # then enqueue new runs individually, until either (a) all retriable

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `run_tests` task executes Apex unit tests using the Salesforce Tooling API and provides comprehensive reporting of test results. This task supports advanced features including test retries for transient failures, dynamic test filtering, code coverage validation, and multiple output formats.
+The `run_tests` task executes Apex unit tests using the Salesforce Tooling API and provides comprehensive reporting of test results. This task supports advanced features including test retries for transient failures, dynamic test filtering, code coverage validation, multiple output formats, synchronous or asynchronous execution, and automatic fallback to synchronous runs when the org's daily async test-class limit is too low.
 
 ## Task Name
 
@@ -171,10 +171,30 @@ cci task run run_tests
 #### `poll_interval`
 - **Type**: `int`
 - **Default**: `1`
-- **Description**: Seconds to wait between polling for Apex test results.
+- **Description**: Seconds to wait between polling for Apex test results. Only used for asynchronous runs.
 - **Example**:
   ```bash
   cci task run run_tests --poll_interval 2
+  ```
+
+### Execution Mode Options
+
+#### `synchronous`
+- **Type**: `bool`
+- **Default**: `False`
+- **Description**: If `True`, run Apex tests with the Tooling API [`runTestsSynchronous`](https://developer.salesforce.com/docs/atlas.en-us.api_tooling.meta/api_tooling/intro_rest_resources_testing_runner_sync.htm) resource instead of [`runTestsAsynchronous`](https://developer.salesforce.com/docs/atlas.en-us.api_tooling.meta/api_tooling/intro_rest_resources_testing_runner_async.htm). Salesforce allows only one class per synchronous POST, so the task runs each class sequentially and maps `successes` / `failures` from the response (no `ApexTestQueueItem` polling). Retries always use `runTestsAsynchronous`. Synchronous runs use stricter governor limits and may time out on large classes. In API 40.0 and later, `runTestsSynchronous` requires the View Setup user permission.
+- **Example**:
+  ```bash
+  cci task run run_tests --synchronous True
+  ```
+
+#### `fallback_sync_on_async_limit`
+- **Type**: `bool`
+- **Default**: `True`
+- **Description**: When running asynchronously, compare the number of selected test classes to `DailyAsyncApexTests` Remaining from [GET /limits](https://developer.salesforce.com/docs/platform/api-rest/guide/resources-limits.html). If Remaining is lower, the task warns, enqueues as many classes as Remaining allows via `runTestsAsynchronous`, waits for that job, then runs the overflow classes via `runTestsSynchronous`. If Remaining is `0`, every class runs synchronously. Ignored when `synchronous` is `True`. This protects against the [maximum number of test classes that can be queued per 24-hour period](https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_gov_limits.htm).
+- **Example**:
+  ```bash
+  cci task run run_tests --fallback_sync_on_async_limit False
   ```
 
 ## Dynamic Filter Behavior
@@ -296,6 +316,29 @@ cci task run run_tests \
   --retry_always True
 ```
 
+## Execution Modes
+
+### Asynchronous (default)
+
+By default the task POSTs all selected class IDs to `runTestsAsynchronous`, polls `ApexTestQueueItem` until the job finishes, then queries `ApexTestResult`.
+
+### Synchronous
+
+Set `synchronous: True` to POST each class to `runTestsSynchronous` and ingest results from the HTTP response. Use this for small suites, debugging, or orgs that cannot queue more async tests. Failed-test retries still use `runTestsAsynchronous`.
+
+### Async limit fallback (default)
+
+Salesforce limits how many test classes can be queued asynchronously per 24-hour period (the greater of 500 or 10×/20× the number of test classes in the org). The REST Limits resource exposes that allocation as `DailyAsyncApexTests`.
+
+When `fallback_sync_on_async_limit` is `True` (the default) and `synchronous` is `False`:
+
+1. The task reads `DailyAsyncApexTests` Remaining from `GET /services/data/vXX.X/limits/` (API 56.0 or later).
+2. If Remaining covers every selected class, the run stays fully asynchronous.
+3. If Remaining is lower than the class count, the task logs a warning, enqueues `Remaining` classes asynchronously, waits for that job, then runs the overflow classes synchronously (one class per POST).
+4. If Remaining is `0`, the task logs a warning and runs every class synchronously.
+
+Set `fallback_sync_on_async_limit` to `False` to skip the limits check and enqueue every class asynchronously (Salesforce may reject the overflow).
+
 ## Output Formats
 
 ### JUnit XML Output
@@ -403,6 +446,16 @@ cci task run run_tests \
   --json_output custom_json.json
 ```
 
+### Run Tests Synchronously
+```bash
+cci task run run_tests --synchronous True
+```
+
+### Disable Async Limit Fallback
+```bash
+cci task run run_tests --fallback_sync_on_async_limit False
+```
+
 ### Complete Example
 ```bash
 cci task run run_tests \
@@ -435,6 +488,10 @@ The task will continue to completion and generate output files even if tests fai
 
 4. **Code Coverage**: Code coverage validation is skipped if the namespace is installed as a managed package in the org.
 
+5. **Synchronous runs**: Each class is a separate HTTP request with synchronous Apex governor limits. Large classes can time out. API 40.0+ requires View Setup.
+
+6. **Daily async test-class limit**: Production orgs (other than Developer Edition) can queue the greater of 500 or 10× the number of test classes per 24 hours. Sandbox and Developer Edition orgs use 20×. `fallback_sync_on_async_limit` (default `True`) overflows to synchronous execution instead of failing the enqueue. The limits resource is accurate within about five minutes of usage.
+
 ## Best Practices
 
 1. **Use `delta_changes` in CI/CD**: Significantly reduces test execution time by running only affected tests
@@ -442,4 +499,6 @@ The task will continue to completion and generate output files even if tests fai
 3. **Set code coverage thresholds**: Enforce minimum coverage requirements to maintain code quality
 4. **Use test suites**: Organize tests into suites for different testing scenarios (smoke, regression, etc.)
 5. **Monitor test statistics**: Review the JSON output to identify tests that are approaching governor limits
+6. **Leave async limit fallback on in CI**: Production and long-lived sandboxes can exhaust `DailyAsyncApexTests`; the default overflow to sync keeps the suite running
+7. **Use `synchronous` only for small suites**: Sync governor limits and HTTP timeouts make it a poor default for a full package test run
 
