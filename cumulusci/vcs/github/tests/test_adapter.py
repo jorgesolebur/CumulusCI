@@ -136,3 +136,31 @@ class TestAdapter(GithubApiTestMixin):
 
         assert isinstance(tag, GitHubTag)
         assert tag.sha == "SHA"
+
+    @responses.activate
+    def test_delete_tag_success(self, repo):
+        tag_ref_url = (
+            "https://api.github.com/repos/TestOwner/TestRepo/git/refs/tags/v1.0.0"
+        )
+        tag_ref = self._get_expected_tag_ref("v1.0.0", "tag_SHA")
+        tag_ref["url"] = tag_ref_url
+        responses.add(
+            "GET",
+            "https://api.github.com/repos/TestOwner/TestRepo/git/ref/tags/v1.0.0",
+            json=tag_ref,
+            status=200,
+        )
+        responses.add("DELETE", tag_ref_url, status=204)
+
+        repo.delete_tag("v1.0.0")
+        assert responses.calls[-1].request.method == "DELETE"
+
+    @responses.activate
+    def test_delete_tag__404(self, repo):
+        responses.add(
+            "GET",
+            "https://api.github.com/repos/TestOwner/TestRepo/git/ref/tags/v1.0.0",
+            status=404,
+        )
+        with pytest.raises(GithubApiNotFoundError):
+            repo.delete_tag("v1.0.0")

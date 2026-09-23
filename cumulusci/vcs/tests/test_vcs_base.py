@@ -90,6 +90,9 @@ class MockRepo(AbstractRepo):
     ):
         pass
 
+    def delete_tag(self, tag_name: str):
+        pass
+
     def get_ref_for_tag(self, tag_name: str):
         pass
 

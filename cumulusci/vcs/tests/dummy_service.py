@@ -97,6 +97,9 @@ class DummyRepo(AbstractRepo):
     ) -> "AbstractGitTag":
         return DummyTag(tag_name)
 
+    def delete_tag(self, tag_name: str) -> None:
+        pass
+
     def get_ref_for_tag(self, tag_name: str) -> "AbstractRef":
         return DummyRef(f"ref-{tag_name}")
 

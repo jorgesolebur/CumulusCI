@@ -84,6 +84,13 @@ class AbstractRepo(ABC):
         raise NotImplementedError("Subclasses should provide their own implementation")
 
     @abstractmethod
+    def delete_tag(self, tag_name: str) -> None:
+        """Delete the git tag with the given name.
+        This method should be overridden by subclasses to provide
+        the specific implementation for deleting a Git Tag."""
+        raise NotImplementedError("Subclasses should provide their own implementation")
+
+    @abstractmethod
     def branch(self, branch_name: str) -> "AbstractBranch":
         """Gets a Reference object for the branch with the given name.
         This method should be overridden by subclasses to provide
@@ -361,6 +368,18 @@ class AbstractRelease(ABC):
     def updateable(self) -> bool:
         """Checks if the release is updateable."""
         return False
+
+    def edit(
+        self,
+        tag_name: str = None,
+        target_commitish: str = None,
+        name: str = None,
+        body: str = None,
+        draft: bool = None,
+        prerelease: bool = None,
+    ) -> "AbstractRelease":
+        """Update an existing release. Providers that recreate via create_release may no-op."""
+        return self
 
 
 class AbstractRef(ABC):
