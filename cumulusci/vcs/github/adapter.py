@@ -198,6 +198,27 @@ class GitHubRelease(AbstractRelease):
         """Gets the tag reference name of the release."""
         return "tags/" + self.tag_name
 
+    def edit(
+        self,
+        tag_name: str = None,
+        target_commitish: str = None,
+        name: str = None,
+        body: str = None,
+        draft: bool = None,
+        prerelease: bool = None,
+    ) -> "GitHubRelease":
+        """Update an existing GitHub release so it tracks a moved tag."""
+        if self.release:
+            self.release.edit(
+                tag_name=tag_name,
+                target_commitish=target_commitish,
+                name=name,
+                body=body,
+                draft=draft,
+                prerelease=prerelease,
+            )
+        return self
+
 
 class GitHubPullRequest(AbstractPullRequest):
     """GitHub pull request object for creating and managing pull requests."""
@@ -386,6 +407,12 @@ class GitHubRepository(AbstractRepo):
             lightweight=lightweight,
         )
         return GitHubTag(tag=tag)
+
+    @catch_common_github_auth_errors
+    def delete_tag(self, tag_name: str) -> None:
+        """Delete the git tag with the given name."""
+        git_ref = self.get_ref_for_tag(tag_name)
+        git_ref.ref.delete()
 
     def branch(self, branch_name) -> GitHubBranch:
         # Fetches a branch from the given repository
