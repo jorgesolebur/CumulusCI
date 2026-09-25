@@ -2,6 +2,20 @@
 
 <!-- latest-start -->
 
+## v5.6.1 (2026-09-25)
+<!-- Release notes generated using configuration in .github/release.yml at main -->
+
+## What's Changed
+### Changes
+* Add delete / update tag options by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#281](https://github.com/jorgesolebur/CumulusCI/pull/281)
+* Triggering patch build by [@rupeshjSFDC](https://github.com/rupeshjSFDC) in [#283](https://github.com/jorgesolebur/CumulusCI/pull/283)
+
+
+**Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.6.0...v5.6.1
+
+
+<!-- latest-stop -->
+
 ## v5.6.0 (2026-09-16)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
@@ -12,8 +26,6 @@
 
 **Full Changelog**: https://github.com/jorgesolebur/CumulusCI/compare/v5.5.0...v5.6.0
 
-
-<!-- latest-stop -->
 
 ## v5.5.0 (2026-09-04)
 <!-- Release notes generated using configuration in .github/release.yml at main -->
