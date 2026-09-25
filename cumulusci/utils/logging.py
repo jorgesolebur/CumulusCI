@@ -8,7 +8,6 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-
 @contextlib.contextmanager
 def tee_stdout_stderr(args, logger, tempfile):
     """Tee stdout and stderr so that they're also routed to
