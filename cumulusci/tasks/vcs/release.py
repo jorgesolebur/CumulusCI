@@ -19,6 +19,13 @@ class CreateRelease(BaseSourceControlTask):
             "description": "The SubscriberPackageVersionId (04t) associated with this release.",
             "required": False,
         },
+        "ancestor_id": {
+            "description": (
+                "The ancestor SubscriberPackageVersionId (04t) to record in the tag message. "
+                "Written before package_type. An empty value is recorded as a blank ancestor_id."
+            ),
+            "required": False,
+        },
         "message": {"description": "The message to attach to the created git tag"},
         "release_content": {
             "description": "The content to include as the release body. Note: vcs_release_notes will overwrite this content, if used."
@@ -69,6 +76,9 @@ class CreateRelease(BaseSourceControlTask):
         message = self.options.get("message", "Release of version {}".format(version))
         if self.options.get("version_id"):
             message += f"\n\nversion_id: {self.options['version_id']}"
+        if "ancestor_id" in self.options:
+            ancestor_id = self.options.get("ancestor_id") or ""
+            message += f"\n\nancestor_id: {ancestor_id}"
         if self.options.get("package_type"):
             message += f"\n\npackage_type: {self.options['package_type']}"
         dependencies = get_static_dependencies(

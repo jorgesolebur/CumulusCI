@@ -90,6 +90,7 @@ class TestCreateRelease(GithubApiTestMixin):
                     "options": {
                         "version": "1.0",
                         "version_id": "04t000000000000",
+                        "ancestor_id": "04tancestor00001",
                         "dependencies": [{"namespace": "foo", "version": "1.0"}],
                         "release_content": "foo release",
                         "package_type": "1GP",
@@ -106,11 +107,80 @@ class TestCreateRelease(GithubApiTestMixin):
         } == task.return_values
         # confirm the package_type was recorded in the tag message
         tag_request = json.loads(responses.calls._calls[4].request.body)
-        assert "package_type: 1GP" in tag_request["message"]
+        message = tag_request["message"]
+        assert message.index("version_id: 04t000000000000") < message.index(
+            "ancestor_id: 04tancestor00001"
+        )
+        assert message.index("ancestor_id: 04tancestor00001") < message.index(
+            "package_type: 1GP"
+        )
         # confirm we didn't create a prerelease
         release_request = json.loads(responses.calls._calls[-1].request.body)
         assert not release_request["prerelease"]
         assert release_request["body"] == "foo release"
+
+    @responses.activate
+    def test_run_task__blank_ancestor_id(self):
+        responses.add(
+            method=responses.GET,
+            url=self.repo_api_url,
+            json=self._get_expected_repo(owner=self.repo_owner, name=self.repo_name),
+        )
+        responses.add(
+            method=responses.GET,
+            url=self.repo_api_url + "/releases/tags/release/1.0",
+            status=404,
+        )
+        responses.add(
+            method=responses.GET,
+            url=self.repo_api_url + "/git/ref/tags/release/1.0",
+            status=404,
+        )
+        responses.add(
+            method=responses.GET,
+            url=self.repo_api_url + f"/commits/{DUMMY_SHA}",
+            json=self._get_expected_commit(DUMMY_SHA),
+            status=200,
+        )
+        responses.add(
+            method=responses.POST,
+            url=self.repo_api_url + "/git/tags",
+            json=self._get_expected_tag(
+                "release/1.0", "21e04cfe480f5293e2f7103eee8a5cbdb94f7982"
+            ),
+            status=201,
+        )
+        responses.add(
+            method=responses.POST,
+            url=self.repo_api_url + "/git/refs",
+            json={},
+            status=201,
+        )
+        responses.add(
+            method=responses.POST,
+            url=self.repo_api_url + "/releases",
+            json=self._get_expected_release("release"),
+            status=201,
+        )
+
+        task = CreateRelease(
+            self.project_config,
+            TaskConfig(
+                {
+                    "options": {
+                        "version": "1.0",
+                        "version_id": "04t000000000000",
+                        "ancestor_id": None,
+                        "package_type": "2GP",
+                        "tag_prefix": "release/",
+                    }
+                }
+            ),
+        )
+        task()
+        tag_request = json.loads(responses.calls._calls[4].request.body)
+        message = tag_request["message"]
+        assert "ancestor_id: \n\npackage_type: 2GP" in message
 
     @responses.activate
     def test_run_task__release_already_exists(self):
