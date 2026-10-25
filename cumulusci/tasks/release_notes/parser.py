@@ -196,7 +196,7 @@ class InstallLinkParser(ChangeNotesLinesParser):
                 "Sandbox & Scratch Orgs:",
                 f"{SANDBOX_LOGIN_URL}/packaging/installPackage.apexp?p0={version_id}",
                 "",
-                "Production & Developer Edition Orgs:",
+                "Production & Developer Edition Orgs(Applicable only for released pckaged):",
                 f"{PROD_LOGIN_URL}/packaging/installPackage.apexp?p0={version_id}",
             ]
 

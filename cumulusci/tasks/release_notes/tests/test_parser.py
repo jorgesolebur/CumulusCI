@@ -593,7 +593,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
+            f"""# Title\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
             == parser.render()
         )
 
@@ -610,7 +610,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
+            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
             == parser.render()
         )
 
@@ -626,7 +626,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
+            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
             == parser.render()
         )
 
@@ -642,7 +642,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\n## Push Schedule\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
+            f"""# Title\r\n\r\n## Push Schedule\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}"""
             == parser.render()
         )
 
@@ -658,7 +658,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
+            f"""# Title\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
             == parser.render()
         )
 
@@ -674,7 +674,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
+            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\nProduction orgs: {generator.production_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
             == parser.render()
         )
 
@@ -690,7 +690,7 @@ class TestInstallLinkParser:
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
         assert (
-            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
+            f"""# Title\r\n\r\n## Push Schedule\r\nSandbox orgs: {generator.sandbox_date}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
             == parser.render()
         )
 
@@ -705,7 +705,7 @@ class TestInstallLinkParser:
         parser = InstallLinkParser(generator, "Title")
         parser.parse("abc")
         version_id = urllib.parse.quote_plus(generator.version_id)
-        assert f"""# Title\r\n\r\n## Push Schedule\r\nProduction orgs: {generator.production_date}\r\n\r\n\r\nProduction & Developer Edition Orgs:\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
+        assert f"""# Title\r\n\r\n## Push Schedule\r\nProduction orgs: {generator.production_date}\r\n\r\n\r\nProduction & Developer Edition Orgs(Applicable only for released pckaged):\r\nhttps://login.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\nSandbox & Scratch Orgs:\r\nhttps://test.salesforce.com/packaging/installPackage.apexp?p0={version_id}\r\n\r\n## Trialforce Template ID\r\n`TBD`"""
 
     def test_package_no_version_id_sandbox_date_no_trial(self):
         generator = mock.Mock(
